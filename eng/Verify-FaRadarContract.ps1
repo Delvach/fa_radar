@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.5"',
+        'private const string Version = "0.1.6"',
         "GetSelectedAtom()",
         "lookCamera",
         "CreateSphereMesh",
@@ -42,6 +42,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Flatten Target Y",
         "Unified Sphere Treatment",
         "World Axis Align",
+        "Ground Axis Lock",
+        'new JSONStorableBool("Ground Axis Lock", true)',
+        'new JSONStorableBool("Flatten Target Y", false)',
         "Grid Follows User",
         "Grid Clip Circle",
         'new JSONStorableFloat("HUD Offset X", -0.59f',
@@ -65,6 +68,13 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "ringZMaterial",
         "CreateSphereShellMaterial",
         "AddClippedGridLine",
+        "ResolveAxisLocalRotation",
+        "ResolveGroundAxisWorldRotation",
+        "Quaternion.Inverse(radarRoot.transform.rotation)",
+        "ResolveTargetGroundRadarLocal",
+        "target.position - viewer.position",
+        'targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", axisRoot.transform',
+        'lastTargetGridDropObject = CreateMeshObject("FA Radar Last Target Grid Drop", axisRoot.transform',
         "ResolveWorldAxisYawDegrees",
         "UpdateAxisVisualRotation",
         "lastTargetBlipObject",
@@ -108,7 +118,7 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "FrameAngelRadar.dll",
-        "fa_radar.0.1.5.dll",
+        "fa_radar.0.1.6.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -143,11 +153,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.5") {
-        Add-Failure "Version config must declare version 0.1.5."
+    if ($version.version -ne "0.1.6") {
+        Add-Failure "Version config must declare version 0.1.6."
     }
-    if ($version.branch -ne "codex/0.1.5-unified-sphere-grid") {
-        Add-Failure "Version config branch must match codex/0.1.5-unified-sphere-grid."
+    if ($version.branch -ne "codex/0.1.6-ground-axis-grid") {
+        Add-Failure "Version config branch must match codex/0.1.6-ground-axis-grid."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -181,7 +191,7 @@ foreach ($file in $unityFiles) {
 if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
-        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.5.dll"
+        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.6.dll"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
         if (-not (Test-Path -LiteralPath $deployedDll -PathType Leaf)) {
             Add-Failure "Live radar DLL was not deployed: $deployedDll"
