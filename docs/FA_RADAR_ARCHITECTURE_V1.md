@@ -10,11 +10,11 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.5` on branch
-  `codex/0.1.5-unified-sphere-grid`.
+- Version: `0.1.6` on branch
+  `codex/0.1.6-ground-axis-grid`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as a compiled VaM plugin DLL:
-  `Custom/Plugins/fa_radar.0.1.5.dll`.
+  `Custom/Plugins/fa_radar.0.1.6.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -22,7 +22,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.5` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.6` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -31,13 +31,14 @@ polygons so targeting can be tested before any art polish:
   with low emission so the shell reads round without becoming attention-grabbing
 - three cached annulus meshes tied to the world-axis visual root
 - distinct, subdued X/Z ring colors for axis readability
-- faded meter grid centered through the sphere at user `y=0`
+- faded meter grid centered through the sphere on the actual world X/Z ground
+  plane
 - grid lines clipped to the radar circle
 - grid panning from viewer world X/Z movement when `Grid Follows User` is on,
   including corrected forward/backward Z direction
 - green center marker for the user
-- orange selected-atom sphere plus a faded centered grid drop marker
-- faded orange last-selected sphere plus a faded centered grid drop marker
+- orange selected-atom sphere plus a faded world-ground grid drop marker
+- faded orange last-selected sphere plus a faded world-ground grid drop marker
 
 The selected atom is resolved with
 `SuperController.singleton.GetSelectedAtom()` on a configurable poll interval.
@@ -46,15 +47,17 @@ The target position is converted through the current look camera with
 Meters` and clamped to the unit sphere. This makes the marker represent the
 selected item relative to the user's current HUD POV.
 
-`Flatten Target Y` maps viewer-local `x/z` onto the radar plane and ignores
-vertical `y` for marker position. This keeps the user at sphere/grid center and
-treats the radar as a world X/Z meter read even when the dish is tilted in the
-HUD.
+By default the selected marker uses all three viewer-local axes. `Flatten Target
+Y` remains available as a test toggle when a stricter X/Z desktop read is more
+useful than height/depth representation.
 
-`World Axis Align` rotates the grid/ring visual root from the viewer's yaw, so
-world X/Z axes rotate relative to the player's current POV instead of staying
-screen-locked. Markers remain POV-relative; the grid and rings provide the
-world-axis reference underneath them.
+`World Axis Align` controls the grid/ring visual root. With the default `Ground
+Axis Lock` enabled, the axis root is counter-rotated from the HUD/dish so its
+world rotation matches real world XYZ. This keeps the meter grid on the actual
+ground X/Z plane for desktop and VR and prevents camera roll from rolling the
+radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
+is available for VR comparison. Markers remain POV-relative; grid-drop markers
+are projected onto the ground-axis root from target world X/Z delta.
 
 `Grid Follows User` uses the viewer's world X/Z position to offset the meter
 grid before it is clipped into the radar circle. A 1m movement along world Z
@@ -78,6 +81,7 @@ Placement uses a saved local offset:
 - `View Yaw Offset`
 - `Desktop Tilt Degrees`
 - `Axis Yaw Offset`
+- `Ground Axis Lock`
 - `Grid Follows User`
 - `Grid Clip Circle`
 
@@ -106,8 +110,8 @@ works through the offset sliders and reset button.
 `scripts/Deploy-FaRadar.ps1` is the future deploy helper. Its default targets
 are direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.5.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.5.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.6.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.6.dll`
 
 The operator clarified that deploy instructions are forward-looking for now,
 so this branch should not be treated as live-deployed until a receipt proves

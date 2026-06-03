@@ -3,7 +3,7 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.5`.
+Current branch version: `0.1.6`.
 
 The current slice is compiled C# only:
 
@@ -18,6 +18,8 @@ The current slice is compiled C# only:
 - unified desktop/VR sphere-grid treatment
 - camera-local anchoring to reduce desktop navigation jitter
 - optional world-axis alignment for the grid and rings
+- ground-axis lock so the grid represents real world X/Z and camera roll does
+  not roll the radar Z axis
 - circular-clipped grid centered with the sphere and panned from user world X/Z movement
 - selected-atom and faded last-selected sphere markers
 
@@ -40,8 +42,8 @@ each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.5.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.5.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.6.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.6.dll`
 
 The operator clarified these are instructions for going forward; this branch is
 not live-deployed unless a deploy receipt says so.

@@ -3,7 +3,7 @@ param(
     [string]$VamRoot = "",
     [string]$RepoRoot = "",
     [string]$VamManagedDir = "",
-    [string]$PluginFileName = "fa_radar.0.1.5.dll",
+    [string]$PluginFileName = "fa_radar.0.1.6.dll",
     [string]$Configuration = "Release",
     [switch]$SkipBuild,
     [switch]$KeepLegacyLooseScript
@@ -179,7 +179,7 @@ $receipt = [ordered]@{
     repoRoot = $resolvedRepoRoot
     branch = $gitBranch
     commit = $gitCommit
-    version = "0.1.5"
+    version = "0.1.6"
     source = $source
     csharpCompiler = $csc
     vamManagedDir = $VamManagedDir

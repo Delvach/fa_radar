@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.5";
+    private const string Version = "0.1.6";
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -26,6 +26,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool desktopTopDownField;
     private JSONStorableBool flatDesktopCircleField;
     private JSONStorableBool worldAxisAlignField;
+    private JSONStorableBool groundAxisLockField;
     private JSONStorableBool lastSelectedEnabledField;
 
     private JSONStorableFloat hudOffsetXField;
@@ -133,9 +134,10 @@ public class FrameAngelRadar : MVRScript
         gridFollowsUserField = new JSONStorableBool("Grid Follows User", true);
         gridClipCircleField = new JSONStorableBool("Grid Clip Circle", true);
         anchorToViewField = new JSONStorableBool("Anchor To View", true);
-        desktopTopDownField = new JSONStorableBool("Flatten Target Y", true);
+        desktopTopDownField = new JSONStorableBool("Flatten Target Y", false);
         flatDesktopCircleField = new JSONStorableBool("Flat Desktop Circle", false);
         worldAxisAlignField = new JSONStorableBool("World Axis Align", true);
+        groundAxisLockField = new JSONStorableBool("Ground Axis Lock", true);
         lastSelectedEnabledField = new JSONStorableBool("Last Selected Enabled", true);
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
@@ -172,6 +174,7 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(desktopTopDownField);
         RegisterBool(flatDesktopCircleField);
         RegisterBool(worldAxisAlignField);
+        RegisterBool(groundAxisLockField);
         RegisterBool(lastSelectedEnabledField);
 
         RegisterFloat(hudOffsetXField);
@@ -208,6 +211,7 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(anchorToViewField, false);
         CreateToggle(lastSelectedEnabledField, true);
         CreateToggle(worldAxisAlignField, true);
+        CreateToggle(groundAxisLockField, false);
         CreateToggle(ringsEnabledField, false);
         CreateToggle(gridEnabledField, true);
         CreateToggle(gridFollowsUserField, false);
@@ -292,9 +296,9 @@ public class FrameAngelRadar : MVRScript
 
         centerMarkerObject = CreateMeshObject("FA Radar User Center", radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
         targetBlipObject = CreateMeshObject("FA Radar Target Blip", radarRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", radarRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
+        targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", axisRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
         lastTargetBlipObject = CreateMeshObject("FA Radar Last Target Blip", radarRoot.transform, targetBlipMesh, lastTargetMaterial, MarkerRenderQueue, MarkerSortingOrder - 2);
-        lastTargetGridDropObject = CreateMeshObject("FA Radar Last Target Grid Drop", radarRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
+        lastTargetGridDropObject = CreateMeshObject("FA Radar Last Target Grid Drop", axisRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
 
         ringObjects = new GameObject[3];
         ringBaseRotations = new Quaternion[3];
@@ -489,10 +493,30 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        float yaw = worldAxisAlignField.val ? ResolveWorldAxisYawDegrees(viewer) : 0.0f;
         axisRoot.transform.localPosition = Vector3.zero;
-        axisRoot.transform.localRotation = Quaternion.AngleAxis(yaw + axisYawOffsetField.val, Vector3.up);
+        axisRoot.transform.localRotation = ResolveAxisLocalRotation(viewer);
         axisRoot.transform.localScale = Vector3.one;
+    }
+
+    private Quaternion ResolveAxisLocalRotation(Transform viewer)
+    {
+        if (!worldAxisAlignField.val)
+        {
+            return Quaternion.identity;
+        }
+
+        if (groundAxisLockField.val && radarRoot != null)
+        {
+            return Quaternion.Inverse(radarRoot.transform.rotation) * ResolveGroundAxisWorldRotation();
+        }
+
+        float yaw = ResolveWorldAxisYawDegrees(viewer);
+        return Quaternion.AngleAxis(yaw + axisYawOffsetField.val, Vector3.up);
+    }
+
+    private Quaternion ResolveGroundAxisWorldRotation()
+    {
+        return Quaternion.AngleAxis(axisYawOffsetField.val, Vector3.up);
     }
 
     private float ResolveWorldAxisYawDegrees(Transform viewer)
@@ -567,15 +591,16 @@ public class FrameAngelRadar : MVRScript
     {
         float visualRadius = ResolveVisualRadius();
         Vector3 radarLocal = ResolveTargetRadarLocal(viewer, target);
+        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, target);
         float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val);
         float spin = Time.time * Mathf.Max(12.0f, ringRotationSpeedField.val * 1.75f);
 
         PositionTargetSphere(targetBlipObject, radarLocal, visualRadius, markerScale, spin);
 
         targetGridDropObject.transform.localPosition = new Vector3(
-            radarLocal.x * visualRadius,
+            groundLocal.x * visualRadius,
             0.0f,
-            radarLocal.z * visualRadius);
+            groundLocal.z * visualRadius);
         targetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, spin, 0.0f);
         targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
 
@@ -614,15 +639,16 @@ public class FrameAngelRadar : MVRScript
 
         float visualRadius = ResolveVisualRadius();
         Vector3 radarLocal = ResolveTargetRadarLocal(viewer, lastTarget);
+        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, lastTarget);
         float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * 0.82f;
         float spin = Time.time * Mathf.Max(10.0f, ringRotationSpeedField.val);
 
         PositionTargetSphere(lastTargetBlipObject, radarLocal, visualRadius, markerScale, -spin);
 
         lastTargetGridDropObject.transform.localPosition = new Vector3(
-            radarLocal.x * visualRadius,
+            groundLocal.x * visualRadius,
             0.0f,
-            radarLocal.z * visualRadius);
+            groundLocal.z * visualRadius);
         lastTargetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, -spin, 0.0f);
         lastTargetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.50f);
     }
@@ -658,6 +684,24 @@ public class FrameAngelRadar : MVRScript
             radarLocal = meterLocal / range;
         }
 
+        if (radarLocal.sqrMagnitude > 1.0f)
+        {
+            radarLocal.Normalize();
+        }
+
+        return radarLocal;
+    }
+
+    private Vector3 ResolveTargetGroundRadarLocal(Transform viewer, Transform target)
+    {
+        if (viewer == null || target == null)
+        {
+            return Vector3.zero;
+        }
+
+        Vector3 worldDelta = target.position - viewer.position;
+        float range = Mathf.Max(0.25f, radarRangeMetersField.val);
+        Vector3 radarLocal = new Vector3(worldDelta.x, 0.0f, worldDelta.z) / range;
         if (radarLocal.sqrMagnitude > 1.0f)
         {
             radarLocal.Normalize();
