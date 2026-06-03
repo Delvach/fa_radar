@@ -1,0 +1,23 @@
+# Local/editor
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Build/test output
+bin/
+obj/
+dist/
+out/
+tmp/
+build/bin/
+*.log
+
+# Unity projects are intentionally out of scope for this repo.
+Assets/
+Library/
+Logs/
+Packages/
+ProjectSettings/
+Temp/
+UserSettings/

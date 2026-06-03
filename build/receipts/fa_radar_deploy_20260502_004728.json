@@ -1,0 +1,15 @@
+﻿{
+    "schemaVersion":  "fa_radar_deploy_receipt_v1",
+    "createdAtUtc":  "2026-05-02T06:47:28.5324084Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "vamRoot":  "F:\\sim\\vam",
+    "source":  "C:\\projects\\fa_radar\\payload\\Custom\\Scripts\\FrameAngel\\Radar\\FrameAngelRadar.cs",
+    "csharpCompiler":  "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "builtDll":  "C:\\projects\\fa_radar\\build\\bin\\Release\\FrameAngelRadar.dll",
+    "deployedDll":  "F:\\sim\\vam\\Custom\\Plugins\\FrameAngel\\Radar\\fa_radar.0.1.0.dll",
+    "pluginFileName":  "fa_radar.0.1.0.dll",
+    "skipBuild":  false,
+    "legacyLooseScript":  "F:\\sim\\vam\\Custom\\Scripts\\FrameAngel\\Radar\\FrameAngelRadar.cs",
+    "archivedLegacyScript":  "F:\\sim\\vam\\Custom\\PluginData\\FrameAngel\\Radar\\Rejected\\20260502_004728_legacy_loose_script\\FrameAngelRadar.cs"
+}
