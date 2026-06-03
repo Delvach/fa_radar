@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.4";
+    private const string Version = "0.1.5";
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -75,6 +75,8 @@ public class FrameAngelRadar : MVRScript
 
     private Material shellMaterial;
     private Material ringMaterial;
+    private Material ringXMaterial;
+    private Material ringZMaterial;
     private Material gridMaterial;
     private Material centerMaterial;
     private Material targetMaterial;
@@ -131,20 +133,20 @@ public class FrameAngelRadar : MVRScript
         gridFollowsUserField = new JSONStorableBool("Grid Follows User", true);
         gridClipCircleField = new JSONStorableBool("Grid Clip Circle", true);
         anchorToViewField = new JSONStorableBool("Anchor To View", true);
-        desktopTopDownField = new JSONStorableBool("Desktop Top Down", true);
-        flatDesktopCircleField = new JSONStorableBool("Flat Desktop Circle", true);
+        desktopTopDownField = new JSONStorableBool("Flatten Target Y", true);
+        flatDesktopCircleField = new JSONStorableBool("Flat Desktop Circle", false);
         worldAxisAlignField = new JSONStorableBool("World Axis Align", true);
         lastSelectedEnabledField = new JSONStorableBool("Last Selected Enabled", true);
 
-        hudOffsetXField = new JSONStorableFloat("HUD Offset X", 0.32f, -1.0f, 1.0f, true, true);
-        hudOffsetYField = new JSONStorableFloat("HUD Offset Y", -0.24f, -1.0f, 1.0f, true, true);
+        hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
+        hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
         hudOffsetZField = new JSONStorableFloat("HUD Offset Z", 0.78f, 0.15f, 1.5f, true, true);
-        hudScaleField = new JSONStorableFloat("HUD Scale", 1.0f, 0.25f, 3.0f, true, true);
+        hudScaleField = new JSONStorableFloat("HUD Scale", 0.49f, 0.25f, 3.0f, true, true);
         viewYawOffsetField = new JSONStorableFloat("View Yaw Offset", 0.0f, -180.0f, 180.0f, true, true);
         desktopTiltDegreesField = new JSONStorableFloat("Desktop Tilt Degrees", 90.0f, 0.0f, 90.0f, true, true);
         axisYawOffsetField = new JSONStorableFloat("Axis Yaw Offset", 0.0f, -180.0f, 180.0f, true, true);
         radarRangeMetersField = new JSONStorableFloat("Radar Range Meters", 5.0f, 0.5f, 30.0f, true, true);
-        radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", 0.075f, 0.025f, 0.25f, true, true);
+        radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", 0.08f, 0.025f, 0.25f, true, true);
         gridStepMetersField = new JSONStorableFloat("Grid Step Meters", 1.0f, 0.25f, 5.0f, true, true);
         shellAlphaField = new JSONStorableFloat("Sphere Alpha", 0.09f, 0.0f, 0.45f, true, true);
         ringAlphaField = new JSONStorableFloat("Ring Alpha", 0.34f, 0.02f, 0.9f, true, true);
@@ -152,7 +154,7 @@ public class FrameAngelRadar : MVRScript
         markerAlphaField = new JSONStorableFloat("Marker Alpha", 0.9f, 0.1f, 1.0f, true, true);
         emissionStrengthField = new JSONStorableFloat("Emission Strength", 1.4f, 0.0f, 4.0f, true, true);
         ringRotationSpeedField = new JSONStorableFloat("Ring Rotation Speed", 18.0f, 0.0f, 90.0f, true, true);
-        targetMarkerScaleField = new JSONStorableFloat("Target Marker Scale", 0.085f, 0.025f, 0.25f, true, true);
+        targetMarkerScaleField = new JSONStorableFloat("Target Marker Scale", 0.09f, 0.025f, 0.25f, true, true);
         lastSelectedFadeSecondsField = new JSONStorableFloat("Last Selected Fade Seconds", 12.0f, 1.0f, 60.0f, true, true);
         pollIntervalField = new JSONStorableFloat("Selection Poll Seconds", 0.15f, 0.03f, 1.0f, true, true);
         responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.0f, 0.0f, 1.0f, true, true);
@@ -205,7 +207,6 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(desktopTopDownField, true);
         CreateToggle(anchorToViewField, false);
         CreateToggle(lastSelectedEnabledField, true);
-        CreateToggle(flatDesktopCircleField, false);
         CreateToggle(worldAxisAlignField, true);
         CreateToggle(ringsEnabledField, false);
         CreateToggle(gridEnabledField, true);
@@ -255,8 +256,10 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        shellMaterial = CreateEmissiveOverlayMaterial("FA Radar Sphere Material", new Color(0.20f, 0.72f, 1.0f, 0.09f), ShellRenderQueue);
+        shellMaterial = CreateSphereShellMaterial("FA Radar Sphere Material", new Color(0.16f, 0.64f, 0.92f, 0.10f), ShellRenderQueue);
         ringMaterial = CreateEmissiveOverlayMaterial("FA Radar Ring Material", new Color(0.25f, 0.90f, 1.0f, 0.34f), RingRenderQueue);
+        ringXMaterial = CreateEmissiveOverlayMaterial("FA Radar X Ring Material", new Color(0.35f, 0.96f, 0.76f, 0.34f), RingRenderQueue);
+        ringZMaterial = CreateEmissiveOverlayMaterial("FA Radar Z Ring Material", new Color(0.38f, 0.62f, 1.0f, 0.34f), RingRenderQueue);
         gridMaterial = CreateEmissiveOverlayMaterial("FA Radar Grid Material", new Color(0.55f, 0.95f, 1.0f, 0.16f), GridRenderQueue);
         centerMaterial = CreateEmissiveOverlayMaterial("FA Radar Center Material", new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
         targetMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Material", new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
@@ -299,8 +302,8 @@ public class FrameAngelRadar : MVRScript
         ringBaseRotations[1] = Quaternion.Euler(90.0f, 0.0f, 0.0f);
         ringBaseRotations[2] = Quaternion.Euler(0.0f, 90.0f, 0.0f);
         ringObjects[0] = CreateMeshObject("FA Radar Ring XY", axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[1] = CreateMeshObject("FA Radar Ring XZ", axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[2] = CreateMeshObject("FA Radar Ring YZ", axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[1] = CreateMeshObject("FA Radar Ring XZ", axisRoot.transform, ringMesh, ringXMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[2] = CreateMeshObject("FA Radar Ring YZ", axisRoot.transform, ringMesh, ringZMaterial, RingRenderQueue, RingSortingOrder);
 
         SetActiveIfChanged(hudRoot, false);
         SetActiveIfChanged(targetBlipObject, false);
@@ -427,7 +430,7 @@ public class FrameAngelRadar : MVRScript
         float visualRadius = ResolveVisualRadius();
         float scaledMarker = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val);
         bool flatDesktop = IsFlatDesktopCircleActive();
-        float ringTime = flatDesktop ? 0.0f : Time.time * Mathf.Max(0.0f, ringRotationSpeedField.val);
+        float ringTime = Time.time * Mathf.Max(0.0f, ringRotationSpeedField.val);
 
         ApplyHudAnchor(viewer);
 
@@ -468,14 +471,15 @@ public class FrameAngelRadar : MVRScript
             ring.transform.localPosition = Vector3.zero;
             ring.transform.localRotation = ringBaseRotations[i] * spin;
             ring.transform.localScale = Vector3.one * (visualRadius * 1.015f);
-            bool showRing = ringsEnabledField.val && (!flatDesktop || i == 0);
+            bool showRing = ringsEnabledField.val;
             SetActiveIfChanged(ring, showRing);
         }
     }
 
     private bool IsFlatDesktopCircleActive()
     {
-        return desktopTopDownField.val && flatDesktopCircleField.val;
+        // Unified Sphere Treatment keeps desktop and VR on the same generated sphere/grid treatment.
+        return false;
     }
 
     private void UpdateAxisVisualRotation(Transform viewer)
@@ -570,7 +574,7 @@ public class FrameAngelRadar : MVRScript
 
         targetGridDropObject.transform.localPosition = new Vector3(
             radarLocal.x * visualRadius,
-            -visualRadius * 1.08f,
+            0.0f,
             radarLocal.z * visualRadius);
         targetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, spin, 0.0f);
         targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
@@ -617,7 +621,7 @@ public class FrameAngelRadar : MVRScript
 
         lastTargetGridDropObject.transform.localPosition = new Vector3(
             radarLocal.x * visualRadius,
-            -visualRadius * 1.08f,
+            0.0f,
             radarLocal.z * visualRadius);
         lastTargetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, -spin, 0.0f);
         lastTargetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.50f);
@@ -709,7 +713,7 @@ public class FrameAngelRadar : MVRScript
         Vector3 worldPosition = viewer.position;
         return new Vector2(
             -PositiveModulo(worldPosition.x, safeStep),
-            -PositiveModulo(worldPosition.z, safeStep));
+            PositiveModulo(worldPosition.z, safeStep));
     }
 
     private float PositiveModulo(float value, float modulus)
@@ -776,8 +780,10 @@ public class FrameAngelRadar : MVRScript
     private void UpdateMaterials()
     {
         float emission = Mathf.Max(0.0f, emissionStrengthField.val);
-        ApplyMaterialColor(shellMaterial, new Color(0.18f, 0.70f, 1.0f, Mathf.Clamp01(shellAlphaField.val)), emission);
+        ApplyMaterialColor(shellMaterial, new Color(0.14f, 0.58f, 0.86f, Mathf.Clamp01(shellAlphaField.val)), emission * 0.55f);
         ApplyMaterialColor(ringMaterial, new Color(0.18f, 0.92f, 1.0f, Mathf.Clamp01(ringAlphaField.val)), emission);
+        ApplyMaterialColor(ringXMaterial, new Color(0.28f, 0.96f, 0.72f, Mathf.Clamp01(ringAlphaField.val)), emission);
+        ApplyMaterialColor(ringZMaterial, new Color(0.36f, 0.62f, 1.0f, Mathf.Clamp01(ringAlphaField.val)), emission);
         ApplyMaterialColor(gridMaterial, new Color(0.48f, 0.95f, 1.0f, Mathf.Clamp01(gridAlphaField.val)), emission);
         ApplyMaterialColor(centerMaterial, new Color(0.38f, 1.0f, 0.60f, Mathf.Clamp01(markerAlphaField.val)), emission);
         ApplyMaterialColor(targetMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val)), emission);
@@ -805,6 +811,37 @@ public class FrameAngelRadar : MVRScript
         Material material = new Material(shader);
         material.name = materialName;
         ApplyMaterialColor(material, color, 1.0f);
+        ApplyOverlayMaterialSettings(material, renderQueue);
+        return material;
+    }
+
+    private Material CreateSphereShellMaterial(string materialName, Color color, int renderQueue)
+    {
+        Shader shader = Shader.Find("Standard");
+        if (shader == null)
+        {
+            shader = Shader.Find("Hidden/Internal-Colored");
+        }
+        if (shader == null)
+        {
+            shader = Shader.Find("Unlit/Color");
+        }
+        if (shader == null)
+        {
+            shader = Shader.Find("Diffuse");
+        }
+
+        Material material = new Material(shader);
+        material.name = materialName;
+        ApplyMaterialColor(material, color, 0.45f);
+        if (material.HasProperty("_Glossiness"))
+        {
+            material.SetFloat("_Glossiness", 0.32f);
+        }
+        if (material.HasProperty("_Metallic"))
+        {
+            material.SetFloat("_Metallic", 0.0f);
+        }
         ApplyOverlayMaterialSettings(material, renderQueue);
         return material;
     }
@@ -1009,7 +1046,7 @@ public class FrameAngelRadar : MVRScript
         float safeStep = Mathf.Max(0.05f, stepMeters);
         int stepCount = Mathf.Clamp(Mathf.CeilToInt(safeRange / safeStep) + 2, 1, 32);
         float lineHalfWidth = 0.006f;
-        float gridY = -1.08f;
+        float gridY = 0.0f;
 
         Mesh mesh = new Mesh();
         mesh.name = "FA Radar Panning Clipped Meter Grid Mesh";
@@ -1148,7 +1185,7 @@ public class FrameAngelRadar : MVRScript
 
     private void ResetHudOffset()
     {
-        SetHudOffset(new Vector3(0.32f, -0.24f, 0.78f));
+        SetHudOffset(new Vector3(-0.59f, 0.22f, 0.78f));
         haveSmoothedHudPosition = false;
         SetStatus("HUD offset reset.");
     }
@@ -1197,6 +1234,8 @@ public class FrameAngelRadar : MVRScript
 
         DestroyOwnedObject(shellMaterial);
         DestroyOwnedObject(ringMaterial);
+        DestroyOwnedObject(ringXMaterial);
+        DestroyOwnedObject(ringZMaterial);
         DestroyOwnedObject(gridMaterial);
         DestroyOwnedObject(centerMaterial);
         DestroyOwnedObject(targetMaterial);
@@ -1205,6 +1244,8 @@ public class FrameAngelRadar : MVRScript
         DestroyOwnedObject(lastTargetDropMaterial);
         shellMaterial = null;
         ringMaterial = null;
+        ringXMaterial = null;
+        ringZMaterial = null;
         gridMaterial = null;
         centerMaterial = null;
         targetMaterial = null;
