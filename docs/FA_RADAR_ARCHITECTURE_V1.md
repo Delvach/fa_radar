@@ -10,11 +10,11 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.2` on branch
-  `codex/0.1.2-desktop-anchor-targets`.
+- Version: `0.1.3` on branch
+  `codex/0.1.3-flat-axis-radar`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as a compiled VaM plugin DLL:
-  `Custom/Plugins/fa_radar.0.1.2.dll`.
+  `Custom/Plugins/fa_radar.0.1.3.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -22,11 +22,12 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.2` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.3` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
-- translucent sphere shell
-- three cached annulus meshes rotating on different axes
+- split shell treatment: flat desktop circle when `Desktop Top Down` and
+  `Flat Desktop Circle` are enabled, sphere shell for VR/3D treatment
+- three cached annulus meshes tied to the world-axis visual root
 - faded meter grid under the sphere
 - green center marker for the user
 - orange selected-atom sphere plus a faded grid drop marker
@@ -42,6 +43,11 @@ selected item relative to the user's current HUD POV.
 For desktop testing, `Desktop Top Down` maps viewer-local `x/z` onto the radar
 plane and ignores vertical `y` for the marker position. This gives a smaller
 2D top-down read while preserving the same selected-atom source.
+
+`World Axis Align` rotates the grid/ring visual root from the viewer's yaw, so
+world X/Z axes rotate relative to the player's current POV instead of staying
+screen-locked. Markers remain POV-relative; the grid and rings provide the
+world-axis reference underneath them.
 
 ## HUD Placement
 
@@ -59,6 +65,7 @@ Placement uses a saved local offset:
 - `HUD Scale`
 - `View Yaw Offset`
 - `Desktop Tilt Degrees`
+- `Axis Yaw Offset`
 
 When the plugin is loaded on a movable atom, `Placement Mode` can capture that
 atom's current position relative to the look camera. Scene/session use still
@@ -69,9 +76,10 @@ works through the offset sliders and reset button.
 - Meshes and materials are created once and destroyed with the plugin.
 - Selection is polled on `Selection Poll Seconds`; there is no per-frame atom
   scan.
-- Per-frame work is selected target transform, small vector math, ring rotation,
-  and active-state diffs. In anchored mode the HUD position/rotation are local
-  to the camera instead of smoothed through world space.
+- Per-frame work is selected target transform, small vector math, world-axis
+  yaw resolution, optional ring rotation, and active-state diffs. In anchored
+  mode the HUD position/rotation are local to the camera instead of smoothed
+  through world space.
 - Grid mesh rebuilds only when `Radar Range Meters` or `Grid Step Meters`
   changes.
 - Materials use the FA Keyboard-inspired overlay pattern:
@@ -83,8 +91,8 @@ works through the offset sliders and reset button.
 `scripts/Deploy-FaRadar.ps1` is the future deploy helper. Its default targets
 are direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.2.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.2.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.3.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.3.dll`
 
 The operator clarified that deploy instructions are forward-looking for now,
 so this branch should not be treated as live-deployed until a receipt proves
