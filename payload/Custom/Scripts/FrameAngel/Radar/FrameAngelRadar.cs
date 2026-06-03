@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.1";
+    private const string Version = "0.1.2";
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -20,11 +20,16 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool placementModeField;
     private JSONStorableBool ringsEnabledField;
     private JSONStorableBool gridEnabledField;
+    private JSONStorableBool anchorToViewField;
+    private JSONStorableBool desktopTopDownField;
+    private JSONStorableBool lastSelectedEnabledField;
 
     private JSONStorableFloat hudOffsetXField;
     private JSONStorableFloat hudOffsetYField;
     private JSONStorableFloat hudOffsetZField;
     private JSONStorableFloat hudScaleField;
+    private JSONStorableFloat viewYawOffsetField;
+    private JSONStorableFloat desktopTiltDegreesField;
     private JSONStorableFloat radarRangeMetersField;
     private JSONStorableFloat radarVisualRadiusField;
     private JSONStorableFloat gridStepMetersField;
@@ -35,17 +40,21 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat emissionStrengthField;
     private JSONStorableFloat ringRotationSpeedField;
     private JSONStorableFloat targetMarkerScaleField;
+    private JSONStorableFloat lastSelectedFadeSecondsField;
     private JSONStorableFloat pollIntervalField;
     private JSONStorableFloat responseSmoothingField;
 
     private JSONStorableString statusField;
 
     private GameObject hudRoot;
+    private GameObject radarRoot;
     private GameObject sphereObject;
     private GameObject gridObject;
     private GameObject centerMarkerObject;
     private GameObject targetBlipObject;
     private GameObject targetGridDropObject;
+    private GameObject lastTargetBlipObject;
+    private GameObject lastTargetGridDropObject;
     private GameObject[] ringObjects;
     private Quaternion[] ringBaseRotations;
     private MeshFilter gridFilter;
@@ -62,15 +71,21 @@ public class FrameAngelRadar : MVRScript
     private Material centerMaterial;
     private Material targetMaterial;
     private Material targetDropMaterial;
+    private Material lastTargetMaterial;
+    private Material lastTargetDropMaterial;
 
     private Atom selectedAtom;
+    private Atom lastSelectedAtom;
     private string selectedUid = "";
+    private string lastSelectedUid = "";
     private float nextSelectionPollTime;
+    private float lastSelectedAtTime = -1000.0f;
     private float lastGridRangeMeters = -1.0f;
     private float lastGridStepMeters = -1.0f;
     private bool visualsReady;
     private bool haveSmoothedHudPosition;
     private Vector3 smoothedHudPosition;
+    private Transform currentHudAnchor;
 
     public override void Init()
     {
@@ -102,13 +117,18 @@ public class FrameAngelRadar : MVRScript
         placementModeField = new JSONStorableBool("Placement Mode", false);
         ringsEnabledField = new JSONStorableBool("Rings Enabled", true);
         gridEnabledField = new JSONStorableBool("Grid Enabled", true);
+        anchorToViewField = new JSONStorableBool("Anchor To View", true);
+        desktopTopDownField = new JSONStorableBool("Desktop Top Down", true);
+        lastSelectedEnabledField = new JSONStorableBool("Last Selected Enabled", true);
 
-        hudOffsetXField = new JSONStorableFloat("HUD Offset X", 0.28f, -1.5f, 1.5f, true, true);
-        hudOffsetYField = new JSONStorableFloat("HUD Offset Y", -0.18f, -1.0f, 1.0f, true, true);
-        hudOffsetZField = new JSONStorableFloat("HUD Offset Z", 0.75f, 0.2f, 2.0f, true, true);
+        hudOffsetXField = new JSONStorableFloat("HUD Offset X", 0.32f, -1.0f, 1.0f, true, true);
+        hudOffsetYField = new JSONStorableFloat("HUD Offset Y", -0.24f, -1.0f, 1.0f, true, true);
+        hudOffsetZField = new JSONStorableFloat("HUD Offset Z", 0.78f, 0.15f, 1.5f, true, true);
         hudScaleField = new JSONStorableFloat("HUD Scale", 1.0f, 0.25f, 3.0f, true, true);
+        viewYawOffsetField = new JSONStorableFloat("View Yaw Offset", 0.0f, -180.0f, 180.0f, true, true);
+        desktopTiltDegreesField = new JSONStorableFloat("Desktop Tilt Degrees", 90.0f, 0.0f, 90.0f, true, true);
         radarRangeMetersField = new JSONStorableFloat("Radar Range Meters", 5.0f, 0.5f, 30.0f, true, true);
-        radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", 0.12f, 0.04f, 0.35f, true, true);
+        radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", 0.075f, 0.025f, 0.25f, true, true);
         gridStepMetersField = new JSONStorableFloat("Grid Step Meters", 1.0f, 0.25f, 5.0f, true, true);
         shellAlphaField = new JSONStorableFloat("Sphere Alpha", 0.09f, 0.0f, 0.45f, true, true);
         ringAlphaField = new JSONStorableFloat("Ring Alpha", 0.34f, 0.02f, 0.9f, true, true);
@@ -117,8 +137,9 @@ public class FrameAngelRadar : MVRScript
         emissionStrengthField = new JSONStorableFloat("Emission Strength", 1.4f, 0.0f, 4.0f, true, true);
         ringRotationSpeedField = new JSONStorableFloat("Ring Rotation Speed", 18.0f, 0.0f, 90.0f, true, true);
         targetMarkerScaleField = new JSONStorableFloat("Target Marker Scale", 0.085f, 0.025f, 0.25f, true, true);
+        lastSelectedFadeSecondsField = new JSONStorableFloat("Last Selected Fade Seconds", 12.0f, 1.0f, 60.0f, true, true);
         pollIntervalField = new JSONStorableFloat("Selection Poll Seconds", 0.15f, 0.03f, 1.0f, true, true);
-        responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.12f, 0.0f, 1.0f, true, true);
+        responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.0f, 0.0f, 1.0f, true, true);
 
         statusField = new JSONStorableString("Status", "");
 
@@ -127,11 +148,16 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(placementModeField);
         RegisterBool(ringsEnabledField);
         RegisterBool(gridEnabledField);
+        RegisterBool(anchorToViewField);
+        RegisterBool(desktopTopDownField);
+        RegisterBool(lastSelectedEnabledField);
 
         RegisterFloat(hudOffsetXField);
         RegisterFloat(hudOffsetYField);
         RegisterFloat(hudOffsetZField);
         RegisterFloat(hudScaleField);
+        RegisterFloat(viewYawOffsetField);
+        RegisterFloat(desktopTiltDegreesField);
         RegisterFloat(radarRangeMetersField);
         RegisterFloat(radarVisualRadiusField);
         RegisterFloat(gridStepMetersField);
@@ -142,6 +168,7 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(emissionStrengthField);
         RegisterFloat(ringRotationSpeedField);
         RegisterFloat(targetMarkerScaleField);
+        RegisterFloat(lastSelectedFadeSecondsField);
         RegisterFloat(pollIntervalField);
         RegisterFloat(responseSmoothingField);
 
@@ -154,8 +181,11 @@ public class FrameAngelRadar : MVRScript
     private void BuildUi()
     {
         CreateToggle(radarEnabledField, false);
+        CreateToggle(desktopTopDownField, true);
+        CreateToggle(anchorToViewField, false);
+        CreateToggle(lastSelectedEnabledField, true);
         CreateToggle(ringsEnabledField, false);
-        CreateToggle(gridEnabledField, false);
+        CreateToggle(gridEnabledField, true);
         CreateToggle(ignoreContainingAtomField, false);
         CreateTextField(statusField, true);
 
@@ -163,11 +193,13 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(gridStepMetersField, true);
         CreateSlider(radarVisualRadiusField, false);
         CreateSlider(hudScaleField, true);
-        CreateSlider(responseSmoothingField, false);
 
-        CreateSlider(hudOffsetXField, true);
+        CreateSlider(hudOffsetXField, false);
         CreateSlider(hudOffsetYField, true);
-        CreateSlider(hudOffsetZField, true);
+        CreateSlider(hudOffsetZField, false);
+        CreateSlider(viewYawOffsetField, true);
+        CreateSlider(desktopTiltDegreesField, false);
+        CreateSlider(responseSmoothingField, true);
 
         CreateToggle(placementModeField, false);
         CreateButton("Capture HUD Offset From Atom", false).button.onClick.AddListener(delegate
@@ -181,6 +213,7 @@ public class FrameAngelRadar : MVRScript
 
         CreateSlider(ringRotationSpeedField, false);
         CreateSlider(targetMarkerScaleField, true);
+        CreateSlider(lastSelectedFadeSecondsField, false);
         CreateSlider(shellAlphaField, false);
         CreateSlider(ringAlphaField, true);
         CreateSlider(gridAlphaField, false);
@@ -202,6 +235,8 @@ public class FrameAngelRadar : MVRScript
         centerMaterial = CreateEmissiveOverlayMaterial("FA Radar Center Material", new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
         targetMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Material", new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
         targetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Drop Material", new Color(1.0f, 0.70f, 0.18f, 0.35f), MarkerRenderQueue);
+        lastTargetMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Material", new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
+        lastTargetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Drop Material", new Color(1.0f, 0.48f, 0.12f, 0.15f), MarkerRenderQueue);
 
         sphereMesh = CreateSphereMesh(8, 16, 1.0f);
         ringMesh = CreateRingMesh(72, 0.975f, 1.0f);
@@ -212,27 +247,33 @@ public class FrameAngelRadar : MVRScript
         lastGridStepMeters = gridStepMetersField.val;
 
         hudRoot = new GameObject("FA Radar HUD");
+        radarRoot = new GameObject("FA Radar Dish");
+        radarRoot.transform.SetParent(hudRoot.transform, false);
 
-        sphereObject = CreateMeshObject("FA Radar Sphere", hudRoot.transform, sphereMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
-        gridObject = CreateMeshObject("FA Radar Meter Grid", hudRoot.transform, gridMesh, gridMaterial, GridRenderQueue, GridSortingOrder);
+        sphereObject = CreateMeshObject("FA Radar Sphere", radarRoot.transform, sphereMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
+        gridObject = CreateMeshObject("FA Radar Meter Grid", radarRoot.transform, gridMesh, gridMaterial, GridRenderQueue, GridSortingOrder);
         gridFilter = gridObject.GetComponent<MeshFilter>();
 
-        centerMarkerObject = CreateMeshObject("FA Radar User Center", hudRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        targetBlipObject = CreateMeshObject("FA Radar Target Blip", hudRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", hudRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
+        centerMarkerObject = CreateMeshObject("FA Radar User Center", radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        targetBlipObject = CreateMeshObject("FA Radar Target Blip", radarRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", radarRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
+        lastTargetBlipObject = CreateMeshObject("FA Radar Last Target Blip", radarRoot.transform, targetBlipMesh, lastTargetMaterial, MarkerRenderQueue, MarkerSortingOrder - 2);
+        lastTargetGridDropObject = CreateMeshObject("FA Radar Last Target Grid Drop", radarRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
 
         ringObjects = new GameObject[3];
         ringBaseRotations = new Quaternion[3];
         ringBaseRotations[0] = Quaternion.identity;
         ringBaseRotations[1] = Quaternion.Euler(90.0f, 0.0f, 0.0f);
         ringBaseRotations[2] = Quaternion.Euler(0.0f, 90.0f, 0.0f);
-        ringObjects[0] = CreateMeshObject("FA Radar Ring XY", hudRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[1] = CreateMeshObject("FA Radar Ring XZ", hudRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[2] = CreateMeshObject("FA Radar Ring YZ", hudRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[0] = CreateMeshObject("FA Radar Ring XY", radarRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[1] = CreateMeshObject("FA Radar Ring XZ", radarRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[2] = CreateMeshObject("FA Radar Ring YZ", radarRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
 
         SetActiveIfChanged(hudRoot, false);
         SetActiveIfChanged(targetBlipObject, false);
         SetActiveIfChanged(targetGridDropObject, false);
+        SetActiveIfChanged(lastTargetBlipObject, false);
+        SetActiveIfChanged(lastTargetGridDropObject, false);
 
         visualsReady = true;
     }
@@ -284,6 +325,8 @@ public class FrameAngelRadar : MVRScript
         {
             UpdateTargetBlip(viewer, target);
         }
+
+        UpdateLastSelectedBlip(viewer);
     }
 
     private void PollSelectionIfDue()
@@ -314,6 +357,13 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
+        if (selectedAtom != null && !string.IsNullOrEmpty(selectedUid))
+        {
+            lastSelectedAtom = selectedAtom;
+            lastSelectedUid = selectedUid;
+            lastSelectedAtTime = Time.time;
+        }
+
         selectedAtom = nextAtom;
         selectedUid = nextUid;
 
@@ -341,19 +391,15 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateRadarDish(Transform viewer)
     {
-        Vector3 desiredWorldPosition = viewer.TransformPoint(GetHudOffset());
-        smoothedHudPosition = SmoothPosition(
-            desiredWorldPosition,
-            smoothedHudPosition,
-            ref haveSmoothedHudPosition);
-
         float visualRadius = ResolveVisualRadius();
         float scaledMarker = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val);
         float ringTime = Time.time * Mathf.Max(0.0f, ringRotationSpeedField.val);
 
-        hudRoot.transform.position = smoothedHudPosition;
-        hudRoot.transform.rotation = viewer.rotation;
-        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+        ApplyHudAnchor(viewer);
+
+        radarRoot.transform.localPosition = Vector3.zero;
+        radarRoot.transform.localRotation = ResolveDishLocalRotation();
+        radarRoot.transform.localScale = Vector3.one;
 
         sphereObject.transform.localPosition = Vector3.zero;
         sphereObject.transform.localRotation = Quaternion.identity;
@@ -385,6 +431,56 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private void ApplyHudAnchor(Transform viewer)
+    {
+        if (hudRoot == null || viewer == null)
+        {
+            return;
+        }
+
+        if (anchorToViewField.val)
+        {
+            if (currentHudAnchor != viewer || hudRoot.transform.parent != viewer)
+            {
+                hudRoot.transform.SetParent(viewer, false);
+                currentHudAnchor = viewer;
+                haveSmoothedHudPosition = false;
+            }
+
+            hudRoot.transform.localPosition = GetHudOffset();
+            hudRoot.transform.localRotation = Quaternion.AngleAxis(viewYawOffsetField.val, Vector3.forward);
+            hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+            return;
+        }
+
+        if (hudRoot.transform.parent != null)
+        {
+            hudRoot.transform.SetParent(null, true);
+            currentHudAnchor = null;
+            haveSmoothedHudPosition = false;
+        }
+
+        Vector3 desiredWorldPosition = viewer.TransformPoint(GetHudOffset());
+        smoothedHudPosition = SmoothPosition(
+            desiredWorldPosition,
+            smoothedHudPosition,
+            ref haveSmoothedHudPosition);
+
+        hudRoot.transform.position = smoothedHudPosition;
+        hudRoot.transform.rotation = viewer.rotation * Quaternion.AngleAxis(viewYawOffsetField.val, Vector3.forward);
+        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+    }
+
+    private Quaternion ResolveDishLocalRotation()
+    {
+        if (!desktopTopDownField.val)
+        {
+            return Quaternion.identity;
+        }
+
+        return Quaternion.Euler(Mathf.Clamp(desktopTiltDegreesField.val, 0.0f, 90.0f), 0.0f, 0.0f);
+    }
+
     private void UpdateTargetBlip(Transform viewer, Transform target)
     {
         float visualRadius = ResolveVisualRadius();
@@ -392,9 +488,7 @@ public class FrameAngelRadar : MVRScript
         float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val);
         float spin = Time.time * Mathf.Max(12.0f, ringRotationSpeedField.val * 1.75f);
 
-        targetBlipObject.transform.localPosition = radarLocal * visualRadius;
-        targetBlipObject.transform.localRotation = Quaternion.AngleAxis(spin, Vector3.forward);
-        targetBlipObject.transform.localScale = Vector3.one * markerScale;
+        PositionTargetSphere(targetBlipObject, radarLocal, visualRadius, markerScale, spin);
 
         targetGridDropObject.transform.localPosition = new Vector3(
             radarLocal.x * visualRadius,
@@ -412,6 +506,57 @@ public class FrameAngelRadar : MVRScript
             meterLocal.z));
     }
 
+    private void UpdateLastSelectedBlip(Transform viewer)
+    {
+        bool showLast = false;
+        float fade = 0.0f;
+        Transform lastTarget = ResolveAtomRootTransform(lastSelectedAtom);
+        if (lastSelectedEnabledField.val && lastTarget != null && !string.IsNullOrEmpty(lastSelectedUid))
+        {
+            bool sameAsCurrent = selectedAtom != null && lastSelectedAtom == selectedAtom;
+            float age = Time.time - lastSelectedAtTime;
+            float fadeSeconds = Mathf.Max(0.1f, lastSelectedFadeSecondsField.val);
+            fade = Mathf.Clamp01(1.0f - (age / fadeSeconds));
+            showLast = !sameAsCurrent && fade > 0.01f;
+        }
+
+        SetActiveIfChanged(lastTargetBlipObject, showLast);
+        SetActiveIfChanged(lastTargetGridDropObject, showLast);
+        if (!showLast)
+        {
+            return;
+        }
+
+        ApplyMaterialColor(lastTargetMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.42f * fade), Mathf.Max(0.0f, emissionStrengthField.val));
+        ApplyMaterialColor(lastTargetDropMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.20f * fade), Mathf.Max(0.0f, emissionStrengthField.val));
+
+        float visualRadius = ResolveVisualRadius();
+        Vector3 radarLocal = ResolveTargetRadarLocal(viewer, lastTarget);
+        float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * 0.82f;
+        float spin = Time.time * Mathf.Max(10.0f, ringRotationSpeedField.val);
+
+        PositionTargetSphere(lastTargetBlipObject, radarLocal, visualRadius, markerScale, -spin);
+
+        lastTargetGridDropObject.transform.localPosition = new Vector3(
+            radarLocal.x * visualRadius,
+            -visualRadius * 1.08f,
+            radarLocal.z * visualRadius);
+        lastTargetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, -spin, 0.0f);
+        lastTargetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.50f);
+    }
+
+    private void PositionTargetSphere(GameObject targetObject, Vector3 radarLocal, float visualRadius, float markerScale, float spin)
+    {
+        if (targetObject == null)
+        {
+            return;
+        }
+
+        targetObject.transform.localPosition = radarLocal * visualRadius;
+        targetObject.transform.localRotation = Quaternion.AngleAxis(spin, Vector3.forward);
+        targetObject.transform.localScale = Vector3.one * markerScale;
+    }
+
     private Vector3 ResolveTargetRadarLocal(Transform viewer, Transform target)
     {
         if (viewer == null || target == null)
@@ -421,7 +566,16 @@ public class FrameAngelRadar : MVRScript
 
         Vector3 meterLocal = viewer.InverseTransformPoint(target.position);
         float range = Mathf.Max(0.25f, radarRangeMetersField.val);
-        Vector3 radarLocal = meterLocal / range;
+        Vector3 radarLocal;
+        if (desktopTopDownField.val)
+        {
+            radarLocal = new Vector3(meterLocal.x, 0.0f, meterLocal.z) / range;
+        }
+        else
+        {
+            radarLocal = meterLocal / range;
+        }
+
         if (radarLocal.sqrMagnitude > 1.0f)
         {
             radarLocal.Normalize();
@@ -514,6 +668,8 @@ public class FrameAngelRadar : MVRScript
         ApplyMaterialColor(centerMaterial, new Color(0.38f, 1.0f, 0.60f, Mathf.Clamp01(markerAlphaField.val)), emission);
         ApplyMaterialColor(targetMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val)), emission);
         ApplyMaterialColor(targetDropMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * 0.42f), emission);
+        ApplyMaterialColor(lastTargetMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.26f), emission);
+        ApplyMaterialColor(lastTargetDropMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.12f), emission);
     }
 
     private Material CreateEmissiveOverlayMaterial(string materialName, Color color, int renderQueue)
@@ -767,45 +923,15 @@ public class FrameAngelRadar : MVRScript
 
     private Mesh CreateTargetBlipMesh()
     {
-        return CreateOctahedronMesh("FA Radar Prototype Target Blip Mesh", 1.0f);
+        Mesh mesh = CreateSphereMesh(6, 12, 1.0f);
+        mesh.name = "FA Radar Prototype Target Sphere Mesh";
+        return mesh;
     }
 
     private Mesh CreateCenterMarkerMesh()
     {
-        return CreateOctahedronMesh("FA Radar Prototype User Center Mesh", 1.0f);
-    }
-
-    private Mesh CreateOctahedronMesh(string meshName, float radius)
-    {
-        Mesh mesh = new Mesh();
-        mesh.name = meshName;
-
-        Vector3[] vertices = new Vector3[]
-        {
-            new Vector3(0.0f, radius, 0.0f),
-            new Vector3(radius, 0.0f, 0.0f),
-            new Vector3(0.0f, 0.0f, radius),
-            new Vector3(-radius, 0.0f, 0.0f),
-            new Vector3(0.0f, 0.0f, -radius),
-            new Vector3(0.0f, -radius, 0.0f)
-        };
-
-        int[] triangles = new int[]
-        {
-            0, 1, 2,
-            0, 2, 3,
-            0, 3, 4,
-            0, 4, 1,
-            5, 2, 1,
-            5, 3, 2,
-            5, 4, 3,
-            5, 1, 4
-        };
-
-        mesh.vertices = vertices;
-        mesh.triangles = triangles;
-        mesh.RecalculateNormals();
-        mesh.RecalculateBounds();
+        Mesh mesh = CreateSphereMesh(6, 12, 1.0f);
+        mesh.name = "FA Radar Prototype User Center Sphere Mesh";
         return mesh;
     }
 
@@ -844,7 +970,7 @@ public class FrameAngelRadar : MVRScript
 
     private void ResetHudOffset()
     {
-        SetHudOffset(new Vector3(0.28f, -0.18f, 0.75f));
+        SetHudOffset(new Vector3(0.32f, -0.24f, 0.78f));
         haveSmoothedHudPosition = false;
         SetStatus("HUD offset reset.");
     }
@@ -876,14 +1002,18 @@ public class FrameAngelRadar : MVRScript
     {
         DestroyOwnedObject(hudRoot);
         hudRoot = null;
+        radarRoot = null;
         sphereObject = null;
         gridObject = null;
         centerMarkerObject = null;
         targetBlipObject = null;
         targetGridDropObject = null;
+        lastTargetBlipObject = null;
+        lastTargetGridDropObject = null;
         ringObjects = null;
         ringBaseRotations = null;
         gridFilter = null;
+        currentHudAnchor = null;
 
         DestroyOwnedObject(shellMaterial);
         DestroyOwnedObject(ringMaterial);
@@ -891,12 +1021,16 @@ public class FrameAngelRadar : MVRScript
         DestroyOwnedObject(centerMaterial);
         DestroyOwnedObject(targetMaterial);
         DestroyOwnedObject(targetDropMaterial);
+        DestroyOwnedObject(lastTargetMaterial);
+        DestroyOwnedObject(lastTargetDropMaterial);
         shellMaterial = null;
         ringMaterial = null;
         gridMaterial = null;
         centerMaterial = null;
         targetMaterial = null;
         targetDropMaterial = null;
+        lastTargetMaterial = null;
+        lastTargetDropMaterial = null;
 
         DestroyOwnedObject(sphereMesh);
         DestroyOwnedObject(ringMesh);

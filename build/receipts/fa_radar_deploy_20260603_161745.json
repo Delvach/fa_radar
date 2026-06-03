@@ -1,0 +1,38 @@
+﻿{
+    "schemaVersion":  "fa_radar_deploy_receipt_v1",
+    "createdAtUtc":  "2026-06-03T22:17:45.6636533Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "branch":  "codex/0.1.2-desktop-anchor-targets",
+    "commit":  "b61c03ed8e3fc4a4b74ca8ddefd639e24c6ed847",
+    "version":  "0.1.2",
+    "source":  "C:\\projects\\fa_radar\\payload\\Custom\\Scripts\\FrameAngel\\Radar\\FrameAngelRadar.cs",
+    "csharpCompiler":  "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "builtDll":  "C:\\projects\\fa_radar\\build\\bin\\Release\\FrameAngelRadar.dll",
+    "pluginFileName":  "fa_radar.0.1.2.dll",
+    "skipBuild":  false,
+    "dirtyState":  [
+
+                   ],
+    "deployedDlls":  [
+                         {
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.0.1.2.dll",
+                             "sha256":  "4E23A699F141CE471D1C9FDB956AC353BD86A99874B8845FB1FD84AFBFD34CC4",
+                             "sourceSha256":  "4E23A699F141CE471D1C9FDB956AC353BD86A99874B8845FB1FD84AFBFD34CC4",
+                             "bytes":  23552
+                         },
+                         {
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.0.1.2.dll",
+                             "sha256":  "4E23A699F141CE471D1C9FDB956AC353BD86A99874B8845FB1FD84AFBFD34CC4",
+                             "sourceSha256":  "4E23A699F141CE471D1C9FDB956AC353BD86A99874B8845FB1FD84AFBFD34CC4",
+                             "bytes":  23552
+                         }
+                     ],
+    "archivedLegacyScripts":  [
+
+                              ]
+}

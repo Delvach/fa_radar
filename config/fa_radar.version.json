@@ -1,18 +1,18 @@
 {
   "schemaVersion": "fa_radar_version_v1",
   "product": "fa_radar",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "channel": "dev",
-  "branch": "codex/0.1.1-radar-hud-sphere-grid",
-  "status": "prototype-hud-sphere-grid",
-  "versionNote": "0.1.1 replaces the arrow-first slice with a generated emissive HUD radar prototype: sphere, three rotating rings, faded meter grid, user center marker, and selected-atom blip mapped from the viewer-local meter vector.",
+  "branch": "codex/0.1.2-desktop-anchor-targets",
+  "status": "prototype-desktop-anchor-targets",
+  "versionNote": "0.1.2 tunes the prototype for desktop testing: camera-local anchoring, desktop top-down mode, smaller default radius, slider-controlled yaw/tilt/offsets, sphere markers, and faded last-selected target support.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
     "lineageNote": "FA Keyboard informed camera-relative placement, render queues, transparent emissive materials, and direct Custom\\Plugins deploy receipts. No keyboard source is copied into this repo."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.0.1.1.dll",
+    "pluginFileName": "fa_radar.0.1.2.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -20,5 +20,5 @@
     "pluginRelativePath": "Custom\\Plugins",
     "policy": "Future builds deploy the compiled DLL directly to each VaM root's Custom\\Plugins folder. No subfolders."
   },
-  "updatedAt": "2026-06-03T15:44:00-06:00"
+  "updatedAt": "2026-06-03T16:12:00-06:00"
 }
