@@ -10,11 +10,11 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.3` on branch
-  `codex/0.1.3-flat-axis-radar`.
+- Version: `0.1.4` on branch
+  `codex/0.1.4-panning-clipped-grid`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as a compiled VaM plugin DLL:
-  `Custom/Plugins/fa_radar.0.1.3.dll`.
+  `Custom/Plugins/fa_radar.0.1.4.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -22,13 +22,15 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.3` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.4` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - split shell treatment: flat desktop circle when `Desktop Top Down` and
   `Flat Desktop Circle` are enabled, sphere shell for VR/3D treatment
 - three cached annulus meshes tied to the world-axis visual root
 - faded meter grid under the sphere
+- grid lines clipped to the radar circle
+- grid panning from viewer world X/Z movement when `Grid Follows User` is on
 - green center marker for the user
 - orange selected-atom sphere plus a faded grid drop marker
 - faded orange last-selected sphere plus a faded grid drop marker
@@ -49,6 +51,11 @@ world X/Z axes rotate relative to the player's current POV instead of staying
 screen-locked. Markers remain POV-relative; the grid and rings provide the
 world-axis reference underneath them.
 
+`Grid Follows User` uses the viewer's world X/Z position to offset the meter
+grid before it is clipped into the radar circle. A 1m movement along world Z
+changes the grid's Z offset by 1m modulo `Grid Step Meters`, so the center
+marker remains the user while the world grid slides underneath it.
+
 ## HUD Placement
 
 The HUD root follows `SuperController.singleton.lookCamera.transform`, with
@@ -66,6 +73,8 @@ Placement uses a saved local offset:
 - `View Yaw Offset`
 - `Desktop Tilt Degrees`
 - `Axis Yaw Offset`
+- `Grid Follows User`
+- `Grid Clip Circle`
 
 When the plugin is loaded on a movable atom, `Placement Mode` can capture that
 atom's current position relative to the look camera. Scene/session use still
@@ -77,9 +86,10 @@ works through the offset sliders and reset button.
 - Selection is polled on `Selection Poll Seconds`; there is no per-frame atom
   scan.
 - Per-frame work is selected target transform, small vector math, world-axis
-  yaw resolution, optional ring rotation, and active-state diffs. In anchored
-  mode the HUD position/rotation are local to the camera instead of smoothed
-  through world space.
+  yaw resolution, optional ring rotation, lightweight grid mesh refresh when
+  viewer grid offset changes, and active-state diffs. In anchored mode the HUD
+  position/rotation are local to the camera instead of smoothed through world
+  space.
 - Grid mesh rebuilds only when `Radar Range Meters` or `Grid Step Meters`
   changes.
 - Materials use the FA Keyboard-inspired overlay pattern:
@@ -91,8 +101,8 @@ works through the offset sliders and reset button.
 `scripts/Deploy-FaRadar.ps1` is the future deploy helper. Its default targets
 are direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.3.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.3.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.4.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.4.dll`
 
 The operator clarified that deploy instructions are forward-looking for now,
 so this branch should not be treated as live-deployed until a receipt proves
