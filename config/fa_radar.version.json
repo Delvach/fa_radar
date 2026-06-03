@@ -1,18 +1,18 @@
 {
   "schemaVersion": "fa_radar_version_v1",
   "product": "fa_radar",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "channel": "dev",
-  "branch": "codex/0.1.3-flat-axis-radar",
-  "status": "prototype-flat-axis-radar",
-  "versionNote": "0.1.3 splits desktop and VR treatments: desktop uses a flat circle while VR keeps the sphere, and grid/rings can rotate with world axes relative to the player's POV.",
+  "branch": "codex/0.1.4-panning-clipped-grid",
+  "status": "prototype-panning-clipped-grid",
+  "versionNote": "0.1.4 makes the desktop grid circular-clipped and pans it from viewer world X/Z movement so meter movement shifts the grid under the centered user marker.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
     "lineageNote": "FA Keyboard informed camera-relative placement, render queues, transparent emissive materials, and direct Custom\\Plugins deploy receipts. No keyboard source is copied into this repo."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.0.1.3.dll",
+    "pluginFileName": "fa_radar.0.1.4.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -20,5 +20,5 @@
     "pluginRelativePath": "Custom\\Plugins",
     "policy": "Future builds deploy the compiled DLL directly to each VaM root's Custom\\Plugins folder. No subfolders."
   },
-  "updatedAt": "2026-06-03T16:25:00-06:00"
+  "updatedAt": "2026-06-03T16:30:00-06:00"
 }

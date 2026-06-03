@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.3";
+    private const string Version = "0.1.4";
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -20,6 +20,8 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool placementModeField;
     private JSONStorableBool ringsEnabledField;
     private JSONStorableBool gridEnabledField;
+    private JSONStorableBool gridFollowsUserField;
+    private JSONStorableBool gridClipCircleField;
     private JSONStorableBool anchorToViewField;
     private JSONStorableBool desktopTopDownField;
     private JSONStorableBool flatDesktopCircleField;
@@ -88,6 +90,9 @@ public class FrameAngelRadar : MVRScript
     private float lastSelectedAtTime = -1000.0f;
     private float lastGridRangeMeters = -1.0f;
     private float lastGridStepMeters = -1.0f;
+    private Vector2 lastGridOffsetMeters;
+    private bool lastGridClipCircle;
+    private bool haveLastGridOffset;
     private bool visualsReady;
     private bool haveSmoothedHudPosition;
     private Vector3 smoothedHudPosition;
@@ -123,6 +128,8 @@ public class FrameAngelRadar : MVRScript
         placementModeField = new JSONStorableBool("Placement Mode", false);
         ringsEnabledField = new JSONStorableBool("Rings Enabled", true);
         gridEnabledField = new JSONStorableBool("Grid Enabled", true);
+        gridFollowsUserField = new JSONStorableBool("Grid Follows User", true);
+        gridClipCircleField = new JSONStorableBool("Grid Clip Circle", true);
         anchorToViewField = new JSONStorableBool("Anchor To View", true);
         desktopTopDownField = new JSONStorableBool("Desktop Top Down", true);
         flatDesktopCircleField = new JSONStorableBool("Flat Desktop Circle", true);
@@ -157,6 +164,8 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(placementModeField);
         RegisterBool(ringsEnabledField);
         RegisterBool(gridEnabledField);
+        RegisterBool(gridFollowsUserField);
+        RegisterBool(gridClipCircleField);
         RegisterBool(anchorToViewField);
         RegisterBool(desktopTopDownField);
         RegisterBool(flatDesktopCircleField);
@@ -200,6 +209,8 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(worldAxisAlignField, true);
         CreateToggle(ringsEnabledField, false);
         CreateToggle(gridEnabledField, true);
+        CreateToggle(gridFollowsUserField, false);
+        CreateToggle(gridClipCircleField, true);
         CreateToggle(ignoreContainingAtomField, false);
         CreateTextField(statusField, true);
 
@@ -258,9 +269,12 @@ public class FrameAngelRadar : MVRScript
         ringMesh = CreateRingMesh(72, 0.975f, 1.0f);
         centerMarkerMesh = CreateCenterMarkerMesh();
         targetBlipMesh = CreateTargetBlipMesh();
-        gridMesh = CreateGridMesh(radarRangeMetersField.val, gridStepMetersField.val);
+        gridMesh = CreateGridMesh(radarRangeMetersField.val, gridStepMetersField.val, Vector2.zero, gridClipCircleField.val);
         lastGridRangeMeters = radarRangeMetersField.val;
         lastGridStepMeters = gridStepMetersField.val;
+        lastGridOffsetMeters = Vector2.zero;
+        lastGridClipCircle = gridClipCircleField.val;
+        haveLastGridOffset = true;
 
         hudRoot = new GameObject("FA Radar HUD");
         radarRoot = new GameObject("FA Radar Dish");
@@ -331,7 +345,7 @@ public class FrameAngelRadar : MVRScript
         SetActiveIfChanged(hudRoot, true);
         PollSelectionIfDue();
         TrackAttachedAtomPlacement(viewer);
-        RefreshGridMeshIfNeeded();
+        RefreshGridMeshIfNeeded(viewer);
         UpdateMaterials();
         UpdateRadarDish(viewer);
 
@@ -648,7 +662,7 @@ public class FrameAngelRadar : MVRScript
         return radarLocal;
     }
 
-    private void RefreshGridMeshIfNeeded()
+    private void RefreshGridMeshIfNeeded(Transform viewer)
     {
         if (gridFilter == null)
         {
@@ -657,7 +671,14 @@ public class FrameAngelRadar : MVRScript
 
         float range = Mathf.Max(0.5f, radarRangeMetersField.val);
         float step = Mathf.Max(0.05f, gridStepMetersField.val);
-        if (Mathf.Abs(range - lastGridRangeMeters) < 0.001f && Mathf.Abs(step - lastGridStepMeters) < 0.001f)
+        Vector2 offset = gridFollowsUserField.val ? ResolveViewerGridOffsetMeters(viewer, step) : Vector2.zero;
+        bool clipCircle = gridClipCircleField.val;
+        bool sameOffset = haveLastGridOffset && (offset - lastGridOffsetMeters).sqrMagnitude < 0.0001f;
+        if (
+            Mathf.Abs(range - lastGridRangeMeters) < 0.001f &&
+            Mathf.Abs(step - lastGridStepMeters) < 0.001f &&
+            sameOffset &&
+            clipCircle == lastGridClipCircle)
         {
             return;
         }
@@ -668,10 +689,39 @@ public class FrameAngelRadar : MVRScript
             gridMesh = null;
         }
 
-        gridMesh = CreateGridMesh(range, step);
+        gridMesh = CreateGridMesh(range, step, offset, clipCircle);
         gridFilter.sharedMesh = gridMesh;
         lastGridRangeMeters = range;
         lastGridStepMeters = step;
+        lastGridOffsetMeters = offset;
+        lastGridClipCircle = clipCircle;
+        haveLastGridOffset = true;
+    }
+
+    private Vector2 ResolveViewerGridOffsetMeters(Transform viewer, float stepMeters)
+    {
+        if (viewer == null)
+        {
+            return Vector2.zero;
+        }
+
+        float safeStep = Mathf.Max(0.05f, stepMeters);
+        Vector3 worldPosition = viewer.position;
+        return new Vector2(
+            -PositiveModulo(worldPosition.x, safeStep),
+            -PositiveModulo(worldPosition.z, safeStep));
+    }
+
+    private float PositiveModulo(float value, float modulus)
+    {
+        float safeModulus = Mathf.Max(0.0001f, modulus);
+        float result = value % safeModulus;
+        if (result < 0.0f)
+        {
+            result += safeModulus;
+        }
+
+        return result;
     }
 
     private float ResolveVisualRadius()
@@ -953,29 +1003,26 @@ public class FrameAngelRadar : MVRScript
         return mesh;
     }
 
-    private Mesh CreateGridMesh(float rangeMeters, float stepMeters)
+    private Mesh CreateGridMesh(float rangeMeters, float stepMeters, Vector2 offsetMeters, bool clipCircle)
     {
         float safeRange = Mathf.Max(0.5f, rangeMeters);
         float safeStep = Mathf.Max(0.05f, stepMeters);
-        int stepCount = Mathf.Clamp(Mathf.FloorToInt(safeRange / safeStep), 1, 24);
+        int stepCount = Mathf.Clamp(Mathf.CeilToInt(safeRange / safeStep) + 2, 1, 32);
         float lineHalfWidth = 0.006f;
         float gridY = -1.08f;
 
         Mesh mesh = new Mesh();
-        mesh.name = "FA Radar Prototype Meter Grid Mesh";
+        mesh.name = "FA Radar Panning Clipped Meter Grid Mesh";
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
 
         for (int i = -stepCount; i <= stepCount; i++)
         {
-            float coordinate = ((float)i * safeStep) / safeRange;
-            if (coordinate < -1.0f || coordinate > 1.0f)
-            {
-                continue;
-            }
+            float xCoordinate = (((float)i * safeStep) + offsetMeters.x) / safeRange;
+            AddClippedGridLine(vertices, triangles, xCoordinate, true, gridY, lineHalfWidth, clipCircle);
 
-            AddGridLine(vertices, triangles, new Vector3(coordinate, gridY, -1.0f), new Vector3(coordinate, gridY, 1.0f), lineHalfWidth);
-            AddGridLine(vertices, triangles, new Vector3(-1.0f, gridY, coordinate), new Vector3(1.0f, gridY, coordinate), lineHalfWidth);
+            float zCoordinate = (((float)i * safeStep) + offsetMeters.y) / safeRange;
+            AddClippedGridLine(vertices, triangles, zCoordinate, false, gridY, lineHalfWidth, clipCircle);
         }
 
         mesh.vertices = vertices.ToArray();
@@ -983,6 +1030,35 @@ public class FrameAngelRadar : MVRScript
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         return mesh;
+    }
+
+    private void AddClippedGridLine(List<Vector3> vertices, List<int> triangles, float coordinate, bool vertical, float gridY, float width, bool clipCircle)
+    {
+        if (coordinate < -1.0f || coordinate > 1.0f)
+        {
+            return;
+        }
+
+        float extent = 1.0f;
+        if (clipCircle)
+        {
+            extent = Mathf.Sqrt(Mathf.Max(0.0f, 1.0f - (coordinate * coordinate)));
+        }
+
+        Vector3 start;
+        Vector3 end;
+        if (vertical)
+        {
+            start = new Vector3(coordinate, gridY, -extent);
+            end = new Vector3(coordinate, gridY, extent);
+        }
+        else
+        {
+            start = new Vector3(-extent, gridY, coordinate);
+            end = new Vector3(extent, gridY, coordinate);
+        }
+
+        AddGridLine(vertices, triangles, start, end, width);
     }
 
     private void AddGridLine(List<Vector3> vertices, List<int> triangles, Vector3 start, Vector3 end, float width)

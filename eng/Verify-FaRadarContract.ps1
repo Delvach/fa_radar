@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.3"',
+        'private const string Version = "0.1.4"',
         "GetSelectedAtom()",
         "lookCamera",
         "CreateSphereMesh",
@@ -42,6 +42,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Desktop Top Down",
         "Flat Desktop Circle",
         "World Axis Align",
+        "Grid Follows User",
+        "Grid Clip Circle",
         "Anchor To View",
         "View Yaw Offset",
         "Desktop Tilt Degrees",
@@ -50,6 +52,10 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Last Selected Fade Seconds",
         "axisRoot",
         "flatCircleObject",
+        "lastGridOffsetMeters",
+        "ResolveViewerGridOffsetMeters",
+        "PositiveModulo",
+        "AddClippedGridLine",
         "ResolveWorldAxisYawDegrees",
         "UpdateAxisVisualRotation",
         "lastTargetBlipObject",
@@ -93,7 +99,7 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "FrameAngelRadar.dll",
-        "fa_radar.0.1.3.dll",
+        "fa_radar.0.1.4.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -128,11 +134,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.3") {
-        Add-Failure "Version config must declare version 0.1.3."
+    if ($version.version -ne "0.1.4") {
+        Add-Failure "Version config must declare version 0.1.4."
     }
-    if ($version.branch -ne "codex/0.1.3-flat-axis-radar") {
-        Add-Failure "Version config branch must match codex/0.1.3-flat-axis-radar."
+    if ($version.branch -ne "codex/0.1.4-panning-clipped-grid") {
+        Add-Failure "Version config branch must match codex/0.1.4-panning-clipped-grid."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -166,7 +172,7 @@ foreach ($file in $unityFiles) {
 if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
-        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.3.dll"
+        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.4.dll"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
         if (-not (Test-Path -LiteralPath $deployedDll -PathType Leaf)) {
             Add-Failure "Live radar DLL was not deployed: $deployedDll"
