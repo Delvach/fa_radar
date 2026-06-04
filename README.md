@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.9`.
+Current branch version: `0.1.11`.
 
-Current product contract version: `0.1.10`.
+Current product contract version: `0.1.11`.
 
 The current slice is compiled C# only:
 
@@ -29,26 +29,38 @@ The current slice is compiled C# only:
   read as a duplicate highlight by default
 - height stems for user, selected atom, and visible available atoms
 - range-edge fade and depth size cues for selected/available markers
-- filterable available atom markers, with lights enabled by default
+- edition-gated available atom markers: Free shows every eligible atom together,
+  Pro exposes category filters
 - click-to-select for visible available CUA/light/person/other atom markers
 - previous-selection rendering parked for now
-- future Free/Pro editions will compile from one codebase with edition gates;
-  Free is the unrestricted radar that shows everything, while Pro adds filters,
-  in-game controls, customizable category colors, and light volume visuals
+- Free/Pro editions compile from one codebase with static symbols; Free is the
+  unrestricted radar that shows everything, while Pro adds filters, category
+  colors, and the staged path for in-game controls and light volume visuals
+- FAP-style Obfuscar wrapper and `.var` package candidate staging
 
 ## Files
 
 - `config/fa_radar.version.json` - branch/version/deploy authority.
+- `config/obfuscation.defaults.json` - Obfuscar profile and keep-rule authority.
 - `payload/Custom/Scripts/FrameAngel/Radar/FrameAngelRadar.cs` - VaM MVRScript source.
-- `scripts/Deploy-FaRadar.ps1` - future compile/deploy helper.
+- `scripts/Build-FaRadar.ps1` - edition compile, obfuscation, package, and receipt helper.
+- `scripts/Obfuscate-FaRadarPlugin.ps1` - bounded Obfuscar.GlobalTool wrapper.
+- `scripts/Deploy-FaRadar.ps1` - edition-aware compile/deploy helper.
 - `eng/Verify-FaRadarContract.ps1` - static contract check for this repo.
 - `docs/FA_RADAR_ARCHITECTURE_V1.md` - current implementation notes.
 - `docs/FA_RADAR_PRODUCT_EDITIONS_V1.md` - Free/Pro product split contract.
 
-## Future Deploy
+## Build And Deploy
 
-The deploy helper defaults to both VaM roots and copies the DLL directly into
-each root's `Custom/Plugins` folder:
+The build helper defaults to Free and Pro, obfuscates with the `vam_compat`
+profile, stages candidate `.var` packages, and writes a build receipt:
+
+```powershell
+.\scripts\Build-FaRadar.ps1
+```
+
+The deploy helper defaults to both VaM roots and copies both edition DLLs
+directly into each root's `Custom/Plugins` folder:
 
 ```powershell
 .\scripts\Deploy-FaRadar.ps1
@@ -56,8 +68,10 @@ each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.9.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.9.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.11.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.11.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.11.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.11.dll`
 
-The operator clarified these are instructions for going forward; this branch is
-not live-deployed unless a deploy receipt says so.
+Release `.var` names remain undecided; current package outputs use neutral
+dev candidate filenames under `build/packages`.

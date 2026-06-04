@@ -1,6 +1,6 @@
 # FA Radar Architecture V1
 
-Updated: 2026-06-03
+Updated: 2026-06-04
 
 ## Goal
 
@@ -10,11 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.9` on branch
-  `codex/0.1.9-click-select-axis-polish`.
+- Version: `0.1.11` on branch
+  `codex/0.1.11-edition-build-packaging`.
 - One MVRScript source: `FrameAngelRadar`.
-- Distributed as a compiled VaM plugin DLL:
-  `Custom/Plugins/fa_radar.0.1.9.dll`.
+- Distributed as compiled VaM plugin DLLs:
+  `Custom/Plugins/fa_radar.free.0.1.11.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.11.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -22,7 +23,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.9` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.11` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -48,8 +49,9 @@ polygons so targeting can be tested before any art polish:
   popping on the boundary
 - depth size cues so closer markers render larger and far markers render
   smaller
-- filterable available atom markers, starting with lights enabled by default
-  and CUA, people, and other atom filters available as toggles
+- edition-gated available atom markers: Free shows every eligible atom
+  together with a neutral marker color; Pro exposes lights, CUA, people, and
+  other atom filters and keeps category colors
 - click-to-select for visible available CUA/light/person/other atom markers
 
 The selected atom is resolved with
@@ -71,14 +73,15 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.9`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.11`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 Available atom markers poll `SuperController.singleton.GetAtoms()` on `Atom
-Poll Seconds`, filter by type/category/uid buckets, sort nearby atoms first, and
-use pooled generated marker/stem objects. With all filters enabled, the marker
-pool can represent the full currently available atom list; normal operation can
-stay focused by leaving only the useful lanes enabled.
+Poll Seconds`, sort nearby atoms first, and use pooled generated marker/stem
+objects. Free builds show every eligible atom that passes the baseline hidden,
+off, selected, and containing-atom checks. Pro builds add the type/category/uid
+bucket filters so normal operation can stay focused by leaving only useful
+lanes enabled.
 
 `Click Select Markers` uses cheap screen-space picking only on mouse-down. The
 plugin projects visible marker objects through `lookCamera.WorldToScreenPoint`,
@@ -151,24 +154,36 @@ works through the offset sliders and reset button.
 
 ## Build And Deploy Contract
 
-`scripts/Deploy-FaRadar.ps1` is the future deploy helper. Its default targets
-are direct plugin folders, not subfolders:
+`scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.9.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.9.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.11.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.11.dll`
 
-The operator clarified that deploy instructions are forward-looking for now,
-so this branch should not be treated as live-deployed until a receipt proves
-both destinations.
+The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
+`-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
+`Obfuscar.GlobalTool`, config-driven profiles, `FrameAngelRadar` keep rules,
+VaM lifecycle callback skip rules, and a `.obf-report.json` next to each output
+DLL.
+
+The build helper also stages neutral candidate `.var` packages under
+`build\packages` with DLLs under `Custom/Plugins` and a root `meta.json`.
+
+`scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
+to direct plugin folders, not subfolders:
+
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.11.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.11.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.11.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.11.dll`
 
 Future `.var` product naming is undecided. Current candidates are
-`FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; this prototype lane
-remains DLL-only until packaging is explicitly opened.
+`FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; current package
+outputs remain dev candidates until the product name is chosen.
 
 ## Product Editions
 
-Free and Pro are planned as one codebase with compile/package gates for the
-different editions, not separate runtime forks.
+Free and Pro are one codebase with compile/package gates for the different
+editions, not separate runtime forks.
 
 - Free is the movable, scalable, visually tunable radar, but it shows all
   supported radar atoms together.
@@ -177,8 +192,7 @@ different editions, not separate runtime forks.
   cones that show rotation, range, and spot angle.
 
 The current product split authority is
-`docs/FA_RADAR_PRODUCT_EDITIONS_V1.md`. The current runtime remains
-`fa_radar.0.1.9.dll`; edition gates are not implemented in this slice.
+`docs/FA_RADAR_PRODUCT_EDITIONS_V1.md`.
 
 ## Parked
 

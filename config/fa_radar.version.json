@@ -1,51 +1,53 @@
 {
-  "schemaVersion": "fa_radar_version_v1",
+  "schemaVersion": "fa_radar_version_v2",
   "product": "fa_radar",
-  "version": "0.1.9",
+  "version": "0.1.11",
   "channel": "dev",
-  "branch": "codex/0.1.9-click-select-axis-polish",
-  "status": "prototype-click-select-axis-polish",
-  "versionNote": "0.1.9 changes rings to VaM-style red/green/blue axis colors, removes the selected marker outline so size remains a proximity cue, and adds click-to-select for visible available atom markers through VaM's proved SelectController API.",
+  "branch": "codex/0.1.11-edition-build-packaging",
+  "status": "edition-build-packaging",
+  "versionNote": "0.1.11 starts the Free/Pro compile split, FAP-style Obfuscar wrapper, package candidate staging, and dual-edition deploy receipts. Free shows every eligible atom with common placement/appearance controls. Pro exposes atom category filters and category colors.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
-    "lineageNote": "FA Keyboard informed camera-relative placement, render queues, transparent emissive materials, and direct Custom\\Plugins deploy receipts. No keyboard source is copied into this repo."
+    "packagingReferenceRepo": "C:\\projects\\fap",
+    "packagingReferenceMode": "read-only bounded Obfuscar.GlobalTool wrapper and receipt discipline",
+    "lineageNote": "FA Keyboard informed camera-relative placement and generated overlay visuals. FAP informs build, obfuscation, and package receipt shape. No source from either repo is copied into the runtime plugin."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.0.1.9.dll",
+    "pluginFileName": "fa_radar.pro.0.1.11.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
     ],
     "pluginRelativePath": "Custom\\Plugins",
-    "policy": "Future builds deploy the compiled DLL directly to each VaM root's Custom\\Plugins folder. No subfolders."
+    "policy": "Build and deploy compiled DLLs directly to each VaM root's Custom\\Plugins folder. No subfolders."
   },
-  "plannedRelease": {
-    "varFileNameCandidates": [
-      "FrameAngel.DaFuqIzzit.1.var",
-      "FrameAngel.Radar.1.var"
-    ],
-    "status": "undecided",
-    "note": "Product package name candidates for a future release. Current prototype deployment remains DLL-only."
-  },
-  "productPlanning": {
-    "contractVersion": "0.1.10",
-    "branch": "codex/0.1.10-product-edition-gates",
-    "status": "documented",
-    "editionStrategy": "one-codebase-compile-gates",
-    "compileSymbols": [
-      "FA_RADAR_FREE",
-      "FA_RADAR_PRO"
-    ],
+  "editions": {
     "free": {
-      "summary": "Radar placement, scale, and appearance freedom. Shows all supported radar atoms together.",
+      "displayName": "Free",
+      "compileSymbols": [
+        "FA_RADAR_FREE"
+      ],
+      "pluginFileName": "fa_radar.free.0.1.11.dll",
+      "packageFileName": "fa_radar.free.0.1.11.var",
+      "packageName": "FrameAngel.RadarFree",
+      "packageCreator": "FrameAngel",
+      "summary": "Movable, scalable, visually tunable radar that shows every eligible radar atom together.",
       "filters": false,
       "inGameControlUi": false,
       "customCategoryColors": false,
       "lightVolumeVisuals": false
     },
     "pro": {
-      "summary": "Operational radar controls with filters, in-game switch UI, customizable colors, and light volume visuals.",
+      "displayName": "Pro",
+      "compileSymbols": [
+        "FA_RADAR_PRO"
+      ],
+      "pluginFileName": "fa_radar.pro.0.1.11.dll",
+      "packageFileName": "fa_radar.pro.0.1.11.var",
+      "packageName": "FrameAngel.RadarPro",
+      "packageCreator": "FrameAngel",
+      "summary": "Operational radar controls with filters, category colors, and the foundation for richer in-game controls and light visuals.",
       "filters": true,
       "inGameControlUi": true,
       "customCategoryColors": true,
@@ -59,5 +61,19 @@
       }
     }
   },
-  "updatedAt": "2026-06-04T00:00:00-06:00"
+  "plannedRelease": {
+    "varFileNameCandidates": [
+      "FrameAngel.DaFuqIzzit.1.var",
+      "FrameAngel.Radar.1.var"
+    ],
+    "status": "undecided",
+    "note": "Human-facing release package names are still undecided. Current build outputs use neutral dev candidate names."
+  },
+  "obfuscation": {
+    "config": "config\\obfuscation.defaults.json",
+    "tool": "Obfuscar.GlobalTool",
+    "profile": "vam_compat",
+    "pluginKey": "fa_radar"
+  },
+  "updatedAt": "2026-06-04T01:13:00-06:00"
 }

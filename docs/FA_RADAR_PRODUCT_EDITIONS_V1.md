@@ -7,8 +7,14 @@ Updated: 2026-06-04
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current deployed prototype remains `fa_radar.0.1.9.dll`. This document is a
-product-contract slice for the future Free/Pro build shape.
+The current build slice is `0.1.11`. It produces Free and Pro DLLs from the
+same source file:
+
+- `fa_radar.free.0.1.11.dll`
+- `fa_radar.pro.0.1.11.dll`
+
+Current package outputs use neutral dev candidate names while release branding
+remains undecided.
 
 ## Free Edition
 
@@ -49,7 +55,7 @@ scene object into noise. Filters and semantic visuals are the value line.
 The source tree stays shared. Compile/package gates decide which edition is
 produced.
 
-Expected future build symbols:
+Build symbols:
 
 - `FA_RADAR_FREE`
 - `FA_RADAR_PRO`
@@ -68,17 +74,22 @@ Rules:
 
 ## Packaging Notes
 
-Future `.var` product naming remains undecided. Current candidates:
+Current build helpers stage candidate `.var` packages:
+
+- `fa_radar.free.0.1.11.var`
+- `fa_radar.pro.0.1.11.var`
+
+Human-facing release `.var` product naming remains undecided. Current
+candidates:
 
 - `FrameAngel.DaFuqIzzit.1.var`
 - `FrameAngel.Radar.1.var`
 
-The package name decision is separate from the compile-gate architecture.
+The release package-name decision is separate from the compile-gate
+architecture.
 
 ## Parked
 
-- exact Free DLL/package filename
-- exact Pro DLL/package filename
 - license or entitlement mechanism
 - final in-game Pro switch UI implementation
 - final people classification source for women/men color defaults

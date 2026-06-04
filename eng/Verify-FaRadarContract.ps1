@@ -11,9 +11,12 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $pluginPath = Join-Path $RepoRoot "payload\Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
+$buildPath = Join-Path $RepoRoot "scripts\Build-FaRadar.ps1"
+$obfuscatePath = Join-Path $RepoRoot "scripts\Obfuscate-FaRadarPlugin.ps1"
 $deployPath = Join-Path $RepoRoot "scripts\Deploy-FaRadar.ps1"
 $docPath = Join-Path $RepoRoot "docs\FA_RADAR_ARCHITECTURE_V1.md"
 $versionPath = Join-Path $RepoRoot "config\fa_radar.version.json"
+$obfuscationConfigPath = Join-Path $RepoRoot "config\obfuscation.defaults.json"
 
 $failures = New-Object System.Collections.Generic.List[string]
 
@@ -28,7 +31,14 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.9"',
+        'private const string Version = "0.1.11"',
+        "#if FA_RADAR_PRO",
+        "private const bool IsProEdition = true",
+        'private const string EditionName = "Pro"',
+        "#else",
+        "private const bool IsProEdition = false",
+        'private const string EditionName = "Free"',
+        "Frame Angel Radar " + '"' + " + Version + " + '"' + " " + '"' + " + EditionName",
         "GetSelectedAtom()",
         "lookCamera",
         "CreateSphereMesh",
@@ -114,6 +124,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "IsCustomUnityAssetAtom",
         "IsPersonAtom",
         "IsAtomVisibleByFilter",
+        "return true",
+        "ResolveAvailableAtomColor",
         "EnsureAvailableMarkerCapacity",
         "availableMarkerObjects",
         "availableStemObjects",
@@ -167,20 +179,65 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
     }
 }
 
+if (-not (Test-Path -LiteralPath $buildPath)) {
+    Add-Failure "Missing edition build helper: $buildPath"
+} else {
+    $build = Get-Content -Raw -LiteralPath $buildPath
+    $requiredBuildSnippets = @(
+        "FA_RADAR_FREE",
+        "FA_RADAR_PRO",
+        "fa_radar.free.0.1.11.dll",
+        "fa_radar.pro.0.1.11.dll",
+        "Obfuscate-FaRadarPlugin.ps1",
+        "Custom\Plugins",
+        "meta.json",
+        "Compress-Archive",
+        "fa_radar_build_receipt_v1",
+        "packagePath",
+        "obfuscationReportPath"
+    )
+
+    foreach ($snippet in $requiredBuildSnippets) {
+        if (-not $build.Contains($snippet)) {
+            Add-Failure "Build helper missing required edition/package snippet: $snippet"
+        }
+    }
+}
+
+if (-not (Test-Path -LiteralPath $obfuscatePath)) {
+    Add-Failure "Missing obfuscation helper: $obfuscatePath"
+} else {
+    $obfuscate = Get-Content -Raw -LiteralPath $obfuscatePath
+    $requiredObfuscationSnippets = @(
+        "Obfuscar.GlobalTool",
+        "obfuscar.console.exe",
+        "config\obfuscation.defaults.json",
+        "SkipType",
+        "SkipMethod",
+        "outputDiffersFromInput",
+        ".obf-report.json"
+    )
+
+    foreach ($snippet in $requiredObfuscationSnippets) {
+        if (-not $obfuscate.Contains($snippet)) {
+            Add-Failure "Obfuscation helper missing required FAP-style snippet: $snippet"
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $deployPath)) {
     Add-Failure "Missing deploy helper: $deployPath"
 } else {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
-        "FrameAngelRadar.dll",
-        "fa_radar.0.1.9.dll",
+        "Build-FaRadar.ps1",
+        "fa_radar.free.0.1.11.dll",
+        "fa_radar.pro.0.1.11.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
-        "VaM_Data\Managed",
-        "Assembly-CSharp.dll",
-        "UnityEngine.CoreModule.dll",
         "fa_radar_deploy_receipt_v1",
+        "buildReceiptPath",
         "deployedDlls",
         "archivedLegacyScripts"
     )
@@ -204,15 +261,44 @@ if (-not (Test-Path -LiteralPath $docPath)) {
     Add-Failure "Missing architecture doc: $docPath"
 }
 
+if (-not (Test-Path -LiteralPath $obfuscationConfigPath)) {
+    Add-Failure "Missing obfuscation config: $obfuscationConfigPath"
+} else {
+    $obfuscationConfig = Get-Content -Raw -LiteralPath $obfuscationConfigPath
+    $requiredObfuscationConfigSnippets = @(
+        '"package": "Obfuscar.GlobalTool"',
+        '"version": "2.2.44"',
+        '"profile": "vam_compat"',
+        '"fa_radar"',
+        '"FrameAngelRadar"',
+        '"Init"',
+        '"Update"',
+        '"OnDestroy"'
+    )
+
+    foreach ($snippet in $requiredObfuscationConfigSnippets) {
+        if (-not $obfuscationConfig.Contains($snippet)) {
+            Add-Failure "Obfuscation config missing required snippet: $snippet"
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.9") {
-        Add-Failure "Version config must declare version 0.1.9."
+    if ($version.version -ne "0.1.11") {
+        Add-Failure "Version config must declare version 0.1.11."
     }
-    if ($version.branch -ne "codex/0.1.9-click-select-axis-polish") {
-        Add-Failure "Version config branch must match codex/0.1.9-click-select-axis-polish."
+    if ($version.branch -ne "codex/0.1.11-edition-build-packaging") {
+        Add-Failure "Version config branch must match codex/0.1.11-edition-build-packaging."
+    }
+    $editionNames = @($version.editions.PSObject.Properties.Name)
+    if ($editionNames -notcontains "free") {
+        Add-Failure "Version config missing free edition."
+    }
+    if ($editionNames -notcontains "pro") {
+        Add-Failure "Version config missing pro edition."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -281,6 +367,8 @@ if (-not (Test-Path -LiteralPath $cecilPath -PathType Leaf)) {
 $unityProjectFolders = Get-ChildItem -LiteralPath $RepoRoot -Recurse -Force -Directory |
     Where-Object {
         $_.FullName -notmatch "\\\.git(\\|$)" -and
+        $_.FullName -notmatch "\\build\\(bin|packages|package_work)(\\|$)" -and
+        $_.FullName -notmatch "\\tools(\\|$)" -and
         ($_.Name -eq "Assets" -or $_.Name -eq "Library" -or $_.Name -eq "Packages" -or $_.Name -eq "ProjectSettings")
     }
 
@@ -291,6 +379,8 @@ foreach ($folder in $unityProjectFolders) {
 $unityFiles = Get-ChildItem -LiteralPath $RepoRoot -Recurse -Force -File |
     Where-Object {
         $_.FullName -notmatch "\\\.git(\\|$)" -and
+        $_.FullName -notmatch "\\build\\(bin|packages|package_work)(\\|$)" -and
+        $_.FullName -notmatch "\\tools(\\|$)" -and
         ($_.Extension -eq ".unity" -or $_.Extension -eq ".asset" -or $_.Extension -eq ".assetbundle")
     }
 
@@ -301,14 +391,20 @@ foreach ($file in $unityFiles) {
 if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
-        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.9.dll"
+        $expectedDlls = @(
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.11.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.11.dll")
+        )
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
-        if (-not (Test-Path -LiteralPath $deployedDll -PathType Leaf)) {
-            Add-Failure "Live radar DLL was not deployed: $deployedDll"
-        } else {
-            $dllItem = Get-Item -LiteralPath $deployedDll
-            if ($dllItem.Length -le 0) {
-                Add-Failure "Live radar DLL is empty: $deployedDll"
+
+        foreach ($deployedDll in $expectedDlls) {
+            if (-not (Test-Path -LiteralPath $deployedDll -PathType Leaf)) {
+                Add-Failure "Live radar DLL was not deployed: $deployedDll"
+            } else {
+                $dllItem = Get-Item -LiteralPath $deployedDll
+                if ($dllItem.Length -le 0) {
+                    Add-Failure "Live radar DLL is empty: $deployedDll"
+                }
             }
         }
 
@@ -321,7 +417,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.9."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.11."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
