@@ -7,11 +7,11 @@ Updated: 2026-06-04
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.17`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.18`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.17.dll`
-- `fa_radar.pro.0.1.17.dll`
+- `fa_radar.free.0.1.18.dll`
+- `fa_radar.pro.0.1.18.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -37,6 +37,7 @@ Free is the radar.
 
 - same generated HUD radar foundation
 - free movement, scale, placement, and appearance controls
+- session-plugin invisible grab handles for VR move/resize
 - shared HUD/static/atom anchor modes
 - global placement/scale/look preferences under
   `Custom\PluginData\FrameAngel\Radar`
@@ -73,6 +74,8 @@ Pro is the operational radar.
 - CUA preset instances use `preferences_cua_common.json` and
   `preferences_cua_pro.json` so creator-anchor tuning does not pollute normal
   HUD/session Radar preferences
+- The first grab-handle implementation is session/scene-plugin only; CUA
+  anchoring gets its own interaction pass later.
 
 Pro should make scene diagnosis and targeting faster without turning every
 scene object into noise. Filters and semantic visuals are the value line.
@@ -106,8 +109,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.17.var`
-- `fa_radar.pro.0.1.17.var`
+- `fa_radar.free.0.1.18.var`
+- `fa_radar.pro.0.1.18.var`
 
 The Pro candidate package includes the CUA preset under
 `Custom/Atom/CustomUnityAsset`; Free does not ship creator-facing CUA resources.

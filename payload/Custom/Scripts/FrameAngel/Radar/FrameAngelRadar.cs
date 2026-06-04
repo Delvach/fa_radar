@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -8,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.17";
+    private const string Version = "0.1.18";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -43,9 +44,16 @@ public class FrameAngelRadar : MVRScript
     private const string AnchorModeWorldStatic = "World Static";
     private const string AnchorModeContainingAtom = "Containing Atom";
     private const string AnchorModeAtomUid = "Anchor Atom UID";
+    private const string GrabHandlePrimarySuffix = "primary";
+    private const string GrabHandleResizeSuffix = "resize";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
     private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
     private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
+    private const float GrabResizeMinimumStartDistanceMeters = 0.05f;
+    private const float GrabHapticCooldownSeconds = 0.08f;
+    private const int GrabHandUnknown = -1;
+    private const int GrabHandLeft = 0;
+    private const int GrabHandRight = 1;
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
     private static readonly Color AxisYColor = new Color(0.22f, 1.0f, 0.34f, 1.0f);
     private static readonly Color AxisZColor = new Color(0.26f, 0.52f, 1.0f, 1.0f);
@@ -84,6 +92,9 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showPersonAtomsField;
     private JSONStorableBool showOtherAtomsField;
     private JSONStorableBool clickSelectMarkersField;
+    private JSONStorableBool grabHandlesEnabledField;
+    private JSONStorableBool grabHandleDebugVisibleField;
+    private JSONStorableBool grabHapticsEnabledField;
     private JSONStorableBool globalPrefsAutoSaveField;
     private JSONStorableBool cuaAnchorPresetField;
 
@@ -140,6 +151,7 @@ public class FrameAngelRadar : MVRScript
     private GameObject targetGridDropObject;
     private GameObject lastTargetBlipObject;
     private GameObject lastTargetGridDropObject;
+    private GameObject resizeGuideLineObject;
     private GameObject[] availableMarkerObjects;
     private GameObject[] availableStemObjects;
     private GameObject[] ringObjects;
@@ -153,6 +165,7 @@ public class FrameAngelRadar : MVRScript
     private Mesh targetBlipMesh;
     private Mesh centerMarkerMesh;
     private Mesh heightStemMesh;
+    private Mesh resizeGuideLineMesh;
 
     private Material shellMaterial;
     private Material ringMaterial;
@@ -167,8 +180,11 @@ public class FrameAngelRadar : MVRScript
     private Material lastTargetMaterial;
     private Material lastTargetDropMaterial;
     private Material availableHeightStemMaterial;
+    private Material grabGuideMaterial;
     private Material[] availableMarkerMaterials;
 
+    private Atom primaryGrabHandleAtom;
+    private Atom resizeGrabHandleAtom;
     private Atom selectedAtom;
     private Atom lastSelectedAtom;
     private List<Atom> trackedAvailableAtoms = new List<Atom>();
@@ -189,13 +205,34 @@ public class FrameAngelRadar : MVRScript
     private bool recorderRadarVisible = true;
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
+    private bool primaryGrabHandleCreatePending;
+    private bool resizeGrabHandleCreatePending;
+    private bool moveGrabActive;
+    private bool resizeGrabActive;
+    private bool resizeHandleDismissedUntilMoveRelease;
+    private bool ovrLeftGrabHapticActive;
+    private bool ovrRightGrabHapticActive;
     private Vector3 smoothedHudPosition;
+    private Vector3 moveStartHandlePosition;
+    private Vector3 moveStartHudOffset;
+    private Vector3 moveStartStaticPosition;
+    private Vector3 resizeStartPrimaryPosition;
+    private Vector3 resizeStartHandlePosition;
     private float nextGlobalPreferencesFlushTime;
     private float nextGlobalPreferencesPollTime;
     private float nextRecorderVisibilityPollTime;
+    private float resizeStartScale;
+    private float resizeStartDistance;
+    private float lastGrabHandleHapticAt;
+    private float ovrLeftGrabHapticStopAt;
+    private float ovrRightGrabHapticStopAt;
     private float radarMaterialAlphaMultiplier = 1.0f;
+    private int moveGrabHand = GrabHandUnknown;
+    private int resizeGrabHand = GrabHandUnknown;
     private string lastAppliedCommonPreferencesJson = "";
     private string lastAppliedProPreferencesJson = "";
+    private string primaryGrabHandleUid = "";
+    private string resizeGrabHandleUid = "";
     private Transform currentHudAnchor;
     private Transform lastGoodViewerTransform;
 
@@ -217,12 +254,14 @@ public class FrameAngelRadar : MVRScript
 
         PollSharedGlobalPreferences();
         FlushGlobalPreferencesIfDue(false);
+        TickGrabHandleHapticStops(Time.unscaledTime);
         TickRadar();
     }
 
     private void OnDestroy()
     {
         FlushGlobalPreferencesIfDue(true);
+        DestroySessionGrabHandles();
         DestroyRuntimeVisuals();
     }
 
@@ -251,6 +290,10 @@ public class FrameAngelRadar : MVRScript
         showPersonAtomsField = new JSONStorableBool("Show People", false);
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
+        // Session Grab Handles are a disposable VR interaction aid for the session/scene plugin path only.
+        grabHandlesEnabledField = new JSONStorableBool("Grab Handles Enabled", false);
+        grabHandleDebugVisibleField = new JSONStorableBool("Show Grab Handle Debug", false);
+        grabHapticsEnabledField = new JSONStorableBool("Grab Haptics", true);
         globalPrefsAutoSaveField = new JSONStorableBool("Global Prefs Auto Save", true);
         cuaAnchorPresetField = new JSONStorableBool("CUA Anchor Preset", false);
         anchorModeField = new JSONStorableStringChooser(
@@ -321,6 +364,9 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showPersonAtomsField);
         RegisterBool(showOtherAtomsField);
         RegisterBool(clickSelectMarkersField);
+        RegisterBool(grabHandlesEnabledField);
+        RegisterBool(grabHandleDebugVisibleField);
+        RegisterBool(grabHapticsEnabledField);
         RegisterBool(globalPrefsAutoSaveField);
         RegisterBool(cuaAnchorPresetField);
         RegisterStringChooser(anchorModeField);
@@ -396,6 +442,9 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(showOtherAtomsField, true);
 #endif
         CreateToggle(clickSelectMarkersField, false);
+        CreateToggle(grabHandlesEnabledField, true);
+        CreateToggle(grabHandleDebugVisibleField, false);
+        CreateToggle(grabHapticsEnabledField, true);
         CreateToggle(ringsEnabledField, false);
         CreateToggle(gridEnabledField, true);
         CreateToggle(gridFollowsUserField, false);
@@ -505,6 +554,9 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(depthSizeCueField);
         ConfigureGlobalPreferenceCallback(availableAtomMarkersEnabledField);
         ConfigureGlobalPreferenceCallback(clickSelectMarkersField);
+        ConfigureGlobalPreferenceCallback(grabHandlesEnabledField);
+        ConfigureGlobalPreferenceCallback(grabHandleDebugVisibleField);
+        ConfigureGlobalPreferenceCallback(grabHapticsEnabledField);
 
         ConfigureGlobalPreferenceCallback(hudOffsetXField);
         ConfigureGlobalPreferenceCallback(hudOffsetYField);
@@ -994,6 +1046,9 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "depthSizeCue", depthSizeCueField);
             ApplyBoolPreference(preferencesJson, "availableAtomMarkers", availableAtomMarkersEnabledField);
             ApplyBoolPreference(preferencesJson, "clickSelectMarkers", clickSelectMarkersField);
+            ApplyBoolPreference(preferencesJson, "grabHandlesEnabled", grabHandlesEnabledField);
+            ApplyBoolPreference(preferencesJson, "grabHandleDebugVisible", grabHandleDebugVisibleField);
+            ApplyBoolPreference(preferencesJson, "grabHaptics", grabHapticsEnabledField);
             ApplyStringPreference(preferencesJson, "anchorMode", anchorModeField);
             ApplyStringPreference(preferencesJson, "anchorAtomUid", anchorAtomUidField);
 
@@ -1096,6 +1151,9 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(depthSizeCueField, true);
         SetBoolNoCallback(availableAtomMarkersEnabledField, true);
         SetBoolNoCallback(clickSelectMarkersField, true);
+        SetBoolNoCallback(grabHandlesEnabledField, false);
+        SetBoolNoCallback(grabHandleDebugVisibleField, false);
+        SetBoolNoCallback(grabHapticsEnabledField, true);
         SetBoolNoCallback(showLightAtomsField, true);
         SetBoolNoCallback(showCustomUnityAssetAtomsField, false);
         SetBoolNoCallback(showPersonAtomsField, false);
@@ -1162,6 +1220,9 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "depthSizeCue", ReadBool(depthSizeCueField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "availableAtomMarkers", ReadBool(availableAtomMarkersEnabledField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "clickSelectMarkers", ReadBool(clickSelectMarkersField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandlesEnabled", ReadBool(grabHandlesEnabledField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandleDebugVisible", ReadBool(grabHandleDebugVisibleField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabHaptics", ReadBool(grabHapticsEnabledField, true));
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorMode", ResolveAnchorMode());
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorAtomUid", ReadString(anchorAtomUidField, ""));
 
@@ -1639,6 +1700,7 @@ public class FrameAngelRadar : MVRScript
         if (!recorderRadarVisible)
         {
             ApplyRecorderRadarVisibility(false);
+            DestroySessionGrabHandles();
             return;
         }
         ApplyRecorderRadarVisibility(true);
@@ -1647,6 +1709,7 @@ public class FrameAngelRadar : MVRScript
         if (!radarEnabledField.val || viewer == null)
         {
             SetActiveIfChanged(hudRoot, false);
+            DestroySessionGrabHandles();
             if (viewer == null)
             {
                 SetStatus("Waiting for VaM look camera.");
@@ -1660,6 +1723,7 @@ public class FrameAngelRadar : MVRScript
         TrackAttachedAtomPlacement(viewer);
         RefreshGridMeshIfNeeded(viewer);
         UpdateMaterials();
+        UpdateSessionGrabHandles(viewer);
         UpdateRadarDish(viewer);
         UpdateUserHeightStem(viewer);
 
@@ -2446,6 +2510,11 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
+        if (IsRadarGrabHandleAtom(atom))
+        {
+            return false;
+        }
+
         if (ignoreContainingAtomField.val && containingAtom != null && atom == containingAtom)
         {
             return false;
@@ -2469,6 +2538,13 @@ public class FrameAngelRadar : MVRScript
     private bool IsLightAtom(Atom atom)
     {
         return AtomTextContains(atom, "light");
+    }
+
+    private bool IsRadarGrabHandleAtom(Atom atom)
+    {
+        return atom != null
+            && !string.IsNullOrEmpty(atom.uid)
+            && atom.uid.StartsWith("FA_Radar_" + EditionName + "_grab_", StringComparison.Ordinal);
     }
 
     private bool IsCustomUnityAssetAtom(Atom atom)
@@ -2605,6 +2681,712 @@ public class FrameAngelRadar : MVRScript
         if (atom != null)
         {
             SelectRadarAtom(atom);
+        }
+    }
+
+    private void UpdateSessionGrabHandles(Transform viewer)
+    {
+        if (!ShouldUseSessionGrabHandles(viewer))
+        {
+            DestroySessionGrabHandles();
+            return;
+        }
+
+        Vector3 radarCenter = ResolveRadarWorldCenter(viewer);
+        EnsurePrimaryGrabHandleAtom(radarCenter);
+        if (primaryGrabHandleAtom == null || primaryGrabHandleAtom.mainController == null)
+        {
+            SetResizeGuideLineVisible(false);
+            return;
+        }
+
+        ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+        FreeControllerV3 primaryController = primaryGrabHandleAtom.mainController;
+        int grabbedHand;
+        bool primaryGrabbed = TryResolveGrabbedHand(primaryController, out grabbedHand);
+        if (primaryGrabbed && !moveGrabActive)
+        {
+            StartMoveGrab(primaryController, grabbedHand);
+        }
+        else if (!primaryGrabbed && moveGrabActive)
+        {
+            EndMoveGrab();
+        }
+
+        if (moveGrabActive)
+        {
+            UpdateMoveGrab(viewer, primaryController);
+            UpdateResizeGrabHandle(viewer, primaryController);
+            return;
+        }
+
+        MoveGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+        DestroyResizeGrabHandleAtom();
+        SetResizeGuideLineVisible(false);
+    }
+
+    private bool ShouldUseSessionGrabHandles(Transform viewer)
+    {
+        if (viewer == null || hudRoot == null || !ReadBool(grabHandlesEnabledField, false))
+        {
+            return false;
+        }
+
+        if (IsCuaPreferenceProfileActive())
+        {
+            return false;
+        }
+
+        if (containingAtom != null && IsCustomUnityAssetAtom(containingAtom))
+        {
+            return false;
+        }
+
+        return recorderRadarVisible && radarEnabledField != null && radarEnabledField.val;
+    }
+
+    private void EnsurePrimaryGrabHandleAtom(Vector3 worldPosition)
+    {
+        primaryGrabHandleUid = BuildGrabHandleUid(GrabHandlePrimarySuffix);
+        primaryGrabHandleAtom = ResolveGrabHandleAtom(primaryGrabHandleUid, primaryGrabHandleAtom);
+        if (primaryGrabHandleAtom != null || primaryGrabHandleCreatePending)
+        {
+            return;
+        }
+
+        primaryGrabHandleCreatePending = true;
+        StartCoroutine(CreateGrabHandleAtomCoroutine(primaryGrabHandleUid, true, worldPosition));
+    }
+
+    private void EnsureResizeGrabHandleAtom(Vector3 worldPosition)
+    {
+        resizeGrabHandleUid = BuildGrabHandleUid(GrabHandleResizeSuffix);
+        resizeGrabHandleAtom = ResolveGrabHandleAtom(resizeGrabHandleUid, resizeGrabHandleAtom);
+        if (resizeGrabHandleAtom != null || resizeGrabHandleCreatePending)
+        {
+            return;
+        }
+
+        resizeGrabHandleCreatePending = true;
+        StartCoroutine(CreateGrabHandleAtomCoroutine(resizeGrabHandleUid, false, worldPosition));
+    }
+
+    private IEnumerator CreateGrabHandleAtomCoroutine(string uid, bool primary, Vector3 worldPosition)
+    {
+        if (SuperController.singleton == null || string.IsNullOrEmpty(uid))
+        {
+            SetGrabHandleCreatePending(primary, false);
+            yield break;
+        }
+
+        Atom atom = SuperController.singleton.GetAtomByUid(uid);
+        if (atom == null)
+        {
+            yield return SuperController.singleton.AddAtomByType("Empty", uid, false, false, false);
+            atom = SuperController.singleton.GetAtomByUid(uid);
+        }
+
+        if (atom != null)
+        {
+            ConfigureGrabHandleAtom(atom, worldPosition);
+            if (primary)
+            {
+                primaryGrabHandleAtom = atom;
+            }
+            else
+            {
+                resizeGrabHandleAtom = atom;
+            }
+        }
+
+        SetGrabHandleCreatePending(primary, false);
+    }
+
+    private void SetGrabHandleCreatePending(bool primary, bool pending)
+    {
+        if (primary)
+        {
+            primaryGrabHandleCreatePending = pending;
+        }
+        else
+        {
+            resizeGrabHandleCreatePending = pending;
+        }
+    }
+
+    private Atom ResolveGrabHandleAtom(string uid, Atom current)
+    {
+        if (SuperController.singleton == null || string.IsNullOrEmpty(uid))
+        {
+            return null;
+        }
+
+        Atom found = SuperController.singleton.GetAtomByUid(uid);
+        if (found != null)
+        {
+            return found;
+        }
+
+        return null;
+    }
+
+    private string BuildGrabHandleUid(string suffix)
+    {
+        string instance = GetInstanceID().ToString(CultureInfo.InvariantCulture).Replace("-", "n");
+        return "FA_Radar_" + EditionName + "_grab_" + instance + "_" + suffix;
+    }
+
+    private void ConfigureGrabHandleAtom(Atom atom, Vector3 worldPosition)
+    {
+        if (atom == null)
+        {
+            return;
+        }
+
+        try
+        {
+            atom.SetOn(true);
+            atom.hidden = false;
+        }
+        catch
+        {
+        }
+
+        FreeControllerV3 controller = atom.mainController;
+        if (controller == null)
+        {
+            return;
+        }
+
+        bool debugVisible = ReadBool(grabHandleDebugVisibleField, false);
+        try
+        {
+            controller.currentPositionState = FreeControllerV3.PositionState.On;
+            controller.currentRotationState = FreeControllerV3.RotationState.Off;
+            controller.canGrabPosition = true;
+            controller.canGrabRotation = false;
+            controller.hidden = !debugVisible;
+            controller.guihidden = !debugVisible;
+        }
+        catch
+        {
+        }
+
+        int unusedHand;
+        if (!TryResolveGrabbedHand(controller, out unusedHand))
+        {
+            MoveGrabHandleAtom(atom, worldPosition);
+        }
+    }
+
+    private void MoveGrabHandleAtom(Atom atom, Vector3 worldPosition)
+    {
+        if (atom == null || atom.mainController == null)
+        {
+            return;
+        }
+
+        try
+        {
+            atom.mainController.MoveTo(worldPosition, true);
+        }
+        catch
+        {
+            try
+            {
+                atom.mainController.transform.position = worldPosition;
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private bool TryResolveGrabbedHand(FreeControllerV3 controller, out int hand)
+    {
+        hand = GrabHandUnknown;
+        if (controller == null)
+        {
+            return false;
+        }
+
+        SuperController sc = SuperController.singleton;
+        if (sc != null)
+        {
+            try
+            {
+                if (sc.LeftGrabbedController == controller || sc.LeftFullGrabbedController == controller)
+                {
+                    hand = GrabHandLeft;
+                    return true;
+                }
+
+                if (sc.RightGrabbedController == controller || sc.RightFullGrabbedController == controller)
+                {
+                    hand = GrabHandRight;
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        try
+        {
+            return controller.isGrabbing;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void StartMoveGrab(FreeControllerV3 primaryController, int hand)
+    {
+        moveGrabActive = true;
+        resizeGrabActive = false;
+        resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabHand = hand;
+        resizeGrabHand = GrabHandUnknown;
+        moveStartHandlePosition = GetControllerWorldPosition(primaryController);
+        moveStartHudOffset = GetHudOffset();
+        moveStartStaticPosition = GetStaticWorldPosition();
+        haveSmoothedHudPosition = false;
+        PulseGrabHandleHaptics(hand, 0.35f, 0.28f, 0.045f);
+        SetStatus("Radar grab move active.");
+    }
+
+    private void UpdateMoveGrab(Transform viewer, FreeControllerV3 primaryController)
+    {
+        if (!moveGrabActive || primaryController == null)
+        {
+            return;
+        }
+
+        Vector3 worldDelta = GetControllerWorldPosition(primaryController) - moveStartHandlePosition;
+        ApplyMoveGrabDelta(viewer, worldDelta);
+    }
+
+    private void EndMoveGrab()
+    {
+        if (moveGrabActive)
+        {
+            MarkGlobalPreferencesDirty();
+            PulseGrabHandleHaptics(moveGrabHand, 0.22f, 0.20f, 0.035f);
+        }
+
+        moveGrabActive = false;
+        resizeGrabActive = false;
+        resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabHand = GrabHandUnknown;
+        resizeGrabHand = GrabHandUnknown;
+        DestroyResizeGrabHandleAtom();
+        SetResizeGuideLineVisible(false);
+        SetStatus("Radar grab move applied.");
+    }
+
+    private void ApplyMoveGrabDelta(Transform viewer, Vector3 worldDelta)
+    {
+        string anchorMode = ResolveAnchorMode();
+        if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
+        {
+            SetStaticWorldPositionNoCallback(moveStartStaticPosition + worldDelta);
+            haveSmoothedHudPosition = false;
+            return;
+        }
+
+        Transform reference = viewer;
+        if (!string.Equals(anchorMode, AnchorModeHud, StringComparison.Ordinal))
+        {
+            Transform anchor = ResolveRadarAnchorTransform(anchorMode);
+            if (anchor != null)
+            {
+                reference = anchor;
+            }
+        }
+
+        Vector3 localDelta = reference != null ? reference.InverseTransformVector(worldDelta) : worldDelta;
+        SetHudOffsetNoCallback(moveStartHudOffset + localDelta);
+        haveSmoothedHudPosition = false;
+    }
+
+    private void UpdateResizeGrabHandle(Transform viewer, FreeControllerV3 primaryController)
+    {
+        if (primaryController == null || moveGrabHand == GrabHandUnknown || resizeHandleDismissedUntilMoveRelease)
+        {
+            DestroyResizeGrabHandleAtom();
+            SetResizeGuideLineVisible(false);
+            return;
+        }
+
+        int freeHand = moveGrabHand == GrabHandLeft ? GrabHandRight : GrabHandLeft;
+        Transform freeController = ResolveMotionControllerTransform(freeHand);
+        Vector3 primaryPosition = GetControllerWorldPosition(primaryController);
+        Vector3 resizeTarget = freeController != null
+            ? freeController.position
+            : primaryPosition + ((viewer != null ? viewer.right : Vector3.right) * 0.25f);
+
+        EnsureResizeGrabHandleAtom(resizeTarget);
+        if (resizeGrabHandleAtom == null || resizeGrabHandleAtom.mainController == null)
+        {
+            UpdateResizeGuideLine(primaryPosition, resizeTarget, false);
+            return;
+        }
+
+        ConfigureGrabHandleAtom(resizeGrabHandleAtom, resizeTarget);
+        FreeControllerV3 resizeController = resizeGrabHandleAtom.mainController;
+        int grabbedHand;
+        bool resizeGrabbed = TryResolveGrabbedHand(resizeController, out grabbedHand);
+        if (resizeGrabbed && !resizeGrabActive && grabbedHand != moveGrabHand)
+        {
+            StartResizeGrab(primaryController, resizeController, grabbedHand);
+        }
+        else if ((!resizeGrabbed || grabbedHand == moveGrabHand) && resizeGrabActive)
+        {
+            EndResizeGrab(true);
+        }
+
+        if (resizeGrabActive)
+        {
+            UpdateResizeGrab(primaryController, resizeController);
+            UpdateResizeGuideLine(GetControllerWorldPosition(primaryController), GetControllerWorldPosition(resizeController), true);
+            return;
+        }
+
+        MoveGrabHandleAtom(resizeGrabHandleAtom, resizeTarget);
+        UpdateResizeGuideLine(primaryPosition, resizeTarget, false);
+    }
+
+    private void StartResizeGrab(FreeControllerV3 primaryController, FreeControllerV3 resizeController, int hand)
+    {
+        resizeGrabActive = true;
+        resizeGrabHand = hand;
+        resizeStartScale = Mathf.Max(0.01f, ReadFloat(hudScaleField, 0.49f));
+        resizeStartPrimaryPosition = GetControllerWorldPosition(primaryController);
+        resizeStartHandlePosition = GetControllerWorldPosition(resizeController);
+        resizeStartDistance = Mathf.Max(
+            GrabResizeMinimumStartDistanceMeters,
+            Vector3.Distance(resizeStartPrimaryPosition, resizeStartHandlePosition));
+        PulseGrabHandleHaptics(hand, 0.48f, 0.35f, 0.05f);
+        SetStatus("Radar grab resize active.");
+    }
+
+    private void UpdateResizeGrab(FreeControllerV3 primaryController, FreeControllerV3 resizeController)
+    {
+        if (!resizeGrabActive || primaryController == null || resizeController == null)
+        {
+            return;
+        }
+
+        float currentDistance = Mathf.Max(
+            GrabResizeMinimumStartDistanceMeters,
+            Vector3.Distance(GetControllerWorldPosition(primaryController), GetControllerWorldPosition(resizeController)));
+        float ratio = currentDistance / Mathf.Max(GrabResizeMinimumStartDistanceMeters, resizeStartDistance);
+        SetHudScaleNoCallback(resizeStartScale * ratio);
+    }
+
+    private void EndResizeGrab(bool dismissUntilMoveRelease)
+    {
+        if (resizeGrabActive)
+        {
+            MarkGlobalPreferencesDirty();
+            PulseGrabHandleHaptics(resizeGrabHand, 0.26f, 0.22f, 0.035f);
+        }
+
+        resizeGrabActive = false;
+        resizeGrabHand = GrabHandUnknown;
+        resizeHandleDismissedUntilMoveRelease = dismissUntilMoveRelease;
+        DestroyResizeGrabHandleAtom();
+        SetResizeGuideLineVisible(false);
+        SetStatus("Radar grab resize applied.");
+    }
+
+    private Transform ResolveMotionControllerTransform(int hand)
+    {
+        SuperController sc = SuperController.singleton;
+        if (sc == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            Camera controllerCamera = hand == GrabHandLeft ? sc.leftControllerCamera : sc.rightControllerCamera;
+            return controllerCamera != null ? controllerCamera.transform : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private Vector3 GetControllerWorldPosition(FreeControllerV3 controller)
+    {
+        if (controller == null)
+        {
+            return Vector3.zero;
+        }
+
+        try
+        {
+            if (controller.control != null)
+            {
+                return controller.control.position;
+            }
+        }
+        catch
+        {
+        }
+
+        return controller.transform.position;
+    }
+
+    private Vector3 ResolveRadarWorldCenter(Transform viewer)
+    {
+        string anchorMode = ResolveAnchorMode();
+        if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
+        {
+            return GetStaticWorldPosition();
+        }
+
+        Transform anchor = !string.Equals(anchorMode, AnchorModeHud, StringComparison.Ordinal)
+            ? ResolveRadarAnchorTransform(anchorMode)
+            : null;
+        if (anchor != null)
+        {
+            return anchor.TransformPoint(GetHudOffset());
+        }
+
+        if (viewer != null)
+        {
+            return viewer.TransformPoint(GetHudOffset());
+        }
+
+        return hudRoot != null ? hudRoot.transform.position : Vector3.zero;
+    }
+
+    private void EnsureResizeGuideLine()
+    {
+        if (resizeGuideLineObject != null)
+        {
+            return;
+        }
+
+        resizeGuideLineMesh = CreateDottedLineMesh();
+        grabGuideMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Grab Resize Guide Material"), new Color(0.72f, 1.0f, 1.0f, 0.36f), MarkerRenderQueue);
+        resizeGuideLineObject = CreateMeshObject(BuildFilmSubjectName("Grab Resize Guide"), null, resizeGuideLineMesh, grabGuideMaterial, MarkerRenderQueue, MarkerSortingOrder - 6);
+        SetActiveIfChanged(resizeGuideLineObject, false);
+    }
+
+    private Mesh CreateDottedLineMesh()
+    {
+        Mesh mesh = new Mesh();
+        mesh.name = "FA Radar Grab Resize Dotted Line Mesh";
+        return mesh;
+    }
+
+    private void UpdateResizeGuideLine(Vector3 start, Vector3 end, bool grabbed)
+    {
+        EnsureResizeGuideLine();
+        if (resizeGuideLineMesh == null)
+        {
+            return;
+        }
+
+        Vector3 delta = end - start;
+        float distance = delta.magnitude;
+        if (distance < 0.01f)
+        {
+            SetResizeGuideLineVisible(false);
+            return;
+        }
+
+        Vector3 direction = delta / distance;
+        Vector3 side = Vector3.Cross(direction, Vector3.up);
+        if (side.sqrMagnitude < 0.0001f)
+        {
+            side = Vector3.Cross(direction, Vector3.right);
+        }
+        side.Normalize();
+
+        float width = grabbed ? 0.006f : 0.004f;
+        float dashLength = Mathf.Clamp(distance * 0.075f, 0.025f, 0.09f);
+        float gapLength = dashLength * 0.85f;
+        List<Vector3> vertices = new List<Vector3>();
+        List<int> triangles = new List<int>();
+        for (float cursor = 0.0f; cursor < distance; cursor += dashLength + gapLength)
+        {
+            float segmentEnd = Mathf.Min(distance, cursor + dashLength);
+            AddWorldLineSegment(vertices, triangles, start + (direction * cursor), start + (direction * segmentEnd), side * width);
+        }
+
+        resizeGuideLineMesh.Clear();
+        resizeGuideLineMesh.SetVertices(vertices);
+        resizeGuideLineMesh.SetTriangles(triangles, 0);
+        resizeGuideLineMesh.RecalculateBounds();
+        ApplyMaterialColor(grabGuideMaterial, new Color(0.72f, 1.0f, 1.0f, grabbed ? 0.74f : 0.36f), Mathf.Max(0.0f, emissionStrengthField.val));
+        SetResizeGuideLineVisible(true);
+    }
+
+    private void AddWorldLineSegment(List<Vector3> vertices, List<int> triangles, Vector3 start, Vector3 end, Vector3 side)
+    {
+        int index = vertices.Count;
+        vertices.Add(start - side);
+        vertices.Add(start + side);
+        vertices.Add(end + side);
+        vertices.Add(end - side);
+        triangles.Add(index);
+        triangles.Add(index + 1);
+        triangles.Add(index + 2);
+        triangles.Add(index);
+        triangles.Add(index + 2);
+        triangles.Add(index + 3);
+    }
+
+    private void SetResizeGuideLineVisible(bool visible)
+    {
+        SetActiveIfChanged(resizeGuideLineObject, visible);
+    }
+
+    private void PulseGrabHandleHaptics(int hand, float frequency, float amplitude, float durationSeconds)
+    {
+        if (!ReadBool(grabHapticsEnabledField, true))
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (now - lastGrabHandleHapticAt < GrabHapticCooldownSeconds)
+        {
+            return;
+        }
+
+        lastGrabHandleHapticAt = now;
+        if (hand == GrabHandLeft || hand == GrabHandUnknown)
+        {
+            PulseGrabHandleOvrHaptic(true, frequency, amplitude, durationSeconds);
+        }
+        if (hand == GrabHandRight || hand == GrabHandUnknown)
+        {
+            PulseGrabHandleOvrHaptic(false, frequency, amplitude, durationSeconds);
+        }
+    }
+
+    private void PulseGrabHandleOvrHaptic(bool left, float frequency, float amplitude, float durationSeconds)
+    {
+        try
+        {
+            OVRInput.Controller controller = left ? OVRInput.Controller.LTouch : OVRInput.Controller.RTouch;
+            OVRInput.SetControllerVibration(Mathf.Clamp01(frequency), Mathf.Clamp01(amplitude), controller);
+            if (left)
+            {
+                ovrLeftGrabHapticActive = true;
+                ovrLeftGrabHapticStopAt = Time.unscaledTime + Mathf.Clamp(durationSeconds, 0.01f, 0.25f);
+            }
+            else
+            {
+                ovrRightGrabHapticActive = true;
+                ovrRightGrabHapticStopAt = Time.unscaledTime + Mathf.Clamp(durationSeconds, 0.01f, 0.25f);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private void TickGrabHandleHapticStops(float now)
+    {
+        if (ovrLeftGrabHapticActive && now >= ovrLeftGrabHapticStopAt)
+        {
+            StopGrabHandleOvrHaptic(true);
+        }
+        if (ovrRightGrabHapticActive && now >= ovrRightGrabHapticStopAt)
+        {
+            StopGrabHandleOvrHaptic(false);
+        }
+    }
+
+    private void StopGrabHandleOvrHaptic(bool left)
+    {
+        try
+        {
+            OVRInput.SetControllerVibration(0.0f, 0.0f, left ? OVRInput.Controller.LTouch : OVRInput.Controller.RTouch);
+        }
+        catch
+        {
+        }
+
+        if (left)
+        {
+            ovrLeftGrabHapticActive = false;
+        }
+        else
+        {
+            ovrRightGrabHapticActive = false;
+        }
+    }
+
+    private void DestroySessionGrabHandles()
+    {
+        if (moveGrabActive || resizeGrabActive)
+        {
+            MarkGlobalPreferencesDirty();
+        }
+
+        moveGrabActive = false;
+        resizeGrabActive = false;
+        resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabHand = GrabHandUnknown;
+        resizeGrabHand = GrabHandUnknown;
+        DestroyGrabHandleAtom(ref primaryGrabHandleAtom, primaryGrabHandleUid);
+        primaryGrabHandleCreatePending = false;
+        DestroyResizeGrabHandleAtom();
+        SetResizeGuideLineVisible(false);
+        StopGrabHandleOvrHaptic(true);
+        StopGrabHandleOvrHaptic(false);
+    }
+
+    private void DestroyResizeGrabHandleAtom()
+    {
+        DestroyGrabHandleAtom(ref resizeGrabHandleAtom, resizeGrabHandleUid);
+        resizeGrabHandleCreatePending = false;
+    }
+
+    private void DestroyGrabHandleAtom(ref Atom atom, string uid)
+    {
+        Atom target = atom;
+        if (target == null && !string.IsNullOrEmpty(uid) && SuperController.singleton != null)
+        {
+            target = SuperController.singleton.GetAtomByUid(uid);
+        }
+
+        if (target != null && SuperController.singleton != null)
+        {
+            try
+            {
+                RemoveGrabHandleAtom(target);
+            }
+            catch
+            {
+                try
+                {
+                    target.Remove();
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        atom = null;
+    }
+
+    private void RemoveGrabHandleAtom(Atom atom)
+    {
+        if (atom != null && SuperController.singleton != null)
+        {
+            SuperController.singleton.RemoveAtom(atom);
         }
     }
 
@@ -3312,6 +4094,32 @@ public class FrameAngelRadar : MVRScript
         hudOffsetZField.SetVal(offset.z);
     }
 
+    private void SetHudOffsetNoCallback(Vector3 offset)
+    {
+        SetFloatNoCallback(hudOffsetXField, ClampStorableFloat(hudOffsetXField, offset.x, -1.0f, 1.0f));
+        SetFloatNoCallback(hudOffsetYField, ClampStorableFloat(hudOffsetYField, offset.y, -1.0f, 1.0f));
+        SetFloatNoCallback(hudOffsetZField, ClampStorableFloat(hudOffsetZField, offset.z, 0.15f, 1.5f));
+    }
+
+    private void SetHudScaleNoCallback(float scale)
+    {
+        SetFloatNoCallback(hudScaleField, ClampStorableFloat(hudScaleField, scale, 0.25f, 3.0f));
+    }
+
+    private void SetStaticWorldPositionNoCallback(Vector3 position)
+    {
+        SetFloatNoCallback(staticWorldXField, ClampStorableFloat(staticWorldXField, position.x, -20.0f, 20.0f));
+        SetFloatNoCallback(staticWorldYField, ClampStorableFloat(staticWorldYField, position.y, -5.0f, 20.0f));
+        SetFloatNoCallback(staticWorldZField, ClampStorableFloat(staticWorldZField, position.z, -20.0f, 20.0f));
+    }
+
+    private static float ClampStorableFloat(JSONStorableFloat field, float value, float fallbackMin, float fallbackMax)
+    {
+        float min = field != null ? field.min : fallbackMin;
+        float max = field != null ? field.max : fallbackMax;
+        return Mathf.Clamp(value, min, max);
+    }
+
     private void CaptureHudOffsetFromAttachedAtom()
     {
         Transform viewer = ResolveViewerTransform();
@@ -3494,6 +4302,7 @@ public class FrameAngelRadar : MVRScript
     private void DestroyRuntimeVisuals()
     {
         DestroyOwnedObject(hudRoot);
+        DestroyOwnedObject(resizeGuideLineObject);
         hudRoot = null;
         radarRoot = null;
         axisRoot = null;
@@ -3507,6 +4316,7 @@ public class FrameAngelRadar : MVRScript
         targetGridDropObject = null;
         lastTargetBlipObject = null;
         lastTargetGridDropObject = null;
+        resizeGuideLineObject = null;
         availableMarkerObjects = null;
         availableStemObjects = null;
         ringObjects = null;
@@ -3528,6 +4338,7 @@ public class FrameAngelRadar : MVRScript
         DestroyOwnedObject(lastTargetMaterial);
         DestroyOwnedObject(lastTargetDropMaterial);
         DestroyOwnedObject(availableHeightStemMaterial);
+        DestroyOwnedObject(grabGuideMaterial);
         if (availableMarkerMaterials != null)
         {
             for (int i = 0; i < availableMarkerMaterials.Length; i++)
@@ -3548,6 +4359,7 @@ public class FrameAngelRadar : MVRScript
         lastTargetMaterial = null;
         lastTargetDropMaterial = null;
         availableHeightStemMaterial = null;
+        grabGuideMaterial = null;
         availableMarkerMaterials = null;
 
         DestroyOwnedObject(sphereMesh);
@@ -3557,6 +4369,7 @@ public class FrameAngelRadar : MVRScript
         DestroyOwnedObject(targetBlipMesh);
         DestroyOwnedObject(centerMarkerMesh);
         DestroyOwnedObject(heightStemMesh);
+        DestroyOwnedObject(resizeGuideLineMesh);
         sphereMesh = null;
         flatCircleMesh = null;
         ringMesh = null;
@@ -3564,6 +4377,7 @@ public class FrameAngelRadar : MVRScript
         targetBlipMesh = null;
         centerMarkerMesh = null;
         heightStemMesh = null;
+        resizeGuideLineMesh = null;
         trackedAvailableAtoms.Clear();
 
         visualsReady = false;

@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.17"',
+        'private const string Version = "0.1.18"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -210,6 +210,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "IsLightAtom",
         "IsCustomUnityAssetAtom",
         "IsPersonAtom",
+        "IsRadarGrabHandleAtom",
         "IsAtomVisibleByFilter",
         "return true",
         "ResolveAvailableAtomColor",
@@ -242,7 +243,28 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Capture HUD Offset From Atom",
         'Shader.Find("Hidden/Internal-Colored")',
         "CompareFunction.Always",
-        "DestroyRuntimeVisuals"
+        "DestroyRuntimeVisuals",
+        "Session Grab Handles",
+        'new JSONStorableBool("Grab Handles Enabled", false)',
+        'new JSONStorableBool("Show Grab Handle Debug", false)',
+        'new JSONStorableBool("Grab Haptics", true)',
+        "UpdateSessionGrabHandles",
+        'SuperController.singleton.AddAtomByType("Empty", uid, false, false, false)',
+        "SuperController.singleton.RemoveAtom(atom)",
+        "LeftGrabbedController",
+        "RightGrabbedController",
+        "leftControllerCamera",
+        "rightControllerCamera",
+        "StartMoveGrab",
+        "UpdateMoveGrab",
+        "StartResizeGrab",
+        "UpdateResizeGrab",
+        "DestroyResizeGrabHandleAtom",
+        "CreateDottedLineMesh",
+        "UpdateResizeGuideLine",
+        "PulseGrabHandleHaptics",
+        "OVRInput.SetControllerVibration",
+        "if (IsCuaPreferenceProfileActive())"
     )
 
     foreach ($snippet in $requiredSnippets) {
@@ -263,6 +285,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "\bSimpleJSON\b",
         "\btargetOutlineObject\b",
         "\btargetOutlineMaterial\b",
+        "\bmotionControllerLeft\b",
+        "\bmotionControllerRight\b",
         "CreateSlider\(viewYawOffsetField",
         "CreateSlider\(axisYawOffsetField",
         "viewYawOffsetField\.val",
@@ -283,8 +307,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.17.dll",
-        "fa_radar.pro.0.1.17.dll",
+        "fa_radar.free.0.1.18.dll",
+        "fa_radar.pro.0.1.18.dll",
         "Preset_FrameAngel_Radar_CUA.vap",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
@@ -329,8 +353,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.17.dll",
-        "fa_radar.pro.0.1.17.dll",
+        "fa_radar.free.0.1.18.dll",
+        "fa_radar.pro.0.1.18.dll",
         "Preset_FrameAngel_Radar_CUA.vap",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
@@ -367,7 +391,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.17.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.18.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"HUD Offset X"',
@@ -413,11 +437,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.17") {
-        Add-Failure "Version config must declare version 0.1.17."
+    if ($version.version -ne "0.1.18") {
+        Add-Failure "Version config must declare version 0.1.18."
     }
-    if ($version.branch -ne "codex/0.1.17-ground-axis-sign-fix") {
-        Add-Failure "Version config branch must match codex/0.1.17-ground-axis-sign-fix."
+    if ($version.branch -ne "codex/0.1.18-session-grab-handles") {
+        Add-Failure "Version config branch must match codex/0.1.18-session-grab-handles."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -518,8 +542,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.17.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.17.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.18.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.18.dll")
         )
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
@@ -548,7 +572,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.17."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.18."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
