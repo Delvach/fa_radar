@@ -1,18 +1,18 @@
 {
   "schemaVersion": "fa_radar_version_v1",
   "product": "fa_radar",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "channel": "dev",
-  "branch": "codex/0.1.6-ground-axis-grid",
-  "status": "prototype-ground-axis-grid",
-  "versionNote": "0.1.6 locks the grid/ring axis root to real world XYZ by default, keeps the grid on the actual ground X/Z plane for desktop and VR, projects target grid drops through world X/Z, and exposes Ground Axis Lock for VR roll testing.",
+  "branch": "codex/0.1.7-marker-clarity-sphere-smooth",
+  "status": "prototype-marker-clarity-sphere-smooth",
+  "versionNote": "0.1.7 makes the selected ground-drop marker opt-in by default to avoid double selected highlights, keeps faded last-selected behavior separate, and increases sphere shell and marker mesh subdivisions.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
     "lineageNote": "FA Keyboard informed camera-relative placement, render queues, transparent emissive materials, and direct Custom\\Plugins deploy receipts. No keyboard source is copied into this repo."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.0.1.6.dll",
+    "pluginFileName": "fa_radar.0.1.7.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -20,5 +20,5 @@
     "pluginRelativePath": "Custom\\Plugins",
     "policy": "Future builds deploy the compiled DLL directly to each VaM root's Custom\\Plugins folder. No subfolders."
   },
-  "updatedAt": "2026-06-03T17:03:00-06:00"
+  "updatedAt": "2026-06-03T20:10:00-06:00"
 }

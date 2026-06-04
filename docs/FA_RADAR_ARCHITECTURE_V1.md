@@ -10,11 +10,11 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.6` on branch
-  `codex/0.1.6-ground-axis-grid`.
+- Version: `0.1.7` on branch
+  `codex/0.1.7-marker-clarity-sphere-smooth`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as a compiled VaM plugin DLL:
-  `Custom/Plugins/fa_radar.0.1.6.dll`.
+  `Custom/Plugins/fa_radar.0.1.7.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -22,13 +22,14 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.6` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.7` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
   target markers
 - a subtle transparent sphere material using the Standard shader when available,
-  with low emission so the shell reads round without becoming attention-grabbing
+  with low emission and increased mesh subdivisions so the shell reads round
+  without becoming attention-grabbing
 - three cached annulus meshes tied to the world-axis visual root
 - distinct, subdued X/Z ring colors for axis readability
 - faded meter grid centered through the sphere on the actual world X/Z ground
@@ -37,7 +38,9 @@ polygons so targeting can be tested before any art polish:
 - grid panning from viewer world X/Z movement when `Grid Follows User` is on,
   including corrected forward/backward Z direction
 - green center marker for the user
-- orange selected-atom sphere plus a faded world-ground grid drop marker
+- orange selected-atom sphere
+- optional selected world-ground grid drop marker, disabled by default so the
+  current selection does not read as a duplicate highlight
 - faded orange last-selected sphere plus a faded world-ground grid drop marker
 
 The selected atom is resolved with
@@ -58,6 +61,11 @@ ground X/Z plane for desktop and VR and prevents camera roll from rolling the
 radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
+
+The faded prior-selection behavior is independent of the selected ground-drop
+projection. `Last Selected Enabled` shows the previous atom after selection
+changes; `Selected Ground Drop` controls only the current atom's ground
+projection dot.
 
 `Grid Follows User` uses the viewer's world X/Z position to offset the meter
 grid before it is clipped into the radar circle. A 1m movement along world Z
@@ -82,6 +90,7 @@ Placement uses a saved local offset:
 - `Desktop Tilt Degrees`
 - `Axis Yaw Offset`
 - `Ground Axis Lock`
+- `Selected Ground Drop`
 - `Grid Follows User`
 - `Grid Clip Circle`
 
@@ -110,8 +119,8 @@ works through the offset sliders and reset button.
 `scripts/Deploy-FaRadar.ps1` is the future deploy helper. Its default targets
 are direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.6.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.6.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.7.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.7.dll`
 
 The operator clarified that deploy instructions are forward-looking for now,
 so this branch should not be treated as live-deployed until a receipt proves
