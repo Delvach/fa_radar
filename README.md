@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.15`.
+Current branch version: `0.1.16`.
 
-Current product contract version: `0.1.15`.
+Current product contract version: `0.1.16`.
 
 The current slice is compiled C# only:
 
@@ -29,6 +29,11 @@ The current slice is compiled C# only:
   churn
 - shared anchor modes for HUD/view, static world placement, containing-atom/CUA
   placement, and explicit atom UID placement without duplicating radar logic
+- Pro CUA preset at
+  `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- FAAR visibility handshake reads
+  `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
+  Radar visuals when `radarHudVisible` is false
 - optional world-axis alignment for the grid and rings
 - ground-axis lock so the grid represents real world X/Z and camera roll does
   not roll the radar Z axis
@@ -43,6 +48,8 @@ The current slice is compiled C# only:
 - click-to-select for visible available CUA/light/person/other atom markers
 - global non-scene-stored preferences under
   `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
+- CUA preset instances use separate global preference files:
+  `preferences_cua_common.json` and `preferences_cua_pro.json`
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free is the
   unrestricted radar that shows everything, while Pro adds filters, category
@@ -81,10 +88,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.15.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.15.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.15.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.15.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.16.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.16.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral
 dev candidate filenames under `build/packages`.

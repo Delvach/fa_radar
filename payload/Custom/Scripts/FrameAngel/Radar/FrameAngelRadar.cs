@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.15";
+    private const string Version = "0.1.16";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -31,15 +31,21 @@ public class FrameAngelRadar : MVRScript
     private const string FrameAngelRadarPreferencesRootPath = "Custom\\PluginData\\FrameAngel\\Radar";
     private const string FrameAngelRadarCommonPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_common.json";
     private const string FrameAngelRadarProPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_pro.json";
+    private const string FrameAngelRadarCuaCommonPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_cua_common.json";
+    private const string FrameAngelRadarCuaProPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_cua_pro.json";
     private const string FrameAngelRadarCommonPreferencesSchemaVersion = "frameangel_radar_common_preferences_v1";
     private const string FrameAngelRadarProPreferencesSchemaVersion = "frameangel_radar_pro_preferences_v1";
+    private const string FrameAngelRadarCuaCommonPreferencesSchemaVersion = "frameangel_radar_cua_common_preferences_v1";
+    private const string FrameAngelRadarCuaProPreferencesSchemaVersion = "frameangel_radar_cua_pro_preferences_v1";
     private const string FilmSubjectIdentifier = "favr.hud.radar";
+    private const string FrameAngelRecorderStatePath = "Custom\\PluginData\\FrameAngelMediaCore\\recorder_v2_state.json";
     private const string AnchorModeHud = "HUD / View";
     private const string AnchorModeWorldStatic = "World Static";
     private const string AnchorModeContainingAtom = "Containing Atom";
     private const string AnchorModeAtomUid = "Anchor Atom UID";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
     private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
+    private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
     private static readonly Color AxisYColor = new Color(0.22f, 1.0f, 0.34f, 1.0f);
     private static readonly Color AxisZColor = new Color(0.26f, 0.52f, 1.0f, 1.0f);
@@ -49,6 +55,12 @@ public class FrameAngelRadar : MVRScript
     private static bool sharedRadarProPreferencesCacheKnown;
     private static string sharedRadarProPreferencesJson = "";
     private static float sharedRadarProPreferencesNextReadAt;
+    private static bool sharedRadarCuaCommonPreferencesCacheKnown;
+    private static string sharedRadarCuaCommonPreferencesJson = "";
+    private static float sharedRadarCuaCommonPreferencesNextReadAt;
+    private static bool sharedRadarCuaProPreferencesCacheKnown;
+    private static string sharedRadarCuaProPreferencesJson = "";
+    private static float sharedRadarCuaProPreferencesNextReadAt;
 
     private JSONStorableBool radarEnabledField;
     private JSONStorableBool ignoreContainingAtomField;
@@ -73,6 +85,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showOtherAtomsField;
     private JSONStorableBool clickSelectMarkersField;
     private JSONStorableBool globalPrefsAutoSaveField;
+    private JSONStorableBool cuaAnchorPresetField;
 
     private JSONStorableFloat hudOffsetXField;
     private JSONStorableFloat hudOffsetYField;
@@ -173,9 +186,14 @@ public class FrameAngelRadar : MVRScript
     private bool haveSmoothedHudPosition;
     private bool globalPreferencesLoading;
     private bool globalPreferencesDirty;
+    private bool recorderRadarVisible = true;
+    private bool lastAppliedRecorderRadarVisible = true;
+    private bool cuaAnchorPresetApplied;
     private Vector3 smoothedHudPosition;
     private float nextGlobalPreferencesFlushTime;
     private float nextGlobalPreferencesPollTime;
+    private float nextRecorderVisibilityPollTime;
+    private float radarMaterialAlphaMultiplier = 1.0f;
     private string lastAppliedCommonPreferencesJson = "";
     private string lastAppliedProPreferencesJson = "";
     private Transform currentHudAnchor;
@@ -234,6 +252,7 @@ public class FrameAngelRadar : MVRScript
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
         globalPrefsAutoSaveField = new JSONStorableBool("Global Prefs Auto Save", true);
+        cuaAnchorPresetField = new JSONStorableBool("CUA Anchor Preset", false);
         anchorModeField = new JSONStorableStringChooser(
             "Anchor Mode",
             new List<string> { AnchorModeHud, AnchorModeWorldStatic, AnchorModeContainingAtom, AnchorModeAtomUid },
@@ -303,6 +322,7 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showOtherAtomsField);
         RegisterBool(clickSelectMarkersField);
         RegisterBool(globalPrefsAutoSaveField);
+        RegisterBool(cuaAnchorPresetField);
         RegisterStringChooser(anchorModeField);
 
         RegisterFloat(hudOffsetXField);
@@ -394,6 +414,7 @@ public class FrameAngelRadar : MVRScript
         {
             ResetGlobalPreferencesAction();
         });
+        CreateToggle(cuaAnchorPresetField, true);
         CreateButton("Use Selected As Anchor", true).button.onClick.AddListener(delegate
         {
             UseSelectedAsAnchor();
@@ -727,7 +748,7 @@ public class FrameAngelRadar : MVRScript
 
         string errorMessage;
         string commonJson = BuildCommonGlobalPreferencesJson();
-        if (!TryWriteGlobalPreferencesToDisk(FrameAngelRadarCommonPreferencesPath, commonJson, out errorMessage))
+        if (!TryWriteGlobalPreferencesToDisk(ResolveCommonPreferencesPath(), commonJson, out errorMessage))
         {
             globalPreferencesDirty = true;
             SetStatus("Global prefs save failed: " + errorMessage);
@@ -739,7 +760,7 @@ public class FrameAngelRadar : MVRScript
 
 #if FA_RADAR_PRO
         string proJson = BuildProGlobalPreferencesJson();
-        if (!TryWriteGlobalPreferencesToDisk(FrameAngelRadarProPreferencesPath, proJson, out errorMessage))
+        if (!TryWriteGlobalPreferencesToDisk(ResolveProPreferencesPath(), proJson, out errorMessage))
         {
             globalPreferencesDirty = true;
             SetStatus("Pro prefs save failed: " + errorMessage);
@@ -812,36 +833,62 @@ public class FrameAngelRadar : MVRScript
         preferencesJson = "";
         if (proPreferences)
         {
-            preferencesJson = sharedRadarProPreferencesJson ?? "";
-            if (sharedRadarProPreferencesCacheKnown && Time.unscaledTime < sharedRadarProPreferencesNextReadAt)
+            if (IsCuaPreferenceProfileActive())
             {
-                return true;
+                preferencesJson = sharedRadarCuaProPreferencesJson ?? "";
+                if (sharedRadarCuaProPreferencesCacheKnown && Time.unscaledTime < sharedRadarCuaProPreferencesNextReadAt)
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                preferencesJson = sharedRadarProPreferencesJson ?? "";
+                if (sharedRadarProPreferencesCacheKnown && Time.unscaledTime < sharedRadarProPreferencesNextReadAt)
+                {
+                    return true;
+                }
             }
 
             if (!TryReadGlobalPreferencesFromDisk(
-                FrameAngelRadarProPreferencesPath,
-                FrameAngelRadarProPreferencesSchemaVersion,
+                ResolveProPreferencesPath(),
+                ResolveProPreferencesSchemaVersion(),
                 out preferencesJson))
             {
-                return sharedRadarProPreferencesCacheKnown;
+                return IsCuaPreferenceProfileActive()
+                    ? sharedRadarCuaProPreferencesCacheKnown
+                    : sharedRadarProPreferencesCacheKnown;
             }
 
             UpdateSharedGlobalPreferencesCache(true, preferencesJson);
             return true;
         }
 
-        preferencesJson = sharedRadarCommonPreferencesJson ?? "";
-        if (sharedRadarCommonPreferencesCacheKnown && Time.unscaledTime < sharedRadarCommonPreferencesNextReadAt)
+        if (IsCuaPreferenceProfileActive())
         {
-            return true;
+            preferencesJson = sharedRadarCuaCommonPreferencesJson ?? "";
+            if (sharedRadarCuaCommonPreferencesCacheKnown && Time.unscaledTime < sharedRadarCuaCommonPreferencesNextReadAt)
+            {
+                return true;
+            }
+        }
+        else
+        {
+            preferencesJson = sharedRadarCommonPreferencesJson ?? "";
+            if (sharedRadarCommonPreferencesCacheKnown && Time.unscaledTime < sharedRadarCommonPreferencesNextReadAt)
+            {
+                return true;
+            }
         }
 
         if (!TryReadGlobalPreferencesFromDisk(
-            FrameAngelRadarCommonPreferencesPath,
-            FrameAngelRadarCommonPreferencesSchemaVersion,
+            ResolveCommonPreferencesPath(),
+            ResolveCommonPreferencesSchemaVersion(),
             out preferencesJson))
         {
-            return sharedRadarCommonPreferencesCacheKnown;
+            return IsCuaPreferenceProfileActive()
+                ? sharedRadarCuaCommonPreferencesCacheKnown
+                : sharedRadarCommonPreferencesCacheKnown;
         }
 
         UpdateSharedGlobalPreferencesCache(false, preferencesJson);
@@ -852,15 +899,64 @@ public class FrameAngelRadar : MVRScript
     {
         if (proPreferences)
         {
+            if (IsCuaPreferenceProfileActive())
+            {
+                sharedRadarCuaProPreferencesJson = preferencesJson ?? "";
+                sharedRadarCuaProPreferencesCacheKnown = true;
+                sharedRadarCuaProPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+                return;
+            }
+
             sharedRadarProPreferencesJson = preferencesJson ?? "";
             sharedRadarProPreferencesCacheKnown = true;
             sharedRadarProPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
             return;
         }
 
+        if (IsCuaPreferenceProfileActive())
+        {
+            sharedRadarCuaCommonPreferencesJson = preferencesJson ?? "";
+            sharedRadarCuaCommonPreferencesCacheKnown = true;
+            sharedRadarCuaCommonPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+            return;
+        }
+
         sharedRadarCommonPreferencesJson = preferencesJson ?? "";
         sharedRadarCommonPreferencesCacheKnown = true;
         sharedRadarCommonPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+    }
+
+    private bool IsCuaPreferenceProfileActive()
+    {
+        return cuaAnchorPresetField != null && cuaAnchorPresetField.val;
+    }
+
+    private string ResolveCommonPreferencesPath()
+    {
+        return IsCuaPreferenceProfileActive()
+            ? FrameAngelRadarCuaCommonPreferencesPath
+            : FrameAngelRadarCommonPreferencesPath;
+    }
+
+    private string ResolveProPreferencesPath()
+    {
+        return IsCuaPreferenceProfileActive()
+            ? FrameAngelRadarCuaProPreferencesPath
+            : FrameAngelRadarProPreferencesPath;
+    }
+
+    private string ResolveCommonPreferencesSchemaVersion()
+    {
+        return IsCuaPreferenceProfileActive()
+            ? FrameAngelRadarCuaCommonPreferencesSchemaVersion
+            : FrameAngelRadarCommonPreferencesSchemaVersion;
+    }
+
+    private string ResolveProPreferencesSchemaVersion()
+    {
+        return IsCuaPreferenceProfileActive()
+            ? FrameAngelRadarCuaProPreferencesSchemaVersion
+            : FrameAngelRadarProPreferencesSchemaVersion;
     }
 
     private bool ApplyCommonGlobalPreferences(string preferencesJson)
@@ -873,7 +969,7 @@ public class FrameAngelRadar : MVRScript
         string schemaVersion;
         if (TryReadStringPreference(preferencesJson, "schemaVersion", out schemaVersion)
             && !string.IsNullOrEmpty(schemaVersion)
-            && !string.Equals(schemaVersion, FrameAngelRadarCommonPreferencesSchemaVersion, StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(schemaVersion, ResolveCommonPreferencesSchemaVersion(), StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -957,7 +1053,7 @@ public class FrameAngelRadar : MVRScript
         string schemaVersion;
         if (TryReadStringPreference(preferencesJson, "schemaVersion", out schemaVersion)
             && !string.IsNullOrEmpty(schemaVersion)
-            && !string.Equals(schemaVersion, FrameAngelRadarProPreferencesSchemaVersion, StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(schemaVersion, ResolveProPreferencesSchemaVersion(), StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -1048,7 +1144,7 @@ public class FrameAngelRadar : MVRScript
         StringBuilder sb = new StringBuilder(2048);
         bool wroteProperty = false;
         sb.Append('{');
-        AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", FrameAngelRadarCommonPreferencesSchemaVersion);
+        AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", ResolveCommonPreferencesSchemaVersion());
         AppendJsonStringProperty(sb, ref wroteProperty, "savedAtUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
         AppendJsonBoolProperty(sb, ref wroteProperty, "globalPrefsAutoSave", ReadBool(globalPrefsAutoSaveField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "radarEnabled", ReadBool(radarEnabledField, true));
@@ -1112,7 +1208,7 @@ public class FrameAngelRadar : MVRScript
         StringBuilder sb = new StringBuilder(384);
         bool wroteProperty = false;
         sb.Append('{');
-        AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", FrameAngelRadarProPreferencesSchemaVersion);
+        AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", ResolveProPreferencesSchemaVersion());
         AppendJsonStringProperty(sb, ref wroteProperty, "savedAtUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showLights", ReadBool(showLightAtomsField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showCUA", ReadBool(showCustomUnityAssetAtomsField, false));
@@ -1282,6 +1378,16 @@ public class FrameAngelRadar : MVRScript
     private static bool TryReadStringPreference(string preferencesJson, string key, out string value)
     {
         return TryReadRawPreferenceValue(preferencesJson, key, out value);
+    }
+
+    private static bool ExtractJsonString(string json, string key, out string value)
+    {
+        return TryReadStringPreference(json, key, out value);
+    }
+
+    private static bool ExtractJsonBool(string json, string key, out bool value)
+    {
+        return TryReadBoolPreference(json, key, out value);
     }
 
     private static bool TryReadBoolPreference(string preferencesJson, string key, out bool value)
@@ -1528,6 +1634,15 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
+        PollRecorderRadarVisibility();
+        ApplyCuaAnchorPresetMode();
+        if (!recorderRadarVisible)
+        {
+            ApplyRecorderRadarVisibility(false);
+            return;
+        }
+        ApplyRecorderRadarVisibility(true);
+
         Transform viewer = ResolveViewerTransform();
         if (!radarEnabledField.val || viewer == null)
         {
@@ -1564,6 +1679,91 @@ public class FrameAngelRadar : MVRScript
         SetActiveIfChanged(lastTargetGridDropObject, false);
         UpdateAvailableAtomMarkers(viewer);
         HandleRadarMarkerClick();
+    }
+
+    private void ApplyCuaAnchorPresetMode()
+    {
+        if (cuaAnchorPresetApplied || cuaAnchorPresetField == null || !cuaAnchorPresetField.val || containingAtom == null)
+        {
+            return;
+        }
+
+        SetBoolNoCallback(globalPrefsAutoSaveField, true);
+        SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
+        SetStringNoCallback(anchorAtomUidField, containingAtom.uid ?? "");
+        SetHudOffset(new Vector3(0.0f, 0.0f, 0.15f));
+        SetFloatNoCallback(hudScaleField, 0.75f);
+        SetFloatNoCallback(anchorRotationXField, 0.0f);
+        SetFloatNoCallback(anchorRotationYField, 0.0f);
+        SetFloatNoCallback(anchorRotationZField, 0.0f);
+        LoadGlobalPreferences();
+        SetBoolNoCallback(globalPrefsAutoSaveField, true);
+        SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
+        SetStringNoCallback(anchorAtomUidField, containingAtom.uid ?? "");
+        haveSmoothedHudPosition = false;
+        cuaAnchorPresetApplied = true;
+        SetStatus("CUA anchor preset active.");
+    }
+
+    private void PollRecorderRadarVisibility()
+    {
+        if (Time.unscaledTime < nextRecorderVisibilityPollTime)
+        {
+            return;
+        }
+
+        nextRecorderVisibilityPollTime = Time.unscaledTime + RecorderVisibilityPollIntervalSeconds;
+        bool visible;
+        recorderRadarVisible = !ReadRecorderRadarVisible(out visible) || visible;
+    }
+
+    private bool ReadRecorderRadarVisible(out bool visible)
+    {
+        visible = true;
+        if (!FileManagerSecure.FileExists(FrameAngelRecorderStatePath, false))
+        {
+            return false;
+        }
+
+        string stateJson;
+        try
+        {
+            stateJson = FileManagerSecure.ReadAllText(FrameAngelRecorderStatePath);
+        }
+        catch
+        {
+            return false;
+        }
+
+        string radarHudFilmSubjectIdentifier;
+        if (ExtractJsonString(stateJson, "radarHudFilmSubjectIdentifier", out radarHudFilmSubjectIdentifier)
+            && !string.IsNullOrEmpty(radarHudFilmSubjectIdentifier)
+            && !string.Equals(radarHudFilmSubjectIdentifier, FilmSubjectIdentifier, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return ExtractJsonBool(stateJson, "radarHudVisible", out visible);
+    }
+
+    private void ApplyRecorderRadarVisibility(bool visible)
+    {
+        if (visible == lastAppliedRecorderRadarVisible)
+        {
+            return;
+        }
+
+        lastAppliedRecorderRadarVisible = visible;
+        SetMaterialAlphaMultiplier(visible ? 1.0f : 0.0f);
+        if (!visible)
+        {
+            SetRadarVisualsVisible(false);
+        }
+    }
+
+    private void SetRadarVisualsVisible(bool visible)
+    {
+        SetActiveIfChanged(hudRoot, visible);
     }
 
     private void PollSelectionIfDue()
@@ -2691,6 +2891,21 @@ public class FrameAngelRadar : MVRScript
         ApplyMaterialColor(availableHeightStemMaterial, new Color(0.78f, 0.88f, 1.0f, Mathf.Clamp01(heightStemAlphaField.val) * 0.72f), emission);
     }
 
+    private void SetMaterialAlphaMultiplier(float multiplier)
+    {
+        multiplier = Mathf.Clamp01(multiplier);
+        if (Mathf.Abs(radarMaterialAlphaMultiplier - multiplier) <= 0.0001f)
+        {
+            return;
+        }
+
+        radarMaterialAlphaMultiplier = multiplier;
+        if (visualsReady)
+        {
+            UpdateMaterials();
+        }
+    }
+
     private Color WithAlpha(Color color, float alpha)
     {
         color.a = alpha;
@@ -2757,6 +2972,8 @@ public class FrameAngelRadar : MVRScript
         {
             return;
         }
+
+        color.a *= Mathf.Clamp01(radarMaterialAlphaMultiplier);
 
         if (material.HasProperty("_Mode"))
         {

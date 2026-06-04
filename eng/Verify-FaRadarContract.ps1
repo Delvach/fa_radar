@@ -17,6 +17,7 @@ $deployPath = Join-Path $RepoRoot "scripts\Deploy-FaRadar.ps1"
 $docPath = Join-Path $RepoRoot "docs\FA_RADAR_ARCHITECTURE_V1.md"
 $versionPath = Join-Path $RepoRoot "config\fa_radar.version.json"
 $obfuscationConfigPath = Join-Path $RepoRoot "config\obfuscation.defaults.json"
+$cuaPresetPath = Join-Path $RepoRoot "payload\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
 
 $failures = New-Object System.Collections.Generic.List[string]
 
@@ -31,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.15"',
+        'private const string Version = "0.1.16"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -69,15 +70,23 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "FrameAngelRadarPreferencesRootPath",
         "FrameAngelRadarCommonPreferencesPath",
         "FrameAngelRadarProPreferencesPath",
+        "FrameAngelRadarCuaCommonPreferencesPath",
+        "FrameAngelRadarCuaProPreferencesPath",
         "FrameAngelRadarCommonPreferencesSchemaVersion",
         "FrameAngelRadarProPreferencesSchemaVersion",
+        "FrameAngelRadarCuaCommonPreferencesSchemaVersion",
+        "FrameAngelRadarCuaProPreferencesSchemaVersion",
         "Custom\\PluginData\\FrameAngel\\Radar",
+        "preferences_cua_common.json",
+        "preferences_cua_pro.json",
         "FileManagerSecure.FileExists",
         "FileManagerSecure.ReadAllText",
         "FileManagerSecure.WriteAllText",
         "FileManagerSecure.CreateDirectory",
         "sharedRadarCommonPreferencesCacheKnown",
         "sharedRadarProPreferencesCacheKnown",
+        "sharedRadarCuaCommonPreferencesCacheKnown",
+        "sharedRadarCuaProPreferencesCacheKnown",
         "LoadGlobalPreferences",
         "WriteGlobalPreferences",
         "TryReadGlobalPreferencesFromDisk",
@@ -85,6 +94,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "PollSharedGlobalPreferences",
         "MarkGlobalPreferencesDirty",
         "FlushGlobalPreferencesIfDue",
+        "IsCuaPreferenceProfileActive",
+        "ResolveCommonPreferencesPath",
+        "ResolveProPreferencesPath",
+        "ResolveCommonPreferencesSchemaVersion",
+        "ResolveProPreferencesSchemaVersion",
         "Global Prefs Auto Save",
         "Save Global Prefs",
         "Load Global Prefs",
@@ -96,10 +110,24 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "FilmSubjectIdentifier",
         '"favr.hud.radar"',
         "BuildFilmSubjectName",
+        "FrameAngelRecorderStatePath",
+        '"Custom\\PluginData\\FrameAngelMediaCore\\recorder_v2_state.json"',
+        "radarHudFilmSubjectIdentifier",
+        "radarHudVisible",
+        "PollRecorderRadarVisibility",
+        "ReadRecorderRadarVisible",
+        "ApplyRecorderRadarVisibility",
+        "SetRadarVisualsVisible",
+        "SetMaterialAlphaMultiplier",
+        "ExtractJsonBool",
+        "ExtractJsonString",
         "AnchorModeHud",
         "AnchorModeWorldStatic",
         "AnchorModeContainingAtom",
         "AnchorModeAtomUid",
+        'new JSONStorableBool("CUA Anchor Preset", false)',
+        "RegisterBool(cuaAnchorPresetField)",
+        "CreateToggle(cuaAnchorPresetField",
         "anchorModeField = new JSONStorableStringChooser",
         'new JSONStorableString("Anchor Atom UID"',
         "RegisterStringChooser(anchorModeField)",
@@ -254,8 +282,9 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.15.dll",
-        "fa_radar.pro.0.1.15.dll",
+        "fa_radar.free.0.1.16.dll",
+        "fa_radar.pro.0.1.16.dll",
+        "Preset_FrameAngel_Radar_CUA.vap",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
         "meta.json",
@@ -299,8 +328,9 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.15.dll",
-        "fa_radar.pro.0.1.15.dll",
+        "fa_radar.free.0.1.16.dll",
+        "fa_radar.pro.0.1.16.dll",
+        "Preset_FrameAngel_Radar_CUA.vap",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -329,6 +359,33 @@ if (-not (Test-Path -LiteralPath $docPath)) {
     Add-Failure "Missing architecture doc: $docPath"
 }
 
+if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
+    Add-Failure "Missing CUA preset: $cuaPresetPath"
+} else {
+    $cuaPreset = Get-Content -Raw -LiteralPath $cuaPresetPath
+    $requiredCuaPresetSnippets = @(
+        '"setUnlistedParamsToDefault" : "true"',
+        '"id" : "PluginManager"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.16.dll"',
+        '"id" : "plugin#0_FrameAngelRadar"',
+        '"Anchor Mode" : "Containing Atom"',
+        '"HUD Offset X"',
+        '"HUD Offset Y"',
+        '"HUD Offset Z"',
+        '"HUD Scale"',
+        '"Anchor Rot X"',
+        '"Anchor Rot Y"',
+        '"Anchor Rot Z"',
+        '"pluginLabel" : "Frame Angel Radar CUA"'
+    )
+
+    foreach ($snippet in $requiredCuaPresetSnippets) {
+        if (-not $cuaPreset.Contains($snippet)) {
+            Add-Failure "CUA preset missing required snippet: $snippet"
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $obfuscationConfigPath)) {
     Add-Failure "Missing obfuscation config: $obfuscationConfigPath"
 } else {
@@ -355,11 +412,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.15") {
-        Add-Failure "Version config must declare version 0.1.15."
+    if ($version.version -ne "0.1.16") {
+        Add-Failure "Version config must declare version 0.1.16."
     }
-    if ($version.branch -ne "codex/0.1.15-anchor-modes") {
-        Add-Failure "Version config branch must match codex/0.1.15-anchor-modes."
+    if ($version.branch -ne "codex/0.1.16-cua-preset-faar-visibility") {
+        Add-Failure "Version config branch must match codex/0.1.16-cua-preset-faar-visibility."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -460,9 +517,10 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.15.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.15.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.16.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.16.dll")
         )
+        $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
 
         foreach ($deployedDll in $expectedDlls) {
@@ -479,13 +537,17 @@ if ($ValidateLiveDeploy.IsPresent) {
         if (Test-Path -LiteralPath $legacyLooseScript -PathType Leaf) {
             Add-Failure "Legacy loose radar .cs remains in VaM script load path: $legacyLooseScript"
         }
+
+        if (-not (Test-Path -LiteralPath $expectedCuaPreset -PathType Leaf)) {
+            Add-Failure "Live CUA preset was not deployed: $expectedCuaPreset"
+        }
     }
 }
 
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.15."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.16."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."

@@ -76,12 +76,14 @@ if (-not (Test-Path -LiteralPath $VamManagedDir -PathType Container)) {
     throw "VaM managed directory does not exist: $VamManagedDir"
 }
 
-# Explicit 0.1.15 filenames keep this deploy helper auditable while version
+# Explicit 0.1.16 filenames keep this deploy helper auditable while version
 # metadata remains the source of truth consumed by Build-FaRadar.ps1.
 $expectedPluginFileNames = @(
-    "fa_radar.free.0.1.15.dll",
-    "fa_radar.pro.0.1.15.dll"
+    "fa_radar.free.0.1.16.dll",
+    "fa_radar.pro.0.1.16.dll"
 )
+$cuaPresetFileName = "Preset_FrameAngel_Radar_CUA.vap"
+$cuaPresetSource = Join-Path $resolvedRepoRoot "payload\Custom\Atom\CustomUnityAsset\$cuaPresetFileName"
 
 $buildScript = Join-Path $resolvedRepoRoot "scripts\Build-FaRadar.ps1"
 if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
@@ -121,7 +123,12 @@ if ($editionBuilds.Count -le 0) {
 }
 
 $deployedDlls = New-Object System.Collections.ArrayList
+$deployedPresets = New-Object System.Collections.ArrayList
 $archivedLegacyScripts = New-Object System.Collections.ArrayList
+$deployCuaPreset = @($editionBuilds | Where-Object { [string]$_.edition -eq "pro" }).Count -gt 0
+if ($deployCuaPreset -and -not (Test-Path -LiteralPath $cuaPresetSource -PathType Leaf)) {
+    throw "Missing Pro CUA preset for deploy: $cuaPresetSource"
+}
 foreach ($root in $resolvedVamRoots) {
     $destinationDirectory = Join-Path $root "Custom\Plugins"
     Ensure-FaRadarDirectory -PathValue $destinationDirectory
@@ -144,6 +151,22 @@ foreach ($root in $resolvedVamRoots) {
             sha256 = Get-FaRadarFileHashOrEmpty -PathValue $destination
             sourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $pluginPath
             bytes = (Get-Item -LiteralPath $destination).Length
+        })
+    }
+
+    if ($deployCuaPreset) {
+        $presetDestinationDirectory = Join-Path $root "Custom\Atom\CustomUnityAsset"
+        Ensure-FaRadarDirectory -PathValue $presetDestinationDirectory
+        $presetDestination = Join-Path $presetDestinationDirectory $cuaPresetFileName
+        Copy-Item -LiteralPath $cuaPresetSource -Destination $presetDestination -Force
+        [void]$deployedPresets.Add([ordered]@{
+            vamRoot = $root
+            presetDirectory = $presetDestinationDirectory
+            path = $presetDestination
+            presetFileName = $cuaPresetFileName
+            sha256 = Get-FaRadarFileHashOrEmpty -PathValue $presetDestination
+            sourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $cuaPresetSource
+            bytes = (Get-Item -LiteralPath $presetDestination).Length
         })
     }
 
@@ -179,6 +202,7 @@ $receipt = [ordered]@{
     version = [string]$buildResult.Version
     editionRequest = $Edition
     expectedPluginFileNames = $expectedPluginFileNames
+    cuaPresetFileName = $cuaPresetFileName
     configuration = $Configuration
     buildReceiptPath = [string]$buildResult.ReceiptPath
     vamManagedDir = $VamManagedDir
@@ -186,6 +210,7 @@ $receipt = [ordered]@{
     skipObfuscation = [bool]$SkipObfuscation
     skipPackage = [bool]$SkipPackage
     deployedDlls = @($deployedDlls)
+    deployedPresets = @($deployedPresets)
     archivedLegacyScripts = @($archivedLegacyScripts)
 }
 Write-FaRadarJson -PathValue $receiptPath -Value $receipt
@@ -197,6 +222,7 @@ Write-FaRadarJson -PathValue $receiptPath -Value $receipt
     EditionRequest = $Edition
     BuildReceiptPath = [string]$buildResult.ReceiptPath
     DeployedDlls = @($deployedDlls)
+    DeployedPresets = @($deployedPresets)
     ArchivedLegacyScripts = @($archivedLegacyScripts)
     ReceiptPath = $receiptPath
     Deployed = $true

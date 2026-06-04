@@ -10,12 +10,14 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.15` on branch
-  `codex/0.1.15-anchor-modes`.
+- Version: `0.1.16` on branch
+  `codex/0.1.16-cua-preset-faar-visibility`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.15.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.15.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.16.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.16.dll`.
+- Pro also ships a thin CustomUnityAsset preset:
+  `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, raw runtime file IO, reflection, broad JSON
@@ -25,7 +27,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.15` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.16` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -81,7 +83,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.15`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.16`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Global Preferences
@@ -97,11 +99,17 @@ The runtime writes only flat scalar JSON through `MVR.FileManagementSecure`:
   available in both Free and Pro
 - `Custom\PluginData\FrameAngel\Radar\preferences_pro.json` for Pro-only
   visibility filters
+- `Custom\PluginData\FrameAngel\Radar\preferences_cua_common.json` for CUA
+  preset placement and visual controls
+- `Custom\PluginData\FrameAngel\Radar\preferences_cua_pro.json` for CUA Pro
+  filter controls
 
 Writes are debounced behind `Global Prefs Auto Save`. The plugin also exposes
 `Load Global Prefs`, `Save Global Prefs`, and `Reset Global Prefs` buttons.
 Loaded values are applied with `valNoCallback`, and a small shared in-process
 cache keeps multiple Radar instances from repeatedly reading the same files.
+The CUA preset uses `CUA Anchor Preset` to select the CUA preference profile,
+so creator-anchor tuning does not pollute the normal HUD/session Radar profile.
 
 Available atom markers poll `SuperController.singleton.GetAtoms()` on `Atom
 Poll Seconds`, sort nearby atoms first, and use pooled generated marker/stem
@@ -154,6 +162,11 @@ static scene pose. The Pro CUA resource path should therefore stay thin:
 creator-facing CUA resources can host or identify an anchor, while Free/Pro
 feature behavior remains in one plugin codebase.
 
+The Pro CUA preset loads the same plugin on a CustomUnityAsset atom, sets
+`CUA Anchor Preset`, and uses `Containing Atom` anchoring. The switch is
+restorable from the preset, but it is not part of the normal global preference
+profile. When active, it uses the separate CUA preference files listed above.
+
 Placement uses a saved local offset:
 
 - `HUD Offset X`
@@ -203,13 +216,18 @@ works through the offset sliders and reset button.
 - The generated object and material names include `favr.hud.radar` as a small
   filming identifier. This is intentionally name-based only: no Unity tag,
   file IO, recorder import, or scene persistence is added for filming.
+- FAAR recorder visibility is read from
+  `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json`. If
+  `radarHudFilmSubjectIdentifier` matches `favr.hud.radar` and
+  `radarHudVisible` is false, Radar hides its generated visual root/materials.
+  This does not modify placement, anchor mode, offsets, scale, or scene data.
 
 ## Build And Deploy Contract
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.15.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.15.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.16.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.16.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -219,14 +237,18 @@ DLL.
 
 The build helper also stages neutral candidate `.var` packages under
 `build\packages` with DLLs under `Custom/Plugins` and a root `meta.json`.
+The Pro package additionally stages
+`Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.15.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.15.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.15.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.15.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.16.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.16.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are
 `FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; current package
