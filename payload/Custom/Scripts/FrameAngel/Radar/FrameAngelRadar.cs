@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.6";
+    private const string Version = "0.1.7";
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -28,6 +28,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool worldAxisAlignField;
     private JSONStorableBool groundAxisLockField;
     private JSONStorableBool lastSelectedEnabledField;
+    private JSONStorableBool selectedGroundDropEnabledField;
 
     private JSONStorableFloat hudOffsetXField;
     private JSONStorableFloat hudOffsetYField;
@@ -139,6 +140,7 @@ public class FrameAngelRadar : MVRScript
         worldAxisAlignField = new JSONStorableBool("World Axis Align", true);
         groundAxisLockField = new JSONStorableBool("Ground Axis Lock", true);
         lastSelectedEnabledField = new JSONStorableBool("Last Selected Enabled", true);
+        selectedGroundDropEnabledField = new JSONStorableBool("Selected Ground Drop", false);
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
@@ -176,6 +178,7 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(worldAxisAlignField);
         RegisterBool(groundAxisLockField);
         RegisterBool(lastSelectedEnabledField);
+        RegisterBool(selectedGroundDropEnabledField);
 
         RegisterFloat(hudOffsetXField);
         RegisterFloat(hudOffsetYField);
@@ -210,6 +213,7 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(desktopTopDownField, true);
         CreateToggle(anchorToViewField, false);
         CreateToggle(lastSelectedEnabledField, true);
+        CreateToggle(selectedGroundDropEnabledField, false);
         CreateToggle(worldAxisAlignField, true);
         CreateToggle(groundAxisLockField, false);
         CreateToggle(ringsEnabledField, false);
@@ -271,7 +275,7 @@ public class FrameAngelRadar : MVRScript
         lastTargetMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Material", new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
         lastTargetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Drop Material", new Color(1.0f, 0.48f, 0.12f, 0.15f), MarkerRenderQueue);
 
-        sphereMesh = CreateSphereMesh(8, 16, 1.0f);
+        sphereMesh = CreateSphereMesh(16, 32, 1.0f);
         flatCircleMesh = CreateDesktopDiskMesh(72, 1.0f);
         ringMesh = CreateRingMesh(72, 0.975f, 1.0f);
         centerMarkerMesh = CreateCenterMarkerMesh();
@@ -358,12 +362,13 @@ public class FrameAngelRadar : MVRScript
 
         Transform target = ResolveAtomRootTransform(selectedAtom);
         bool hasSelection = target != null;
+        bool showSelectedGroundDrop = hasSelection && selectedGroundDropEnabledField.val;
         SetActiveIfChanged(targetBlipObject, hasSelection);
-        SetActiveIfChanged(targetGridDropObject, hasSelection);
+        SetActiveIfChanged(targetGridDropObject, showSelectedGroundDrop);
 
         if (hasSelection)
         {
-            UpdateTargetBlip(viewer, target);
+            UpdateTargetBlip(viewer, target, showSelectedGroundDrop);
         }
 
         UpdateLastSelectedBlip(viewer);
@@ -587,7 +592,7 @@ public class FrameAngelRadar : MVRScript
         return Quaternion.Euler(Mathf.Clamp(desktopTiltDegreesField.val, 0.0f, 90.0f), 0.0f, 0.0f);
     }
 
-    private void UpdateTargetBlip(Transform viewer, Transform target)
+    private void UpdateTargetBlip(Transform viewer, Transform target, bool showGroundDrop)
     {
         float visualRadius = ResolveVisualRadius();
         Vector3 radarLocal = ResolveTargetRadarLocal(viewer, target);
@@ -597,12 +602,15 @@ public class FrameAngelRadar : MVRScript
 
         PositionTargetSphere(targetBlipObject, radarLocal, visualRadius, markerScale, spin);
 
-        targetGridDropObject.transform.localPosition = new Vector3(
-            groundLocal.x * visualRadius,
-            0.0f,
-            groundLocal.z * visualRadius);
-        targetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, spin, 0.0f);
-        targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
+        if (showGroundDrop)
+        {
+            targetGridDropObject.transform.localPosition = new Vector3(
+                groundLocal.x * visualRadius,
+                0.0f,
+                groundLocal.z * visualRadius);
+            targetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, spin, 0.0f);
+            targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
+        }
 
         Vector3 meterLocal = viewer.InverseTransformPoint(target.position);
         SetStatus(string.Format(
@@ -831,7 +839,7 @@ public class FrameAngelRadar : MVRScript
         ApplyMaterialColor(gridMaterial, new Color(0.48f, 0.95f, 1.0f, Mathf.Clamp01(gridAlphaField.val)), emission);
         ApplyMaterialColor(centerMaterial, new Color(0.38f, 1.0f, 0.60f, Mathf.Clamp01(markerAlphaField.val)), emission);
         ApplyMaterialColor(targetMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val)), emission);
-        ApplyMaterialColor(targetDropMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * 0.42f), emission);
+        ApplyMaterialColor(targetDropMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * 0.18f), emission);
         ApplyMaterialColor(lastTargetMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.26f), emission);
         ApplyMaterialColor(lastTargetDropMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.12f), emission);
     }
@@ -1182,14 +1190,14 @@ public class FrameAngelRadar : MVRScript
 
     private Mesh CreateTargetBlipMesh()
     {
-        Mesh mesh = CreateSphereMesh(6, 12, 1.0f);
+        Mesh mesh = CreateSphereMesh(8, 16, 1.0f);
         mesh.name = "FA Radar Prototype Target Sphere Mesh";
         return mesh;
     }
 
     private Mesh CreateCenterMarkerMesh()
     {
-        Mesh mesh = CreateSphereMesh(6, 12, 1.0f);
+        Mesh mesh = CreateSphereMesh(8, 16, 1.0f);
         mesh.name = "FA Radar Prototype User Center Sphere Mesh";
         return mesh;
     }
