@@ -7,11 +7,11 @@ Updated: 2026-06-04
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.15`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.16`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.15.dll`
-- `fa_radar.pro.0.1.15.dll`
+- `fa_radar.free.0.1.16.dll`
+- `fa_radar.pro.0.1.16.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -40,6 +40,7 @@ Free is the radar.
 - shared HUD/static/atom anchor modes
 - global placement/scale/look preferences under
   `Custom\PluginData\FrameAngel\Radar`
+- normal HUD/session prefs are separate from CUA preset prefs
 - user-controlled visual tuning for the radar itself
 - no visibility filtering
 - all available radar-supported atoms are shown together
@@ -67,6 +68,11 @@ Pro is the operational radar.
 - color customization is a Pro feature
 - creator-facing CUA resources should be thin anchor hosts around the shared
   runtime, not duplicate radar logic
+- Pro ships `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+  as a scene-anchor starter
+- CUA preset instances use `preferences_cua_common.json` and
+  `preferences_cua_pro.json` so creator-anchor tuning does not pollute normal
+  HUD/session Radar preferences
 
 Pro should make scene diagnosis and targeting faster without turning every
 scene object into noise. Filters and semantic visuals are the value line.
@@ -91,7 +97,8 @@ Rules:
 - no raw runtime file IO, reflection, broad JSON object serializers, repo-local
   runtime JSON dependency, or absolute development paths are introduced for
   edition gating
-- global preferences use VaM `FileManagerSecure` and flat scalar JSON only
+- global preferences use VaM `FileManagerSecure` and flat scalar JSON only;
+  normal HUD/session and CUA preset profiles use separate files
 - edition gates should be static compile/package gates, not fragile runtime
   string checks
 
@@ -99,8 +106,11 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.15.var`
-- `fa_radar.pro.0.1.15.var`
+- `fa_radar.free.0.1.16.var`
+- `fa_radar.pro.0.1.16.var`
+
+The Pro candidate package includes the CUA preset under
+`Custom/Atom/CustomUnityAsset`; Free does not ship creator-facing CUA resources.
 
 Human-facing release `.var` product naming remains undecided. Current
 candidates:

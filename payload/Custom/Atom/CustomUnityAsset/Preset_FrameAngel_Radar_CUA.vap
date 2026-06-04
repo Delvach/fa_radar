@@ -1,0 +1,77 @@
+{
+   "setUnlistedParamsToDefault" : "true",
+   "storables" : [
+      {
+         "id" : "PhysicsMaterialControl",
+         "dynamicFriction" : "0.6",
+         "staticFriction" : "0.6",
+         "bounciness" : "0",
+         "frictionCombine" : "Average",
+         "bounceCombine" : "Average"
+      },
+      {
+         "id" : "CollisionTrigger",
+         "triggerEnabled" : "false",
+         "invertAtomFilter" : "false",
+         "useRelativeVelocityFilter" : "false",
+         "invertRelativeVelocityFilter" : "false",
+         "relativeVelocityFilter" : "1",
+         "trigger" : {
+            "startActions" : [
+            ],
+            "transitionActions" : [
+            ],
+            "endActions" : [
+            ]
+         }
+      },
+      {
+         "id" : "scale",
+         "scale" : "1"
+      },
+      {
+         "id" : "asset",
+         "importLightmaps" : "true",
+         "importLightProbes" : "true",
+         "registerCanvases" : "false",
+         "showCanvases" : "true",
+         "loadDll" : "false",
+         "assetName" : "",
+         "assetUrl" : "",
+         "assetDllUrl" : ""
+      },
+      {
+         "id" : "PluginManager",
+         "plugins" : {
+            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.16.dll"
+         }
+      },
+      {
+         "id" : "plugin#0_FrameAngelRadar",
+         "enabled" : "true",
+         "pluginLabel" : "Frame Angel Radar CUA",
+         "CUA Anchor Preset" : "true",
+         "Global Prefs Auto Save" : "true",
+         "Radar Enabled" : "true",
+         "Anchor Mode" : "Containing Atom",
+         "Anchor Atom UID" : "",
+         "HUD Offset X" : "0",
+         "HUD Offset Y" : "0",
+         "HUD Offset Z" : "0.15",
+         "HUD Scale" : "0.75",
+         "Anchor Rot X" : "0",
+         "Anchor Rot Y" : "0",
+         "Anchor Rot Z" : "0",
+         "Rings Enabled" : "true",
+         "Grid Enabled" : "true",
+         "Grid Follows User" : "true",
+         "Grid Clip Circle" : "true",
+         "World Axis Align" : "true",
+         "Ground Axis Lock" : "true",
+         "Height Stems" : "true",
+         "Depth Size Cue" : "true",
+         "Available Atom Markers" : "true",
+         "Click Select Markers" : "true"
+      }
+   ]
+}

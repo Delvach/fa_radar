@@ -14,9 +14,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 0.1.15 audit anchors. The live values are read from config/fa_radar.version.json.
-# Free: FA_RADAR_FREE -> fa_radar.free.0.1.15.dll
-# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.15.dll
+# 0.1.16 audit anchors. The live values are read from config/fa_radar.version.json.
+# Free: FA_RADAR_FREE -> fa_radar.free.0.1.16.dll
+# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.16.dll
+# Pro CUA preset: Preset_FrameAngel_Radar_CUA.vap
 
 function Ensure-FaRadarDirectory {
     param([string]$PathValue)
@@ -119,6 +120,7 @@ $source = Join-Path $resolvedRepoRoot "payload\Custom\Scripts\FrameAngel\Radar\F
 if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
     throw "Missing source plugin: $source"
 }
+$cuaPresetSource = Join-Path $resolvedRepoRoot "payload\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
 
 if ([string]::IsNullOrWhiteSpace($VamManagedDir)) {
     $VamManagedDir = Join-Path $VamRoot "VaM_Data\Managed"
@@ -247,6 +249,7 @@ foreach ($editionId in $requestedEditions) {
     $packagePath = ""
     $packageSha256 = ""
     $stageRoot = ""
+    $cuaPresetPackagePath = ""
     if (-not $SkipPackage.IsPresent) {
         $packageWorkRoot = Join-Path (Join-Path $buildRoot "package_work") $editionId
         $stageRoot = Join-Path $packageWorkRoot "stage"
@@ -256,15 +259,27 @@ foreach ($editionId in $requestedEditions) {
         Ensure-FaRadarDirectory -PathValue $pluginStageDirectory
         Copy-Item -LiteralPath $pluginPath -Destination (Join-Path $pluginStageDirectory $pluginFileName) -Force
 
+        $contentList = New-Object System.Collections.ArrayList
+        [void]$contentList.Add("Custom/Plugins/$pluginFileName")
+        if ([string]::Equals($editionId, "pro", [System.StringComparison]::OrdinalIgnoreCase)) {
+            if (-not (Test-Path -LiteralPath $cuaPresetSource -PathType Leaf)) {
+                throw "Missing Pro CUA preset: $cuaPresetSource"
+            }
+
+            $cuaPresetStageDirectory = Join-Path $stageRoot "Custom\Atom\CustomUnityAsset"
+            Ensure-FaRadarDirectory -PathValue $cuaPresetStageDirectory
+            $cuaPresetPackagePath = Join-Path $cuaPresetStageDirectory "Preset_FrameAngel_Radar_CUA.vap"
+            Copy-Item -LiteralPath $cuaPresetSource -Destination $cuaPresetPackagePath -Force
+            [void]$contentList.Add("Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap")
+        }
+
         $meta = [ordered]@{
             licenseType = "CC BY"
             creatorName = $packageCreator
             packageName = $packageName
             description = "Frame Angel Radar $displayName $version plugin build."
-            instructions = "Install this package in VaM AddonPackages. The plugin DLL is staged under Custom/Plugins."
-            contentList = @(
-                "Custom/Plugins/$pluginFileName"
-            )
+            instructions = "Install this package in VaM AddonPackages. The plugin DLL is staged under Custom/Plugins. Pro also includes a CustomUnityAsset preset for scene anchoring."
+            contentList = @($contentList)
             dependencies = @{}
         }
         Write-FaRadarJson -PathValue (Join-Path $stageRoot "meta.json") -Value $meta
@@ -300,6 +315,7 @@ foreach ($editionId in $requestedEditions) {
         packageFileName = $packageFileName
         packagePath = $packagePath
         packageSha256 = $packageSha256
+        cuaPresetPackagePath = $cuaPresetPackagePath
         stageRoot = $stageRoot
     })
 }
