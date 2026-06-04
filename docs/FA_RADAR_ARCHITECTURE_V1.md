@@ -165,6 +165,21 @@ Future `.var` product naming is undecided. Current candidates are
 `FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; this prototype lane
 remains DLL-only until packaging is explicitly opened.
 
+## Product Editions
+
+Free and Pro are planned as one codebase with compile/package gates for the
+different editions, not separate runtime forks.
+
+- Free is the movable, scalable, visually tunable radar, but it shows all
+  supported radar atoms together.
+- Pro adds visibility switches, available in-game controls, customizable
+  category colors, and richer light visuals such as range spheres and spotlight
+  cones that show rotation, range, and spot angle.
+
+The current product split authority is
+`docs/FA_RADAR_PRODUCT_EDITIONS_V1.md`. The current runtime remains
+`fa_radar.0.1.9.dll`; edition gates are not implemented in this slice.
+
 ## Parked
 
 - Visual acceptance in VaM.

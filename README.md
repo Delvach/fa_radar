@@ -5,6 +5,8 @@ HUD-relative radar for the currently selected atom.
 
 Current branch version: `0.1.9`.
 
+Current product contract version: `0.1.10`.
+
 The current slice is compiled C# only:
 
 - no Unity project
@@ -30,6 +32,9 @@ The current slice is compiled C# only:
 - filterable available atom markers, with lights enabled by default
 - click-to-select for visible available CUA/light/person/other atom markers
 - previous-selection rendering parked for now
+- future Free/Pro editions will compile from one codebase with edition gates;
+  Free is the unrestricted radar that shows everything, while Pro adds filters,
+  in-game controls, customizable category colors, and light volume visuals
 
 ## Files
 
@@ -38,6 +43,7 @@ The current slice is compiled C# only:
 - `scripts/Deploy-FaRadar.ps1` - future compile/deploy helper.
 - `eng/Verify-FaRadarContract.ps1` - static contract check for this repo.
 - `docs/FA_RADAR_ARCHITECTURE_V1.md` - current implementation notes.
+- `docs/FA_RADAR_PRODUCT_EDITIONS_V1.md` - Free/Pro product split contract.
 
 ## Future Deploy
 

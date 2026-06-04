@@ -28,5 +28,36 @@
     "status": "undecided",
     "note": "Product package name candidates for a future release. Current prototype deployment remains DLL-only."
   },
-  "updatedAt": "2026-06-03T21:20:00-06:00"
+  "productPlanning": {
+    "contractVersion": "0.1.10",
+    "branch": "codex/0.1.10-product-edition-gates",
+    "status": "documented",
+    "editionStrategy": "one-codebase-compile-gates",
+    "compileSymbols": [
+      "FA_RADAR_FREE",
+      "FA_RADAR_PRO"
+    ],
+    "free": {
+      "summary": "Radar placement, scale, and appearance freedom. Shows all supported radar atoms together.",
+      "filters": false,
+      "inGameControlUi": false,
+      "customCategoryColors": false,
+      "lightVolumeVisuals": false
+    },
+    "pro": {
+      "summary": "Operational radar controls with filters, in-game switch UI, customizable colors, and light volume visuals.",
+      "filters": true,
+      "inGameControlUi": true,
+      "customCategoryColors": true,
+      "defaultPeopleColors": {
+        "women": "pink",
+        "men": "blue"
+      },
+      "lightVolumeVisuals": {
+        "pointLights": "range spheres",
+        "spotLights": "cones showing rotation, range, and spot angle"
+      }
+    }
+  },
+  "updatedAt": "2026-06-04T00:00:00-06:00"
 }
