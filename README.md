@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.16`.
+Current branch version: `0.1.17`.
 
-Current product contract version: `0.1.16`.
+Current product contract version: `0.1.17`.
 
 The current slice is compiled C# only:
 
@@ -88,11 +88,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.16.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.17.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.17.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.16.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.17.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.17.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral

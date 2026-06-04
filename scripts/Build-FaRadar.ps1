@@ -14,9 +14,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 0.1.16 audit anchors. The live values are read from config/fa_radar.version.json.
-# Free: FA_RADAR_FREE -> fa_radar.free.0.1.16.dll
-# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.16.dll
+# 0.1.17 audit anchors. The live values are read from config/fa_radar.version.json.
+# Free: FA_RADAR_FREE -> fa_radar.free.0.1.17.dll
+# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.17.dll
 # Pro CUA preset: Preset_FrameAngel_Radar_CUA.vap
 
 function Ensure-FaRadarDirectory {
