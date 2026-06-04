@@ -16,6 +16,21 @@ same source file:
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
 
+## First Release UI Scope
+
+The first release uses native VaM plugin UI only.
+
+- no external browser UI
+- no companion app UI
+- no custom in-world Frame Angel switch surface
+- no separate control panel outside VaM's plugin UI
+
+Controls for the first version should be ordinary plugin checkboxes, sliders,
+buttons, and text fields. The first release should focus on core radar
+features: placement, scale, all-atom visibility in Free, Pro filters/colors,
+marker clarity, useful light discovery, package/deploy reliability, and stable
+performance.
+
 ## Free Edition
 
 Free is the radar.
@@ -38,7 +53,7 @@ instrument.
 Pro is the operational radar.
 
 - visibility switches for atom categories and specific target lanes
-- available in-game control UI using Frame Angel's own switch controls
+- native VaM plugin UI controls for first release filters and tuning
 - category colors, including customizable defaults for women and men
 - default people colors start as pink for women and blue for men
 - CUA, light, people, and other-atom visibility can be controlled separately
@@ -65,8 +80,8 @@ Rules:
 - shared radar placement, grid, marker, click-selection, and generated-material
   foundation remains common code
 - Free builds exclude Pro-only controls and Pro-only generated visuals
-- Pro builds include filters, in-game controls, color customization, and light
-  volume visuals
+- Pro builds include filters, native plugin UI controls, color customization,
+  and light volume visuals
 - no runtime file IO, reflection, repo-local JSON dependency, or absolute
   development paths are introduced for edition gating
 - edition gates should be static compile/package gates, not fragile runtime
@@ -91,5 +106,6 @@ architecture.
 ## Parked
 
 - license or entitlement mechanism
-- final in-game Pro switch UI implementation
+- custom Frame Angel switch UI
+- external/browser/companion UI
 - final people classification source for women/men color defaults

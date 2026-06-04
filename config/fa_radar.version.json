@@ -47,9 +47,16 @@
       "packageFileName": "fa_radar.pro.0.1.11.var",
       "packageName": "FrameAngel.RadarPro",
       "packageCreator": "FrameAngel",
-      "summary": "Operational radar controls with filters, category colors, and the foundation for richer in-game controls and light visuals.",
+      "summary": "Operational radar controls with native VaM plugin UI filters, category colors, and the foundation for light visuals.",
       "filters": true,
       "inGameControlUi": true,
+      "firstReleaseUiSurface": {
+        "nativeVamPluginUiOnly": true,
+        "externalUi": false,
+        "browserUi": false,
+        "companionUi": false,
+        "customFrameAngelSwitchSurface": false
+      },
       "customCategoryColors": true,
       "defaultPeopleColors": {
         "women": "pink",
