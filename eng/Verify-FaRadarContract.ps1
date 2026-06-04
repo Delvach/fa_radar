@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.11"',
+        'private const string Version = "0.1.13"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -66,9 +66,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         'new JSONStorableFloat("HUD Scale", 0.49f',
         'new JSONStorableFloat("Radar Visual Radius", 0.08f',
         "Anchor To View",
-        "View Yaw Offset",
+        "Floor Area Scale",
         "Desktop Tilt Degrees",
-        "Axis Yaw Offset",
         "Height Stems",
         'new JSONStorableBool("Height Stems", true)',
         "Height Scale Meters",
@@ -107,6 +106,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "UpdateHeightStem",
         "userHeightStemObject",
         "targetHeightStemObject",
+        "floorAreaScaleField",
+        'new JSONStorableFloat("Floor Area Scale", 1.0f',
+        "ResolveFloorAreaScale",
+        "ResolveEffectiveRadarRangeMeters",
+        "ResolveEffectiveHeightScaleMeters",
         "ResolveHeightRadarY",
         "ResolveRangeFadeAlpha",
         "ResolveDepthScale",
@@ -145,6 +149,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "lastTargetBlipObject",
         "lastSelectedUid",
         "ApplyHudAnchor",
+        "lastGoodViewerTransform",
+        "ResolveStableViewerTransform",
+        "return lastGoodViewerTransform",
         "Radar Range Meters",
         "Grid Step Meters",
         "Ring Rotation Speed",
@@ -169,7 +176,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "\bSystem\.Reflection\b",
         "\bReflection\b",
         "\btargetOutlineObject\b",
-        "\btargetOutlineMaterial\b"
+        "\btargetOutlineMaterial\b",
+        "CreateSlider\(viewYawOffsetField",
+        "CreateSlider\(axisYawOffsetField",
+        "viewYawOffsetField\.val",
+        "axisYawOffsetField\.val"
     )
 
     foreach ($pattern in $forbiddenPatterns) {
@@ -186,8 +197,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.11.dll",
-        "fa_radar.pro.0.1.11.dll",
+        "fa_radar.free.0.1.13.dll",
+        "fa_radar.pro.0.1.13.dll",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
         "meta.json",
@@ -231,8 +242,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.11.dll",
-        "fa_radar.pro.0.1.11.dll",
+        "fa_radar.free.0.1.13.dll",
+        "fa_radar.pro.0.1.13.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -287,11 +298,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.11") {
-        Add-Failure "Version config must declare version 0.1.11."
+    if ($version.version -ne "0.1.13") {
+        Add-Failure "Version config must declare version 0.1.13."
     }
-    if ($version.branch -ne "codex/0.1.11-edition-build-packaging") {
-        Add-Failure "Version config branch must match codex/0.1.11-edition-build-packaging."
+    if ($version.branch -ne "codex/0.1.13-grid-scale-anchor-fix") {
+        Add-Failure "Version config branch must match codex/0.1.13-grid-scale-anchor-fix."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -392,8 +403,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.11.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.11.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.13.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.13.dll")
         )
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
 
@@ -417,7 +428,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.11."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.13."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."

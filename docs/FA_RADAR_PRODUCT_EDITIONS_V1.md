@@ -7,11 +7,11 @@ Updated: 2026-06-04
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.11`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.13`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.11.dll`
-- `fa_radar.pro.0.1.11.dll`
+- `fa_radar.free.0.1.13.dll`
+- `fa_radar.pro.0.1.13.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -91,8 +91,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.11.var`
-- `fa_radar.pro.0.1.11.var`
+- `fa_radar.free.0.1.13.var`
+- `fa_radar.pro.0.1.13.var`
 
 Human-facing release `.var` product naming remains undecided. Current
 candidates:
