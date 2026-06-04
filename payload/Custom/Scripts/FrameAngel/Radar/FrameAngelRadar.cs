@@ -5,7 +5,18 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.9";
+    private const string Version = "0.1.11";
+#if FA_RADAR_PRO && FA_RADAR_FREE
+#error Define only one FA Radar edition symbol.
+#endif
+#if FA_RADAR_PRO
+    private const bool IsProEdition = true;
+    private const string EditionName = "Pro";
+#else
+    // FA_RADAR_FREE is the default-safe build behavior when no Pro symbol is present.
+    private const bool IsProEdition = false;
+    private const string EditionName = "Free";
+#endif
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -136,7 +147,7 @@ public class FrameAngelRadar : MVRScript
         BuildStorables();
         BuildUi();
         EnsureRuntimeVisuals();
-        SetStatus("Frame Angel Radar " + Version + " prototype ready.");
+        SetStatus("Frame Angel Radar " + Version + " " + EditionName + " ready.");
     }
 
     private void Update()
@@ -278,10 +289,12 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(worldAxisAlignField, true);
         CreateToggle(groundAxisLockField, false);
         CreateToggle(availableAtomMarkersEnabledField, true);
+#if FA_RADAR_PRO
         CreateToggle(showLightAtomsField, false);
         CreateToggle(showCustomUnityAssetAtomsField, true);
         CreateToggle(showPersonAtomsField, false);
         CreateToggle(showOtherAtomsField, true);
+#endif
         CreateToggle(clickSelectMarkersField, false);
         CreateToggle(ringsEnabledField, false);
         CreateToggle(gridEnabledField, true);
@@ -981,16 +994,19 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
+#if FA_RADAR_PRO
         bool light = IsLightAtom(atom);
         bool cua = IsCustomUnityAssetAtom(atom);
         bool person = IsPersonAtom(atom);
         bool other = !light && !cua && !person;
-
         return
             (light && showLightAtomsField.val) ||
             (cua && showCustomUnityAssetAtomsField.val) ||
             (person && showPersonAtomsField.val) ||
             (other && showOtherAtomsField.val);
+#else
+        return true;
+#endif
     }
 
     private bool IsLightAtom(Atom atom)
@@ -1231,6 +1247,7 @@ public class FrameAngelRadar : MVRScript
 
     private Color ResolveAvailableAtomColor(Atom atom, float alpha)
     {
+#if FA_RADAR_PRO
         if (IsLightAtom(atom))
         {
             return new Color(1.0f, 0.88f, 0.30f, alpha);
@@ -1245,6 +1262,9 @@ public class FrameAngelRadar : MVRScript
         }
 
         return new Color(0.58f, 0.74f, 1.0f, alpha);
+#else
+        return new Color(0.62f, 0.82f, 1.0f, alpha);
+#endif
     }
 
     private void RefreshGridMeshIfNeeded(Transform viewer)

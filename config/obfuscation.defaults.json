@@ -1,0 +1,72 @@
+{
+  "tool": {
+    "package": "Obfuscar.GlobalTool",
+    "version": "2.2.44",
+    "toolPath": "tools/obfuscar"
+  },
+  "defaults": {
+    "enabled": true,
+    "profile": "vam_compat"
+  },
+  "profiles": {
+    "unity_lifecycle_safe": {
+      "keepPublicApi": true,
+      "hidePrivateApi": true,
+      "renameFields": true,
+      "renameProperties": true,
+      "renameEvents": true,
+      "hideStrings": true,
+      "reuseNames": true,
+      "useUnicodeNames": false,
+      "suppressIldasm": true,
+      "skipMethods": [
+        {
+          "type": "FrameAngelRadar",
+          "name": "Init"
+        },
+        {
+          "type": "FrameAngelRadar",
+          "name": "Update"
+        },
+        {
+          "type": "FrameAngelRadar",
+          "name": "OnDestroy"
+        }
+      ]
+    },
+    "vam_compat": {
+      "keepPublicApi": true,
+      "hidePrivateApi": false,
+      "renameFields": false,
+      "renameProperties": false,
+      "renameEvents": false,
+      "hideStrings": false,
+      "reuseNames": false,
+      "useUnicodeNames": false,
+      "suppressIldasm": true
+    }
+  },
+  "plugins": {
+    "fa_radar": {
+      "enabled": true,
+      "profile": "vam_compat",
+      "keepTypes": [
+        "FrameAngelRadar"
+      ],
+      "skipMethods": [
+        {
+          "type": "FrameAngelRadar",
+          "name": "Init"
+        },
+        {
+          "type": "FrameAngelRadar",
+          "name": "Update"
+        },
+        {
+          "type": "FrameAngelRadar",
+          "name": "OnDestroy"
+        }
+      ]
+    }
+  }
+}

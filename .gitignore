@@ -11,6 +11,9 @@ dist/
 out/
 tmp/
 build/bin/
+build/package_work/
+build/packages/
+tools/
 *.log
 
 # Unity projects are intentionally out of scope for this repo.
