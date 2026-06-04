@@ -1,0 +1,72 @@
+﻿{
+    "schemaVersion":  "fa_radar_deploy_receipt_v1",
+    "createdAtUtc":  "2026-06-04T19:17:13.1004083Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "branch":  "main",
+    "commit":  "6b14a4255be41b6c24d43c5efa168ecf1407e002",
+    "dirtyState":  [
+                       " M .gitignore",
+                       " M README.md",
+                       " M docs/FA_RADAR_ARCHITECTURE_V1.md",
+                       " M eng/Verify-FaRadarContract.ps1",
+                       " M payload/Custom/Scripts/FrameAngel/Radar/FrameAngelRadar.cs",
+                       "?? build/receipts/fa_radar_build_20260604_131712.json"
+                   ],
+    "version":  "0.1.14",
+    "editionRequest":  "All",
+    "expectedPluginFileNames":  [
+                                    "fa_radar.free.0.1.14.dll",
+                                    "fa_radar.pro.0.1.14.dll"
+                                ],
+    "configuration":  "Release",
+    "buildReceiptPath":  "C:\\projects\\fa_radar\\build\\receipts\\fa_radar_build_20260604_131712.json",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "skipBuild":  false,
+    "skipObfuscation":  false,
+    "skipPackage":  false,
+    "deployedDlls":  [
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.free.0.1.14.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.14.dll",
+                             "sha256":  "269A03AD881DEA14748E4B2E48D8975779B6B99F277DC20F64D6C9312F35DF93",
+                             "sourceSha256":  "269A03AD881DEA14748E4B2E48D8975779B6B99F277DC20F64D6C9312F35DF93",
+                             "bytes":  50688
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.pro.0.1.14.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.14.dll",
+                             "sha256":  "852F3A3FDC3E9E80F473BBCE86654D2F100EE13597FA76B3070F5F6414C68DAA",
+                             "sourceSha256":  "852F3A3FDC3E9E80F473BBCE86654D2F100EE13597FA76B3070F5F6414C68DAA",
+                             "bytes":  51200
+                         },
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.free.0.1.14.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.14.dll",
+                             "sha256":  "269A03AD881DEA14748E4B2E48D8975779B6B99F277DC20F64D6C9312F35DF93",
+                             "sourceSha256":  "269A03AD881DEA14748E4B2E48D8975779B6B99F277DC20F64D6C9312F35DF93",
+                             "bytes":  50688
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.pro.0.1.14.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.14.dll",
+                             "sha256":  "852F3A3FDC3E9E80F473BBCE86654D2F100EE13597FA76B3070F5F6414C68DAA",
+                             "sourceSha256":  "852F3A3FDC3E9E80F473BBCE86654D2F100EE13597FA76B3070F5F6414C68DAA",
+                             "bytes":  51200
+                         }
+                     ],
+    "archivedLegacyScripts":  [
+
+                              ]
+}

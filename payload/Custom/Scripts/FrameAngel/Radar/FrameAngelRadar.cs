@@ -33,6 +33,7 @@ public class FrameAngelRadar : MVRScript
     private const string FrameAngelRadarProPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_pro.json";
     private const string FrameAngelRadarCommonPreferencesSchemaVersion = "frameangel_radar_common_preferences_v1";
     private const string FrameAngelRadarProPreferencesSchemaVersion = "frameangel_radar_pro_preferences_v1";
+    private const string FilmSubjectIdentifier = "favr.hud.radar";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
     private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
@@ -1257,19 +1258,19 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        shellMaterial = CreateSphereShellMaterial("FA Radar Sphere Material", new Color(0.16f, 0.64f, 0.92f, 0.10f), ShellRenderQueue);
-        ringMaterial = CreateEmissiveOverlayMaterial("FA Radar Z Axis Ring Material", WithAlpha(AxisZColor, 0.34f), RingRenderQueue);
-        ringXMaterial = CreateEmissiveOverlayMaterial("FA Radar Y Axis Ring Material", WithAlpha(AxisYColor, 0.34f), RingRenderQueue);
-        ringZMaterial = CreateEmissiveOverlayMaterial("FA Radar X Axis Ring Material", WithAlpha(AxisXColor, 0.34f), RingRenderQueue);
-        gridMaterial = CreateEmissiveOverlayMaterial("FA Radar Grid Material", new Color(0.55f, 0.95f, 1.0f, 0.16f), GridRenderQueue);
-        centerMaterial = CreateEmissiveOverlayMaterial("FA Radar Center Material", new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
-        userHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar User Height Stem Material", new Color(0.40f, 1.0f, 0.62f, 0.42f), MarkerRenderQueue);
-        targetMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Material", new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
-        targetHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Height Stem Material", new Color(1.0f, 0.70f, 0.18f, 0.42f), MarkerRenderQueue);
-        targetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Drop Material", new Color(1.0f, 0.70f, 0.18f, 0.35f), MarkerRenderQueue);
-        lastTargetMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Material", new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
-        lastTargetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Drop Material", new Color(1.0f, 0.48f, 0.12f, 0.15f), MarkerRenderQueue);
-        availableHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar Available Height Stem Material", new Color(0.78f, 0.88f, 1.0f, 0.28f), MarkerRenderQueue);
+        shellMaterial = CreateSphereShellMaterial(BuildFilmSubjectName("Sphere Material"), new Color(0.16f, 0.64f, 0.92f, 0.10f), ShellRenderQueue);
+        ringMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Z Axis Ring Material"), WithAlpha(AxisZColor, 0.34f), RingRenderQueue);
+        ringXMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Y Axis Ring Material"), WithAlpha(AxisYColor, 0.34f), RingRenderQueue);
+        ringZMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("X Axis Ring Material"), WithAlpha(AxisXColor, 0.34f), RingRenderQueue);
+        gridMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Grid Material"), new Color(0.55f, 0.95f, 1.0f, 0.16f), GridRenderQueue);
+        centerMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Center Material"), new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
+        userHeightStemMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("User Height Stem Material"), new Color(0.40f, 1.0f, 0.62f, 0.42f), MarkerRenderQueue);
+        targetMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Target Material"), new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
+        targetHeightStemMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Target Height Stem Material"), new Color(1.0f, 0.70f, 0.18f, 0.42f), MarkerRenderQueue);
+        targetDropMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Target Drop Material"), new Color(1.0f, 0.70f, 0.18f, 0.35f), MarkerRenderQueue);
+        lastTargetMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Last Target Material"), new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
+        lastTargetDropMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Last Target Drop Material"), new Color(1.0f, 0.48f, 0.12f, 0.15f), MarkerRenderQueue);
+        availableHeightStemMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Available Height Stem Material"), new Color(0.78f, 0.88f, 1.0f, 0.28f), MarkerRenderQueue);
 
         sphereMesh = CreateSphereMesh(16, 32, 1.0f);
         flatCircleMesh = CreateDesktopDiskMesh(72, 1.0f);
@@ -1284,33 +1285,33 @@ public class FrameAngelRadar : MVRScript
         lastGridClipCircle = gridClipCircleField.val;
         haveLastGridOffset = true;
 
-        hudRoot = new GameObject("FA Radar HUD");
-        radarRoot = new GameObject("FA Radar Dish");
+        hudRoot = new GameObject(BuildFilmSubjectName("HUD"));
+        radarRoot = new GameObject(BuildFilmSubjectName("Dish"));
         radarRoot.transform.SetParent(hudRoot.transform, false);
         axisRoot = new GameObject("FA Radar World Axis");
         axisRoot.transform.SetParent(radarRoot.transform, false);
 
-        flatCircleObject = CreateMeshObject("FA Radar Flat Desktop Circle", axisRoot.transform, flatCircleMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
-        sphereObject = CreateMeshObject("FA Radar Sphere", radarRoot.transform, sphereMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
-        gridObject = CreateMeshObject("FA Radar Meter Grid", axisRoot.transform, gridMesh, gridMaterial, GridRenderQueue, GridSortingOrder);
+        flatCircleObject = CreateMeshObject(BuildFilmSubjectName("Flat Desktop Circle"), axisRoot.transform, flatCircleMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
+        sphereObject = CreateMeshObject(BuildFilmSubjectName("Sphere"), radarRoot.transform, sphereMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
+        gridObject = CreateMeshObject(BuildFilmSubjectName("Meter Grid"), axisRoot.transform, gridMesh, gridMaterial, GridRenderQueue, GridSortingOrder);
         gridFilter = gridObject.GetComponent<MeshFilter>();
 
-        centerMarkerObject = CreateMeshObject("FA Radar User Center", radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        userHeightStemObject = CreateMeshObject("FA Radar User Height Stem", axisRoot.transform, heightStemMesh, userHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 5);
-        targetBlipObject = CreateMeshObject("FA Radar Target Blip", axisRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        targetHeightStemObject = CreateMeshObject("FA Radar Target Height Stem", axisRoot.transform, heightStemMesh, targetHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 4);
-        targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", axisRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
-        lastTargetBlipObject = CreateMeshObject("FA Radar Last Target Blip", radarRoot.transform, targetBlipMesh, lastTargetMaterial, MarkerRenderQueue, MarkerSortingOrder - 2);
-        lastTargetGridDropObject = CreateMeshObject("FA Radar Last Target Grid Drop", axisRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
+        centerMarkerObject = CreateMeshObject(BuildFilmSubjectName("User Center"), radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        userHeightStemObject = CreateMeshObject(BuildFilmSubjectName("User Height Stem"), axisRoot.transform, heightStemMesh, userHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 5);
+        targetBlipObject = CreateMeshObject(BuildFilmSubjectName("Target Blip"), axisRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        targetHeightStemObject = CreateMeshObject(BuildFilmSubjectName("Target Height Stem"), axisRoot.transform, heightStemMesh, targetHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 4);
+        targetGridDropObject = CreateMeshObject(BuildFilmSubjectName("Target Grid Drop"), axisRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
+        lastTargetBlipObject = CreateMeshObject(BuildFilmSubjectName("Last Target Blip"), radarRoot.transform, targetBlipMesh, lastTargetMaterial, MarkerRenderQueue, MarkerSortingOrder - 2);
+        lastTargetGridDropObject = CreateMeshObject(BuildFilmSubjectName("Last Target Grid Drop"), axisRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
 
         ringObjects = new GameObject[3];
         ringBaseRotations = new Quaternion[3];
         ringBaseRotations[0] = Quaternion.identity;
         ringBaseRotations[1] = Quaternion.Euler(90.0f, 0.0f, 0.0f);
         ringBaseRotations[2] = Quaternion.Euler(0.0f, 90.0f, 0.0f);
-        ringObjects[0] = CreateMeshObject("FA Radar Ring XY", axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[1] = CreateMeshObject("FA Radar Ring XZ", axisRoot.transform, ringMesh, ringXMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[2] = CreateMeshObject("FA Radar Ring YZ", axisRoot.transform, ringMesh, ringZMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[0] = CreateMeshObject(BuildFilmSubjectName("Ring XY"), axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[1] = CreateMeshObject(BuildFilmSubjectName("Ring XZ"), axisRoot.transform, ringMesh, ringXMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[2] = CreateMeshObject(BuildFilmSubjectName("Ring YZ"), axisRoot.transform, ringMesh, ringZMaterial, RingRenderQueue, RingSortingOrder);
 
         SetActiveIfChanged(hudRoot, false);
         SetActiveIfChanged(userHeightStemObject, false);
@@ -1333,6 +1334,11 @@ public class FrameAngelRadar : MVRScript
         renderer.sharedMaterial = material;
         ApplyRendererOverlaySettings(renderer, renderQueue, sortingOrder);
         return target;
+    }
+
+    private static string BuildFilmSubjectName(string role)
+    {
+        return FilmSubjectIdentifier + "." + role;
     }
 
     private void TickRadar()

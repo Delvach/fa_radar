@@ -15,6 +15,9 @@ The current slice is compiled C# only:
 - no raw runtime file IO; global prefs use VaM `FileManagerSecure` only
 - generated translucent/emissive sphere shell with a subtle lit material and
   higher subdivisions
+- generated HUD objects and materials carry the `favr.hud.radar` filming
+  identifier so FAAR/recorder tooling can locate the radar without scene
+  storage or a product dependency
 - three generated rotating rings, colored to match VaM/world axes
 - faded generated meter grid
 - floor-only area scale that expands or contracts represented meters without

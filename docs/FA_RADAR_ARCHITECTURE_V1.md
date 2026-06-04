@@ -58,6 +58,9 @@ polygons so targeting can be tested before any art polish:
   together with a neutral marker color; Pro exposes lights, CUA, people, and
   other atom filters and keeps category colors
 - click-to-select for visible available CUA/light/person/other atom markers
+- generated HUD objects and materials carry the `favr.hud.radar` filming
+  identifier so FAAR/recorder tooling can locate the radar in final-recording
+  workflows without adding a recorder dependency or scene-stored control data
 
 The selected atom is resolved with
 `SuperController.singleton.GetSelectedAtom()` on a configurable poll interval.
@@ -180,6 +183,9 @@ works through the offset sliders and reset button.
 - Materials use the FA Keyboard-inspired overlay pattern:
   `Hidden/Internal-Colored`, alpha blend, `ZWrite=0`, and
   `CompareFunction.Always`.
+- The generated object and material names include `favr.hud.radar` as a small
+  filming identifier. This is intentionally name-based only: no Unity tag,
+  file IO, recorder import, or scene persistence is added for filming.
 
 ## Build And Deploy Contract
 
