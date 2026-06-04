@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.16` on branch
-  `codex/0.1.16-cua-preset-faar-visibility`.
+- Version: `0.1.17` on branch
+  `codex/0.1.17-ground-axis-sign-fix`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.16.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.16.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.17.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.17.dll`.
 - Pro also ships a thin CustomUnityAsset preset:
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,7 +27,8 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.16` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.17` branch preserves the prototype-first generated visual treatment
+and fixes grid-follow panning along the world Z/blue axis. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -83,7 +84,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.16`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.17`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Global Preferences
@@ -226,8 +227,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.16.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.16.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.17.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.17.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -243,11 +244,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.16.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.17.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.17.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.16.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.16.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.17.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.17.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are

@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.16";
+    private const string Version = "0.1.17";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -2771,7 +2771,7 @@ public class FrameAngelRadar : MVRScript
         Vector3 worldPosition = viewer.position;
         return new Vector2(
             -PositiveModulo(worldPosition.x, safeStep),
-            PositiveModulo(worldPosition.z, safeStep));
+            -PositiveModulo(worldPosition.z, safeStep));
     }
 
     private float PositiveModulo(float value, float modulus)
