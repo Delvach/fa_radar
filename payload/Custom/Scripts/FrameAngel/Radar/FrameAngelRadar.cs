@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using MVR.FileManagementSecure;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.13";
+    private const string Version = "0.1.14";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -25,9 +28,22 @@ public class FrameAngelRadar : MVRScript
     private const int GridSortingOrder = 32740;
     private const int RingSortingOrder = 32750;
     private const int MarkerSortingOrder = 32760;
+    private const string FrameAngelRadarPreferencesRootPath = "Custom\\PluginData\\FrameAngel\\Radar";
+    private const string FrameAngelRadarCommonPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_common.json";
+    private const string FrameAngelRadarProPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_pro.json";
+    private const string FrameAngelRadarCommonPreferencesSchemaVersion = "frameangel_radar_common_preferences_v1";
+    private const string FrameAngelRadarProPreferencesSchemaVersion = "frameangel_radar_pro_preferences_v1";
+    private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
+    private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
     private static readonly Color AxisYColor = new Color(0.22f, 1.0f, 0.34f, 1.0f);
     private static readonly Color AxisZColor = new Color(0.26f, 0.52f, 1.0f, 1.0f);
+    private static bool sharedRadarCommonPreferencesCacheKnown;
+    private static string sharedRadarCommonPreferencesJson = "";
+    private static float sharedRadarCommonPreferencesNextReadAt;
+    private static bool sharedRadarProPreferencesCacheKnown;
+    private static string sharedRadarProPreferencesJson = "";
+    private static float sharedRadarProPreferencesNextReadAt;
 
     private JSONStorableBool radarEnabledField;
     private JSONStorableBool ignoreContainingAtomField;
@@ -51,6 +67,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showPersonAtomsField;
     private JSONStorableBool showOtherAtomsField;
     private JSONStorableBool clickSelectMarkersField;
+    private JSONStorableBool globalPrefsAutoSaveField;
 
     private JSONStorableFloat hudOffsetXField;
     private JSONStorableFloat hudOffsetYField;
@@ -138,13 +155,20 @@ public class FrameAngelRadar : MVRScript
     private bool haveLastGridOffset;
     private bool visualsReady;
     private bool haveSmoothedHudPosition;
+    private bool globalPreferencesLoading;
+    private bool globalPreferencesDirty;
     private Vector3 smoothedHudPosition;
+    private float nextGlobalPreferencesFlushTime;
+    private float nextGlobalPreferencesPollTime;
+    private string lastAppliedCommonPreferencesJson = "";
+    private string lastAppliedProPreferencesJson = "";
     private Transform currentHudAnchor;
     private Transform lastGoodViewerTransform;
 
     public override void Init()
     {
         BuildStorables();
+        LoadGlobalPreferences();
         BuildUi();
         EnsureRuntimeVisuals();
         SetStatus("Frame Angel Radar " + Version + " " + EditionName + " ready.");
@@ -157,11 +181,14 @@ public class FrameAngelRadar : MVRScript
             EnsureRuntimeVisuals();
         }
 
+        PollSharedGlobalPreferences();
+        FlushGlobalPreferencesIfDue(false);
         TickRadar();
     }
 
     private void OnDestroy()
     {
+        FlushGlobalPreferencesIfDue(true);
         DestroyRuntimeVisuals();
     }
 
@@ -190,6 +217,7 @@ public class FrameAngelRadar : MVRScript
         showPersonAtomsField = new JSONStorableBool("Show People", false);
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
+        globalPrefsAutoSaveField = new JSONStorableBool("Global Prefs Auto Save", true);
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
@@ -242,6 +270,7 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showPersonAtomsField);
         RegisterBool(showOtherAtomsField);
         RegisterBool(clickSelectMarkersField);
+        RegisterBool(globalPrefsAutoSaveField);
 
         RegisterFloat(hudOffsetXField);
         RegisterFloat(hudOffsetYField);
@@ -274,11 +303,16 @@ public class FrameAngelRadar : MVRScript
 
         RegisterAction(new JSONStorableAction("Capture HUD Offset From Atom", CaptureHudOffsetFromAttachedAtom));
         RegisterAction(new JSONStorableAction("Reset HUD Offset", ResetHudOffset));
+        RegisterAction(new JSONStorableAction("Save Global Prefs", SaveGlobalPreferencesAction));
+        RegisterAction(new JSONStorableAction("Load Global Prefs", LoadGlobalPreferencesAction));
+        RegisterAction(new JSONStorableAction("Reset Global Prefs", ResetGlobalPreferencesAction));
+        ConfigureGlobalPreferenceCallbacks();
     }
 
     private void BuildUi()
     {
         CreateToggle(radarEnabledField, false);
+        CreateToggle(globalPrefsAutoSaveField, true);
         CreateToggle(desktopTopDownField, true);
         CreateToggle(anchorToViewField, false);
         CreateToggle(selectedGroundDropEnabledField, false);
@@ -300,6 +334,18 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(gridClipCircleField, true);
         CreateToggle(ignoreContainingAtomField, false);
         CreateTextField(statusField, true);
+        CreateButton("Load Global Prefs", false).button.onClick.AddListener(delegate
+        {
+            LoadGlobalPreferencesAction();
+        });
+        CreateButton("Save Global Prefs", true).button.onClick.AddListener(delegate
+        {
+            SaveGlobalPreferencesAction();
+        });
+        CreateButton("Reset Global Prefs", false).button.onClick.AddListener(delegate
+        {
+            ResetGlobalPreferencesAction();
+        });
 
         CreateSlider(radarRangeMetersField, false);
         CreateSlider(floorAreaScaleField, true);
@@ -338,6 +384,870 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(emissionStrengthField, false);
         CreateSlider(pollIntervalField, true);
         CreateSlider(atomPollSecondsField, true);
+    }
+
+    private void ConfigureGlobalPreferenceCallbacks()
+    {
+        ConfigureGlobalPreferenceField(globalPrefsAutoSaveField);
+        if (globalPrefsAutoSaveField != null)
+        {
+            globalPrefsAutoSaveField.setCallbackFunction = delegate(bool value)
+            {
+                if (!globalPreferencesLoading)
+                {
+                    WriteGlobalPreferences();
+                }
+            };
+        }
+
+        ConfigureGlobalPreferenceCallback(radarEnabledField);
+        ConfigureGlobalPreferenceCallback(ignoreContainingAtomField);
+        ConfigureGlobalPreferenceCallback(ringsEnabledField);
+        ConfigureGlobalPreferenceCallback(gridEnabledField);
+        ConfigureGlobalPreferenceCallback(gridFollowsUserField);
+        ConfigureGlobalPreferenceCallback(gridClipCircleField);
+        ConfigureGlobalPreferenceCallback(anchorToViewField);
+        ConfigureGlobalPreferenceCallback(desktopTopDownField);
+        ConfigureGlobalPreferenceCallback(worldAxisAlignField);
+        ConfigureGlobalPreferenceCallback(groundAxisLockField);
+        ConfigureGlobalPreferenceCallback(selectedGroundDropEnabledField);
+        ConfigureGlobalPreferenceCallback(heightStemsEnabledField);
+        ConfigureGlobalPreferenceCallback(depthSizeCueField);
+        ConfigureGlobalPreferenceCallback(availableAtomMarkersEnabledField);
+        ConfigureGlobalPreferenceCallback(clickSelectMarkersField);
+
+        ConfigureGlobalPreferenceCallback(hudOffsetXField);
+        ConfigureGlobalPreferenceCallback(hudOffsetYField);
+        ConfigureGlobalPreferenceCallback(hudOffsetZField);
+        ConfigureGlobalPreferenceCallback(hudScaleField);
+        ConfigureGlobalPreferenceCallback(desktopTiltDegreesField);
+        ConfigureGlobalPreferenceCallback(radarRangeMetersField);
+        ConfigureGlobalPreferenceCallback(floorAreaScaleField);
+        ConfigureGlobalPreferenceCallback(radarVisualRadiusField);
+        ConfigureGlobalPreferenceCallback(gridStepMetersField);
+        ConfigureGlobalPreferenceCallback(shellAlphaField);
+        ConfigureGlobalPreferenceCallback(ringAlphaField);
+        ConfigureGlobalPreferenceCallback(gridAlphaField);
+        ConfigureGlobalPreferenceCallback(markerAlphaField);
+        ConfigureGlobalPreferenceCallback(emissionStrengthField);
+        ConfigureGlobalPreferenceCallback(ringRotationSpeedField);
+        ConfigureGlobalPreferenceCallback(targetMarkerScaleField);
+        ConfigureGlobalPreferenceCallback(heightScaleMetersField);
+        ConfigureGlobalPreferenceCallback(heightStemAlphaField);
+        ConfigureGlobalPreferenceCallback(rangeFadeMetersField);
+        ConfigureGlobalPreferenceCallback(depthSizeStrengthField);
+        ConfigureGlobalPreferenceCallback(atomPollSecondsField);
+        ConfigureGlobalPreferenceCallback(availableAtomAlphaField);
+        ConfigureGlobalPreferenceCallback(markerClickRadiusPixelsField);
+        ConfigureGlobalPreferenceCallback(pollIntervalField);
+        ConfigureGlobalPreferenceCallback(responseSmoothingField);
+
+        ConfigureGlobalPreferenceCallback(showLightAtomsField);
+        ConfigureGlobalPreferenceCallback(showCustomUnityAssetAtomsField);
+        ConfigureGlobalPreferenceCallback(showPersonAtomsField);
+        ConfigureGlobalPreferenceCallback(showOtherAtomsField);
+    }
+
+    private static void ConfigureGlobalPreferenceField(JSONStorableParam field)
+    {
+        if (field == null)
+        {
+            return;
+        }
+
+        field.isStorable = false;
+        field.isRestorable = false;
+    }
+
+    private void ConfigureGlobalPreferenceCallback(JSONStorableBool field)
+    {
+        ConfigureGlobalPreferenceField(field);
+        if (field == null)
+        {
+            return;
+        }
+
+        field.setCallbackFunction = delegate(bool value)
+        {
+            MarkGlobalPreferencesDirty();
+        };
+    }
+
+    private void ConfigureGlobalPreferenceCallback(JSONStorableFloat field)
+    {
+        ConfigureGlobalPreferenceField(field);
+        if (field == null)
+        {
+            return;
+        }
+
+        field.setCallbackFunction = delegate(float value)
+        {
+            MarkGlobalPreferencesDirty();
+        };
+    }
+
+    private void SaveGlobalPreferencesAction()
+    {
+        WriteGlobalPreferences();
+    }
+
+    private void LoadGlobalPreferencesAction()
+    {
+        LoadGlobalPreferences();
+    }
+
+    private void ResetGlobalPreferencesAction()
+    {
+        bool previousLoading = globalPreferencesLoading;
+        globalPreferencesLoading = true;
+        try
+        {
+            ApplyBuiltInGlobalPreferenceDefaults();
+        }
+        finally
+        {
+            globalPreferencesLoading = previousLoading;
+        }
+
+        haveSmoothedHudPosition = false;
+        InvalidateGridMesh();
+        WriteGlobalPreferences();
+        SetStatus("Global prefs reset.");
+    }
+
+    private void MarkGlobalPreferencesDirty()
+    {
+        if (globalPreferencesLoading)
+        {
+            return;
+        }
+
+        if (globalPrefsAutoSaveField != null && !globalPrefsAutoSaveField.val)
+        {
+            return;
+        }
+
+        globalPreferencesDirty = true;
+        nextGlobalPreferencesFlushTime = Time.unscaledTime + GlobalPreferencesFlushDelaySeconds;
+    }
+
+    private void FlushGlobalPreferencesIfDue(bool force)
+    {
+        if (!globalPreferencesDirty)
+        {
+            return;
+        }
+
+        if (globalPrefsAutoSaveField != null && !globalPrefsAutoSaveField.val)
+        {
+            return;
+        }
+
+        if (!force && Time.unscaledTime < nextGlobalPreferencesFlushTime)
+        {
+            return;
+        }
+
+        WriteGlobalPreferences();
+    }
+
+    private void LoadGlobalPreferences()
+    {
+        bool loadedAny = false;
+        string preferencesJson;
+        if (TryReadSharedGlobalPreferencesCache(false, out preferencesJson))
+        {
+            loadedAny = ApplyCommonGlobalPreferences(preferencesJson) || loadedAny;
+        }
+
+#if FA_RADAR_PRO
+        if (TryReadSharedGlobalPreferencesCache(true, out preferencesJson))
+        {
+            loadedAny = ApplyProGlobalPreferences(preferencesJson) || loadedAny;
+        }
+#endif
+
+        globalPreferencesDirty = false;
+        if (loadedAny)
+        {
+            SetStatus("Global prefs loaded.");
+        }
+        else
+        {
+            SetStatus("No global prefs found; defaults active.");
+        }
+    }
+
+    private void PollSharedGlobalPreferences()
+    {
+        if (globalPreferencesDirty || Time.unscaledTime < nextGlobalPreferencesPollTime)
+        {
+            return;
+        }
+
+        nextGlobalPreferencesPollTime = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+
+        bool applied = false;
+        string preferencesJson;
+        if (TryReadSharedGlobalPreferencesCache(false, out preferencesJson)
+            && !string.Equals(preferencesJson ?? "", lastAppliedCommonPreferencesJson ?? "", StringComparison.Ordinal))
+        {
+            applied = ApplyCommonGlobalPreferences(preferencesJson) || applied;
+        }
+
+#if FA_RADAR_PRO
+        if (TryReadSharedGlobalPreferencesCache(true, out preferencesJson)
+            && !string.Equals(preferencesJson ?? "", lastAppliedProPreferencesJson ?? "", StringComparison.Ordinal))
+        {
+            applied = ApplyProGlobalPreferences(preferencesJson) || applied;
+        }
+#endif
+
+        if (applied)
+        {
+            SetStatus("Global prefs refreshed.");
+        }
+    }
+
+    private void WriteGlobalPreferences()
+    {
+        if (globalPreferencesLoading)
+        {
+            return;
+        }
+
+        string errorMessage;
+        string commonJson = BuildCommonGlobalPreferencesJson();
+        if (!TryWriteGlobalPreferencesToDisk(FrameAngelRadarCommonPreferencesPath, commonJson, out errorMessage))
+        {
+            globalPreferencesDirty = true;
+            SetStatus("Global prefs save failed: " + errorMessage);
+            return;
+        }
+
+        UpdateSharedGlobalPreferencesCache(false, commonJson);
+        lastAppliedCommonPreferencesJson = commonJson;
+
+#if FA_RADAR_PRO
+        string proJson = BuildProGlobalPreferencesJson();
+        if (!TryWriteGlobalPreferencesToDisk(FrameAngelRadarProPreferencesPath, proJson, out errorMessage))
+        {
+            globalPreferencesDirty = true;
+            SetStatus("Pro prefs save failed: " + errorMessage);
+            return;
+        }
+
+        UpdateSharedGlobalPreferencesCache(true, proJson);
+        lastAppliedProPreferencesJson = proJson;
+#endif
+
+        globalPreferencesDirty = false;
+        SetStatus("Global prefs saved.");
+    }
+
+    private bool TryWriteGlobalPreferencesToDisk(string preferencesPath, string preferencesJson, out string errorMessage)
+    {
+        errorMessage = "";
+        try
+        {
+            if (!FileManagerSecure.DirectoryExists(FrameAngelRadarPreferencesRootPath, false))
+            {
+                FileManagerSecure.CreateDirectory(FrameAngelRadarPreferencesRootPath);
+            }
+
+            FileManagerSecure.WriteAllText(preferencesPath, preferencesJson);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            return false;
+        }
+    }
+
+    private bool TryReadGlobalPreferencesFromDisk(
+        string preferencesPath,
+        string expectedSchemaVersion,
+        out string preferencesJson)
+    {
+        preferencesJson = "";
+        if (string.IsNullOrEmpty(preferencesPath) || !FileManagerSecure.FileExists(preferencesPath, false))
+        {
+            return false;
+        }
+
+        try
+        {
+            preferencesJson = FileManagerSecure.ReadAllText(preferencesPath);
+        }
+        catch
+        {
+            preferencesJson = "";
+            return false;
+        }
+
+        string schemaVersion;
+        if (TryReadStringPreference(preferencesJson, "schemaVersion", out schemaVersion)
+            && !string.IsNullOrEmpty(schemaVersion)
+            && !string.Equals(schemaVersion, expectedSchemaVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            preferencesJson = "";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryReadSharedGlobalPreferencesCache(bool proPreferences, out string preferencesJson)
+    {
+        preferencesJson = "";
+        if (proPreferences)
+        {
+            preferencesJson = sharedRadarProPreferencesJson ?? "";
+            if (sharedRadarProPreferencesCacheKnown && Time.unscaledTime < sharedRadarProPreferencesNextReadAt)
+            {
+                return true;
+            }
+
+            if (!TryReadGlobalPreferencesFromDisk(
+                FrameAngelRadarProPreferencesPath,
+                FrameAngelRadarProPreferencesSchemaVersion,
+                out preferencesJson))
+            {
+                return sharedRadarProPreferencesCacheKnown;
+            }
+
+            UpdateSharedGlobalPreferencesCache(true, preferencesJson);
+            return true;
+        }
+
+        preferencesJson = sharedRadarCommonPreferencesJson ?? "";
+        if (sharedRadarCommonPreferencesCacheKnown && Time.unscaledTime < sharedRadarCommonPreferencesNextReadAt)
+        {
+            return true;
+        }
+
+        if (!TryReadGlobalPreferencesFromDisk(
+            FrameAngelRadarCommonPreferencesPath,
+            FrameAngelRadarCommonPreferencesSchemaVersion,
+            out preferencesJson))
+        {
+            return sharedRadarCommonPreferencesCacheKnown;
+        }
+
+        UpdateSharedGlobalPreferencesCache(false, preferencesJson);
+        return true;
+    }
+
+    private void UpdateSharedGlobalPreferencesCache(bool proPreferences, string preferencesJson)
+    {
+        if (proPreferences)
+        {
+            sharedRadarProPreferencesJson = preferencesJson ?? "";
+            sharedRadarProPreferencesCacheKnown = true;
+            sharedRadarProPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+            return;
+        }
+
+        sharedRadarCommonPreferencesJson = preferencesJson ?? "";
+        sharedRadarCommonPreferencesCacheKnown = true;
+        sharedRadarCommonPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+    }
+
+    private bool ApplyCommonGlobalPreferences(string preferencesJson)
+    {
+        if (string.IsNullOrEmpty(preferencesJson))
+        {
+            return false;
+        }
+
+        string schemaVersion;
+        if (TryReadStringPreference(preferencesJson, "schemaVersion", out schemaVersion)
+            && !string.IsNullOrEmpty(schemaVersion)
+            && !string.Equals(schemaVersion, FrameAngelRadarCommonPreferencesSchemaVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        bool previousLoading = globalPreferencesLoading;
+        globalPreferencesLoading = true;
+        try
+        {
+            ApplyBoolPreference(preferencesJson, "globalPrefsAutoSave", globalPrefsAutoSaveField);
+            ApplyBoolPreference(preferencesJson, "radarEnabled", radarEnabledField);
+            ApplyBoolPreference(preferencesJson, "ignoreAttachedAtom", ignoreContainingAtomField);
+            ApplyBoolPreference(preferencesJson, "ringsEnabled", ringsEnabledField);
+            ApplyBoolPreference(preferencesJson, "gridEnabled", gridEnabledField);
+            ApplyBoolPreference(preferencesJson, "gridFollowsUser", gridFollowsUserField);
+            ApplyBoolPreference(preferencesJson, "gridClipCircle", gridClipCircleField);
+            ApplyBoolPreference(preferencesJson, "anchorToView", anchorToViewField);
+            ApplyBoolPreference(preferencesJson, "flattenTargetY", desktopTopDownField);
+            ApplyBoolPreference(preferencesJson, "worldAxisAlign", worldAxisAlignField);
+            ApplyBoolPreference(preferencesJson, "groundAxisLock", groundAxisLockField);
+            ApplyBoolPreference(preferencesJson, "selectedGroundDrop", selectedGroundDropEnabledField);
+            ApplyBoolPreference(preferencesJson, "heightStems", heightStemsEnabledField);
+            ApplyBoolPreference(preferencesJson, "depthSizeCue", depthSizeCueField);
+            ApplyBoolPreference(preferencesJson, "availableAtomMarkers", availableAtomMarkersEnabledField);
+            ApplyBoolPreference(preferencesJson, "clickSelectMarkers", clickSelectMarkersField);
+
+            ApplyFloatPreference(preferencesJson, "hudOffsetX", hudOffsetXField);
+            ApplyFloatPreference(preferencesJson, "hudOffsetY", hudOffsetYField);
+            ApplyFloatPreference(preferencesJson, "hudOffsetZ", hudOffsetZField);
+            ApplyFloatPreference(preferencesJson, "hudScale", hudScaleField);
+            ApplyFloatPreference(preferencesJson, "desktopTiltDegrees", desktopTiltDegreesField);
+            ApplyFloatPreference(preferencesJson, "radarRangeMeters", radarRangeMetersField);
+            ApplyFloatPreference(preferencesJson, "floorAreaScale", floorAreaScaleField);
+            ApplyFloatPreference(preferencesJson, "radarVisualRadius", radarVisualRadiusField);
+            ApplyFloatPreference(preferencesJson, "gridStepMeters", gridStepMetersField);
+            ApplyFloatPreference(preferencesJson, "shellAlpha", shellAlphaField);
+            ApplyFloatPreference(preferencesJson, "ringAlpha", ringAlphaField);
+            ApplyFloatPreference(preferencesJson, "gridAlpha", gridAlphaField);
+            ApplyFloatPreference(preferencesJson, "markerAlpha", markerAlphaField);
+            ApplyFloatPreference(preferencesJson, "emissionStrength", emissionStrengthField);
+            ApplyFloatPreference(preferencesJson, "ringRotationSpeed", ringRotationSpeedField);
+            ApplyFloatPreference(preferencesJson, "targetMarkerScale", targetMarkerScaleField);
+            ApplyFloatPreference(preferencesJson, "heightScaleMeters", heightScaleMetersField);
+            ApplyFloatPreference(preferencesJson, "heightStemAlpha", heightStemAlphaField);
+            ApplyFloatPreference(preferencesJson, "rangeFadeMeters", rangeFadeMetersField);
+            ApplyFloatPreference(preferencesJson, "depthSizeStrength", depthSizeStrengthField);
+            ApplyFloatPreference(preferencesJson, "atomPollSeconds", atomPollSecondsField);
+            ApplyFloatPreference(preferencesJson, "availableAtomAlpha", availableAtomAlphaField);
+            ApplyFloatPreference(preferencesJson, "markerClickRadiusPixels", markerClickRadiusPixelsField);
+            ApplyFloatPreference(preferencesJson, "selectionPollSeconds", pollIntervalField);
+            ApplyFloatPreference(preferencesJson, "responseSmoothing", responseSmoothingField);
+        }
+        finally
+        {
+            globalPreferencesLoading = previousLoading;
+        }
+
+        lastAppliedCommonPreferencesJson = preferencesJson;
+        haveSmoothedHudPosition = false;
+        InvalidateGridMesh();
+        return true;
+    }
+
+    private bool ApplyProGlobalPreferences(string preferencesJson)
+    {
+        if (string.IsNullOrEmpty(preferencesJson))
+        {
+            return false;
+        }
+
+        string schemaVersion;
+        if (TryReadStringPreference(preferencesJson, "schemaVersion", out schemaVersion)
+            && !string.IsNullOrEmpty(schemaVersion)
+            && !string.Equals(schemaVersion, FrameAngelRadarProPreferencesSchemaVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        bool previousLoading = globalPreferencesLoading;
+        globalPreferencesLoading = true;
+        try
+        {
+            ApplyBoolPreference(preferencesJson, "showLights", showLightAtomsField);
+            ApplyBoolPreference(preferencesJson, "showCUA", showCustomUnityAssetAtomsField);
+            ApplyBoolPreference(preferencesJson, "showPeople", showPersonAtomsField);
+            ApplyBoolPreference(preferencesJson, "showOtherAtoms", showOtherAtomsField);
+        }
+        finally
+        {
+            globalPreferencesLoading = previousLoading;
+        }
+
+        lastAppliedProPreferencesJson = preferencesJson;
+        trackedAvailableAtoms.Clear();
+        nextAtomPollTime = 0.0f;
+        return true;
+    }
+
+    private void ApplyBuiltInGlobalPreferenceDefaults()
+    {
+        SetBoolNoCallback(globalPrefsAutoSaveField, true);
+        SetBoolNoCallback(radarEnabledField, true);
+        SetBoolNoCallback(ignoreContainingAtomField, true);
+        SetBoolNoCallback(ringsEnabledField, true);
+        SetBoolNoCallback(gridEnabledField, true);
+        SetBoolNoCallback(gridFollowsUserField, true);
+        SetBoolNoCallback(gridClipCircleField, true);
+        SetBoolNoCallback(anchorToViewField, true);
+        SetBoolNoCallback(desktopTopDownField, false);
+        SetBoolNoCallback(worldAxisAlignField, true);
+        SetBoolNoCallback(groundAxisLockField, true);
+        SetBoolNoCallback(selectedGroundDropEnabledField, false);
+        SetBoolNoCallback(heightStemsEnabledField, true);
+        SetBoolNoCallback(depthSizeCueField, true);
+        SetBoolNoCallback(availableAtomMarkersEnabledField, true);
+        SetBoolNoCallback(clickSelectMarkersField, true);
+        SetBoolNoCallback(showLightAtomsField, true);
+        SetBoolNoCallback(showCustomUnityAssetAtomsField, false);
+        SetBoolNoCallback(showPersonAtomsField, false);
+        SetBoolNoCallback(showOtherAtomsField, false);
+
+        SetFloatNoCallback(hudOffsetXField, -0.59f);
+        SetFloatNoCallback(hudOffsetYField, 0.22f);
+        SetFloatNoCallback(hudOffsetZField, 0.78f);
+        SetFloatNoCallback(hudScaleField, 0.49f);
+        SetFloatNoCallback(desktopTiltDegreesField, 90.0f);
+        SetFloatNoCallback(radarRangeMetersField, 5.0f);
+        SetFloatNoCallback(floorAreaScaleField, 1.0f);
+        SetFloatNoCallback(radarVisualRadiusField, 0.08f);
+        SetFloatNoCallback(gridStepMetersField, 1.0f);
+        SetFloatNoCallback(shellAlphaField, 0.09f);
+        SetFloatNoCallback(ringAlphaField, 0.34f);
+        SetFloatNoCallback(gridAlphaField, 0.16f);
+        SetFloatNoCallback(markerAlphaField, 0.9f);
+        SetFloatNoCallback(emissionStrengthField, 1.4f);
+        SetFloatNoCallback(ringRotationSpeedField, 0.0f);
+        SetFloatNoCallback(targetMarkerScaleField, 0.09f);
+        SetFloatNoCallback(heightScaleMetersField, 6.0f);
+        SetFloatNoCallback(heightStemAlphaField, 0.42f);
+        SetFloatNoCallback(rangeFadeMetersField, 1.25f);
+        SetFloatNoCallback(depthSizeStrengthField, 0.35f);
+        SetFloatNoCallback(atomPollSecondsField, 0.75f);
+        SetFloatNoCallback(availableAtomAlphaField, 0.46f);
+        SetFloatNoCallback(markerClickRadiusPixelsField, 20.0f);
+        SetFloatNoCallback(pollIntervalField, 0.15f);
+        SetFloatNoCallback(responseSmoothingField, 0.0f);
+    }
+
+    private string BuildCommonGlobalPreferencesJson()
+    {
+        StringBuilder sb = new StringBuilder(2048);
+        bool wroteProperty = false;
+        sb.Append('{');
+        AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", FrameAngelRadarCommonPreferencesSchemaVersion);
+        AppendJsonStringProperty(sb, ref wroteProperty, "savedAtUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "globalPrefsAutoSave", ReadBool(globalPrefsAutoSaveField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "radarEnabled", ReadBool(radarEnabledField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "ignoreAttachedAtom", ReadBool(ignoreContainingAtomField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "ringsEnabled", ReadBool(ringsEnabledField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "gridEnabled", ReadBool(gridEnabledField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "gridFollowsUser", ReadBool(gridFollowsUserField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "gridClipCircle", ReadBool(gridClipCircleField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "anchorToView", ReadBool(anchorToViewField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "flattenTargetY", ReadBool(desktopTopDownField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "worldAxisAlign", ReadBool(worldAxisAlignField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "groundAxisLock", ReadBool(groundAxisLockField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "selectedGroundDrop", ReadBool(selectedGroundDropEnabledField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "heightStems", ReadBool(heightStemsEnabledField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "depthSizeCue", ReadBool(depthSizeCueField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "availableAtomMarkers", ReadBool(availableAtomMarkersEnabledField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "clickSelectMarkers", ReadBool(clickSelectMarkersField, true));
+
+        AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetX", ReadFloat(hudOffsetXField, -0.59f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetY", ReadFloat(hudOffsetYField, 0.22f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetZ", ReadFloat(hudOffsetZField, 0.78f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "hudScale", ReadFloat(hudScaleField, 0.49f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "desktopTiltDegrees", ReadFloat(desktopTiltDegreesField, 90.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "radarRangeMeters", ReadFloat(radarRangeMetersField, 5.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "floorAreaScale", ReadFloat(floorAreaScaleField, 1.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "radarVisualRadius", ReadFloat(radarVisualRadiusField, 0.08f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "gridStepMeters", ReadFloat(gridStepMetersField, 1.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "shellAlpha", ReadFloat(shellAlphaField, 0.09f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "ringAlpha", ReadFloat(ringAlphaField, 0.34f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "gridAlpha", ReadFloat(gridAlphaField, 0.16f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "markerAlpha", ReadFloat(markerAlphaField, 0.9f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "emissionStrength", ReadFloat(emissionStrengthField, 1.4f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "ringRotationSpeed", ReadFloat(ringRotationSpeedField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "targetMarkerScale", ReadFloat(targetMarkerScaleField, 0.09f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "heightScaleMeters", ReadFloat(heightScaleMetersField, 6.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "heightStemAlpha", ReadFloat(heightStemAlphaField, 0.42f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "rangeFadeMeters", ReadFloat(rangeFadeMetersField, 1.25f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "depthSizeStrength", ReadFloat(depthSizeStrengthField, 0.35f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "atomPollSeconds", ReadFloat(atomPollSecondsField, 0.75f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "availableAtomAlpha", ReadFloat(availableAtomAlphaField, 0.46f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "markerClickRadiusPixels", ReadFloat(markerClickRadiusPixelsField, 20.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "selectionPollSeconds", ReadFloat(pollIntervalField, 0.15f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "responseSmoothing", ReadFloat(responseSmoothingField, 0.0f));
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private string BuildProGlobalPreferencesJson()
+    {
+        StringBuilder sb = new StringBuilder(384);
+        bool wroteProperty = false;
+        sb.Append('{');
+        AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", FrameAngelRadarProPreferencesSchemaVersion);
+        AppendJsonStringProperty(sb, ref wroteProperty, "savedAtUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showLights", ReadBool(showLightAtomsField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showCUA", ReadBool(showCustomUnityAssetAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showPeople", ReadBool(showPersonAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showOtherAtoms", ReadBool(showOtherAtomsField, false));
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private void ApplyBoolPreference(string preferencesJson, string key, JSONStorableBool field)
+    {
+        bool value;
+        if (field != null && TryReadBoolPreference(preferencesJson, key, out value))
+        {
+            field.valNoCallback = value;
+        }
+    }
+
+    private void ApplyFloatPreference(string preferencesJson, string key, JSONStorableFloat field)
+    {
+        float value;
+        if (field != null && TryReadFloatPreference(preferencesJson, key, out value))
+        {
+            field.valNoCallback = value;
+        }
+    }
+
+    private static void SetBoolNoCallback(JSONStorableBool field, bool value)
+    {
+        if (field != null)
+        {
+            field.valNoCallback = value;
+        }
+    }
+
+    private static void SetFloatNoCallback(JSONStorableFloat field, float value)
+    {
+        if (field != null)
+        {
+            field.valNoCallback = value;
+        }
+    }
+
+    private static bool ReadBool(JSONStorableBool field, bool fallback)
+    {
+        return field != null ? field.val : fallback;
+    }
+
+    private static float ReadFloat(JSONStorableFloat field, float fallback)
+    {
+        return field != null ? field.val : fallback;
+    }
+
+    private static void AppendJsonStringProperty(StringBuilder sb, ref bool wroteProperty, string key, string value)
+    {
+        AppendJsonPropertyPrefix(sb, ref wroteProperty, key);
+        sb.Append('"').Append(EscapeJsonString(value ?? "")).Append('"');
+    }
+
+    private static void AppendJsonBoolProperty(StringBuilder sb, ref bool wroteProperty, string key, bool value)
+    {
+        AppendJsonPropertyPrefix(sb, ref wroteProperty, key);
+        sb.Append(value ? "true" : "false");
+    }
+
+    private static void AppendJsonFloatProperty(StringBuilder sb, ref bool wroteProperty, string key, float value)
+    {
+        AppendJsonPropertyPrefix(sb, ref wroteProperty, key);
+        sb.Append(FormatPreferenceFloat(value));
+    }
+
+    private static void AppendJsonPropertyPrefix(StringBuilder sb, ref bool wroteProperty, string key)
+    {
+        if (wroteProperty)
+        {
+            sb.Append(',');
+        }
+        else
+        {
+            wroteProperty = true;
+        }
+
+        sb.Append('"').Append(EscapeJsonString(key ?? "")).Append("\":");
+    }
+
+    private static string FormatPreferenceFloat(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string EscapeJsonString(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder(value.Length + 8);
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+            switch (c)
+            {
+                case '\\':
+                    sb.Append("\\\\");
+                    break;
+                case '"':
+                    sb.Append("\\\"");
+                    break;
+                case '\n':
+                    sb.Append("\\n");
+                    break;
+                case '\r':
+                    sb.Append("\\r");
+                    break;
+                case '\t':
+                    sb.Append("\\t");
+                    break;
+                default:
+                    sb.Append(c);
+                    break;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static bool TryReadStringPreference(string preferencesJson, string key, out string value)
+    {
+        return TryReadRawPreferenceValue(preferencesJson, key, out value);
+    }
+
+    private static bool TryReadBoolPreference(string preferencesJson, string key, out bool value)
+    {
+        value = false;
+        string rawValue;
+        if (!TryReadRawPreferenceValue(preferencesJson, key, out rawValue))
+        {
+            return false;
+        }
+
+        rawValue = rawValue.Trim();
+        if (string.Equals(rawValue, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            value = true;
+            return true;
+        }
+
+        if (string.Equals(rawValue, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            value = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadFloatPreference(string preferencesJson, string key, out float value)
+    {
+        value = 0.0f;
+        string rawValue;
+        if (!TryReadRawPreferenceValue(preferencesJson, key, out rawValue))
+        {
+            return false;
+        }
+
+        return float.TryParse(rawValue.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static bool TryReadRawPreferenceValue(string preferencesJson, string key, out string value)
+    {
+        value = "";
+        if (string.IsNullOrEmpty(preferencesJson) || string.IsNullOrEmpty(key))
+        {
+            return false;
+        }
+
+        string needle = "\"" + key + "\"";
+        int keyIndex = preferencesJson.IndexOf(needle, StringComparison.Ordinal);
+        if (keyIndex < 0)
+        {
+            return false;
+        }
+
+        int colonIndex = preferencesJson.IndexOf(':', keyIndex + needle.Length);
+        if (colonIndex < 0)
+        {
+            return false;
+        }
+
+        int valueStart = colonIndex + 1;
+        while (valueStart < preferencesJson.Length && char.IsWhiteSpace(preferencesJson[valueStart]))
+        {
+            valueStart++;
+        }
+
+        if (valueStart >= preferencesJson.Length)
+        {
+            return false;
+        }
+
+        if (preferencesJson[valueStart] == '"')
+        {
+            return TryReadQuotedJsonString(preferencesJson, valueStart + 1, out value);
+        }
+
+        int valueEnd = valueStart;
+        while (valueEnd < preferencesJson.Length
+            && preferencesJson[valueEnd] != ','
+            && preferencesJson[valueEnd] != '}')
+        {
+            valueEnd++;
+        }
+
+        value = preferencesJson.Substring(valueStart, valueEnd - valueStart).Trim();
+        return value.Length > 0;
+    }
+
+    private static bool TryReadQuotedJsonString(string json, int startIndex, out string value)
+    {
+        value = "";
+        StringBuilder sb = new StringBuilder();
+        bool escaping = false;
+        for (int i = startIndex; i < json.Length; i++)
+        {
+            char c = json[i];
+            if (escaping)
+            {
+                switch (c)
+                {
+                    case '"':
+                    case '\\':
+                    case '/':
+                        sb.Append(c);
+                        break;
+                    case 'n':
+                        sb.Append('\n');
+                        break;
+                    case 'r':
+                        sb.Append('\r');
+                        break;
+                    case 't':
+                        sb.Append('\t');
+                        break;
+                    default:
+                        sb.Append(c);
+                        break;
+                }
+
+                escaping = false;
+                continue;
+            }
+
+            if (c == '\\')
+            {
+                escaping = true;
+                continue;
+            }
+
+            if (c == '"')
+            {
+                value = sb.ToString();
+                return true;
+            }
+
+            sb.Append(c);
+        }
+
+        return false;
+    }
+
+    private void InvalidateGridMesh()
+    {
+        lastGridRangeMeters = -1.0f;
+        lastGridStepMeters = -1.0f;
+        haveLastGridOffset = false;
     }
 
     private void EnsureRuntimeVisuals()

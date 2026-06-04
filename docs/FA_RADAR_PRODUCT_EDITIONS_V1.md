@@ -7,11 +7,11 @@ Updated: 2026-06-04
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.13`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.14`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.13.dll`
-- `fa_radar.pro.0.1.13.dll`
+- `fa_radar.free.0.1.14.dll`
+- `fa_radar.pro.0.1.14.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -37,6 +37,8 @@ Free is the radar.
 
 - same generated HUD radar foundation
 - free movement, scale, placement, and appearance controls
+- global placement/scale/look preferences under
+  `Custom\PluginData\FrameAngel\Radar`
 - user-controlled visual tuning for the radar itself
 - no visibility filtering
 - all available radar-supported atoms are shown together
@@ -53,6 +55,7 @@ instrument.
 Pro is the operational radar.
 
 - visibility switches for atom categories and specific target lanes
+- Pro-only filter preferences stored separately from common Free/Pro prefs
 - native VaM plugin UI controls for first release filters and tuning
 - category colors, including customizable defaults for women and men
 - default people colors start as pink for women and blue for men
@@ -82,8 +85,10 @@ Rules:
 - Free builds exclude Pro-only controls and Pro-only generated visuals
 - Pro builds include filters, native plugin UI controls, color customization,
   and light volume visuals
-- no runtime file IO, reflection, repo-local JSON dependency, or absolute
-  development paths are introduced for edition gating
+- no raw runtime file IO, reflection, broad JSON object serializers, repo-local
+  runtime JSON dependency, or absolute development paths are introduced for
+  edition gating
+- global preferences use VaM `FileManagerSecure` and flat scalar JSON only
 - edition gates should be static compile/package gates, not fragile runtime
   string checks
 
@@ -91,8 +96,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.13.var`
-- `fa_radar.pro.0.1.13.var`
+- `fa_radar.free.0.1.14.var`
+- `fa_radar.pro.0.1.14.var`
 
 Human-facing release `.var` product naming remains undecided. Current
 candidates:

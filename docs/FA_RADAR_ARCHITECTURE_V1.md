@@ -10,20 +10,22 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.13` on branch
-  `codex/0.1.13-grid-scale-anchor-fix`.
+- Version: `0.1.14` on branch
+  `codex/0.1.14-global-prefs`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.13.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.13.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.14.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.14.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
-- No Unity project, asset bundles, external JSON, runtime file IO, or
-  reflection.
+- No Unity project, asset bundles, raw runtime file IO, reflection, broad JSON
+  object serializers, repo-local runtime dependencies, or absolute dev paths.
+  Global user prefs are the only runtime file access and use VaM
+  `FileManagerSecure` under `Custom\PluginData\FrameAngel\Radar`.
 
 ## Prototype Visual
 
-The `0.1.13` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.14` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -76,8 +78,27 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.13`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.14`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
+
+## Global Preferences
+
+Radar placement, scale, visual tuning, and available-marker behavior are global
+user preferences, not scene authority. Preference controls are registered for
+the native VaM plugin UI but marked `isStorable=false` and `isRestorable=false`
+so scene saves do not become the source of truth.
+
+The runtime writes only flat scalar JSON through `MVR.FileManagementSecure`:
+
+- `Custom\PluginData\FrameAngel\Radar\preferences_common.json` for controls
+  available in both Free and Pro
+- `Custom\PluginData\FrameAngel\Radar\preferences_pro.json` for Pro-only
+  visibility filters
+
+Writes are debounced behind `Global Prefs Auto Save`. The plugin also exposes
+`Load Global Prefs`, `Save Global Prefs`, and `Reset Global Prefs` buttons.
+Loaded values are applied with `valNoCallback`, and a small shared in-process
+cache keeps multiple Radar instances from repeatedly reading the same files.
 
 Available atom markers poll `SuperController.singleton.GetAtoms()` on `Atom
 Poll Seconds`, sort nearby atoms first, and use pooled generated marker/stem
@@ -164,8 +185,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.13.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.13.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.14.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.14.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -179,10 +200,10 @@ The build helper also stages neutral candidate `.var` packages under
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.13.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.13.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.13.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.13.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.14.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.14.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.14.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.14.dll`
 
 Future `.var` product naming is undecided. Current candidates are
 `FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; current package

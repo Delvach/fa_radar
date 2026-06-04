@@ -3,16 +3,16 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.13`.
+Current branch version: `0.1.14`.
 
-Current product contract version: `0.1.13`.
+Current product contract version: `0.1.14`.
 
 The current slice is compiled C# only:
 
 - no Unity project
 - no asset bundle
 - compiled VaM plugin DLL
-- no runtime file reads or writes
+- no raw runtime file IO; global prefs use VaM `FileManagerSecure` only
 - generated translucent/emissive sphere shell with a subtle lit material and
   higher subdivisions
 - three generated rotating rings, colored to match VaM/world axes
@@ -36,6 +36,8 @@ The current slice is compiled C# only:
 - edition-gated available atom markers: Free shows every eligible atom together,
   Pro exposes category filters
 - click-to-select for visible available CUA/light/person/other atom markers
+- global non-scene-stored preferences under
+  `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free is the
   unrestricted radar that shows everything, while Pro adds filters, category
@@ -74,11 +76,10 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.13.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.13.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.13.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.13.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.13.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.14.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.14.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.14.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.14.dll`
 
 Release `.var` names remain undecided; current package outputs use neutral
 dev candidate filenames under `build/packages`.
