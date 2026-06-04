@@ -35,7 +35,9 @@ The current slice is compiled C# only:
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free is the
   unrestricted radar that shows everything, while Pro adds filters, category
-  colors, and the staged path for in-game controls and light volume visuals
+  colors, and the staged path for light volume visuals
+- first release UI is native VaM plugin UI only; no external/browser/companion
+  UI surface
 - FAP-style Obfuscar wrapper and `.var` package candidate staging
 
 ## Files

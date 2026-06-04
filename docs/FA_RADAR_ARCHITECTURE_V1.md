@@ -187,9 +187,15 @@ editions, not separate runtime forks.
 
 - Free is the movable, scalable, visually tunable radar, but it shows all
   supported radar atoms together.
-- Pro adds visibility switches, available in-game controls, customizable
+- Pro adds visibility switches in the native VaM plugin UI, customizable
   category colors, and richer light visuals such as range spheres and spotlight
   cones that show rotation, range, and spot angle.
+
+The first release is plugin-UI-only. Do not build or assume a browser,
+companion, custom external, or separate in-world control surface for v1. The
+first version should focus on core radar behavior: placement, scale, all-atom
+visibility in Free, Pro category filters/colors, marker clarity, light-finding
+basics, and deploy/package reliability.
 
 The current product split authority is
 `docs/FA_RADAR_PRODUCT_EDITIONS_V1.md`.
@@ -198,5 +204,6 @@ The current product split authority is
 
 - Visual acceptance in VaM.
 - Richer final art treatment after prototype targeting is proven.
+- External/browser/companion UI and custom control surfaces for later versions.
 - Unity-authored HUD assets; Unity remains out of scope until explicitly
   opened for this repo.
