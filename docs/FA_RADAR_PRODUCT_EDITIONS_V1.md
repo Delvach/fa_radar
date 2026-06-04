@@ -7,11 +7,11 @@ Updated: 2026-06-04
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.14`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.15`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.14.dll`
-- `fa_radar.pro.0.1.14.dll`
+- `fa_radar.free.0.1.15.dll`
+- `fa_radar.pro.0.1.15.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -37,6 +37,7 @@ Free is the radar.
 
 - same generated HUD radar foundation
 - free movement, scale, placement, and appearance controls
+- shared HUD/static/atom anchor modes
 - global placement/scale/look preferences under
   `Custom\PluginData\FrameAngel\Radar`
 - user-controlled visual tuning for the radar itself
@@ -64,6 +65,8 @@ Pro is the operational radar.
 - spotlight visualization as generated cones
 - spotlight rotation, range, and spot-angle representation
 - color customization is a Pro feature
+- creator-facing CUA resources should be thin anchor hosts around the shared
+  runtime, not duplicate radar logic
 
 Pro should make scene diagnosis and targeting faster without turning every
 scene object into noise. Filters and semantic visuals are the value line.
@@ -96,8 +99,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.14.var`
-- `fa_radar.pro.0.1.14.var`
+- `fa_radar.free.0.1.15.var`
+- `fa_radar.pro.0.1.15.var`
 
 Human-facing release `.var` product naming remains undecided. Current
 candidates:

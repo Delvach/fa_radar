@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.14`.
+Current branch version: `0.1.15`.
 
-Current product contract version: `0.1.14`.
+Current product contract version: `0.1.15`.
 
 The current slice is compiled C# only:
 
@@ -27,6 +27,8 @@ The current slice is compiled C# only:
 - camera-local anchoring to reduce desktop navigation jitter
 - stable look-camera caching to prevent HUD anchor jumps during atom add/remove
   churn
+- shared anchor modes for HUD/view, static world placement, containing-atom/CUA
+  placement, and explicit atom UID placement without duplicating radar logic
 - optional world-axis alignment for the grid and rings
 - ground-axis lock so the grid represents real world X/Z and camera roll does
   not roll the radar Z axis
@@ -79,10 +81,10 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.14.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.14.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.14.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.14.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.15.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.15.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.15.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.15.dll`
 
 Release `.var` names remain undecided; current package outputs use neutral
 dev candidate filenames under `build/packages`.

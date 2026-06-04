@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.14"',
+        'private const string Version = "0.1.15"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -96,6 +96,29 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "FilmSubjectIdentifier",
         '"favr.hud.radar"',
         "BuildFilmSubjectName",
+        "AnchorModeHud",
+        "AnchorModeWorldStatic",
+        "AnchorModeContainingAtom",
+        "AnchorModeAtomUid",
+        "anchorModeField = new JSONStorableStringChooser",
+        'new JSONStorableString("Anchor Atom UID"',
+        "RegisterStringChooser(anchorModeField)",
+        "RegisterString(anchorAtomUidField)",
+        "CreatePopup(anchorModeField",
+        "CreateTextField(anchorAtomUidField",
+        "Use Selected As Anchor",
+        "Use Containing Atom Anchor",
+        "Capture Static From Current View",
+        "ResolveRadarAnchorTransform",
+        "ApplyViewAnchor",
+        "ApplyWorldStaticAnchor",
+        "ApplyTransformAnchor",
+        "ResolveAnchorAtom",
+        "FindAtomByUid",
+        "field.valNoCallback = NormalizeAnchorMode",
+        'field.valNoCallback = value ?? ""',
+        '"anchorMode"',
+        '"anchorAtomUid"',
         "Anchor To View",
         "Floor Area Scale",
         "Desktop Tilt Degrees",
@@ -231,8 +254,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.14.dll",
-        "fa_radar.pro.0.1.14.dll",
+        "fa_radar.free.0.1.15.dll",
+        "fa_radar.pro.0.1.15.dll",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
         "meta.json",
@@ -276,8 +299,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.14.dll",
-        "fa_radar.pro.0.1.14.dll",
+        "fa_radar.free.0.1.15.dll",
+        "fa_radar.pro.0.1.15.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -332,11 +355,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.14") {
-        Add-Failure "Version config must declare version 0.1.14."
+    if ($version.version -ne "0.1.15") {
+        Add-Failure "Version config must declare version 0.1.15."
     }
-    if ($version.branch -ne "codex/0.1.14-global-prefs") {
-        Add-Failure "Version config branch must match codex/0.1.14-global-prefs."
+    if ($version.branch -ne "codex/0.1.15-anchor-modes") {
+        Add-Failure "Version config branch must match codex/0.1.15-anchor-modes."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -437,8 +460,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.14.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.14.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.15.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.15.dll")
         )
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
 
@@ -462,7 +485,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.14."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.15."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."

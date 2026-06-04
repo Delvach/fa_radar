@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.14` on branch
-  `codex/0.1.14-global-prefs`.
+- Version: `0.1.15` on branch
+  `codex/0.1.15-anchor-modes`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.14.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.14.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.15.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.15.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, raw runtime file IO, reflection, broad JSON
@@ -25,7 +25,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.14` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.15` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -81,7 +81,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.14`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.15`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Global Preferences
@@ -137,6 +137,23 @@ is the default for desktop testing because it avoids navigation jitter, keeps
 rotation locked to the current view, and prevents add/remove atom churn from
 reanchoring to a transient camera.
 
+`Anchor Mode` is the shared runtime adapter for HUD and creator-facing scene
+placement. It does not fork the radar core:
+
+- `HUD / View` keeps the existing camera-relative behavior.
+- `World Static` freezes the generated radar root at a captured world pose.
+- `Containing Atom` parents the radar root under the atom/CUA the plugin is
+  loaded on, so creators can move or parent that host with normal VaM tools.
+- `Anchor Atom UID` parents the radar root under any explicit atom UID,
+  including a camera/CUA/control atom if the scene provides one.
+
+The same `HUD Offset` and `HUD Scale` controls are reused as local anchor
+offset/scale for atom-backed modes. `Anchor Rot X/Y/Z` gives a local rotation
+for atom-backed modes, and `Static World X/Y/Z/Pitch/Yaw/Roll` stores the
+static scene pose. The Pro CUA resource path should therefore stay thin:
+creator-facing CUA resources can host or identify an anchor, while Free/Pro
+feature behavior remains in one plugin codebase.
+
 Placement uses a saved local offset:
 
 - `HUD Offset X`
@@ -191,8 +208,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.14.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.14.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.15.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.15.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -206,10 +223,10 @@ The build helper also stages neutral candidate `.var` packages under
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.14.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.14.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.14.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.14.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.15.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.15.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.15.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.15.dll`
 
 Future `.var` product naming is undecided. Current candidates are
 `FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; current package
