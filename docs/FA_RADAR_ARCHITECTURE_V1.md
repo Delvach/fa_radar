@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.11` on branch
-  `codex/0.1.11-edition-build-packaging`.
+- Version: `0.1.13` on branch
+  `codex/0.1.13-grid-scale-anchor-fix`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.11.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.11.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.13.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.13.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -23,7 +23,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.11` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.13` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -35,6 +35,9 @@ polygons so targeting can be tested before any art polish:
 - VaM/world axis ring colors: X is red, Y is green, and Z is blue
 - faded meter grid centered through the sphere on the actual world X/Z ground
   plane
+- `Floor Area Scale` expands or contracts the represented meter range for the
+  grid, marker mapping, and height mapping without changing the compass visual
+  radius
 - grid lines clipped to the radar circle
 - grid panning from viewer world X/Z movement when `Grid Follows User` is on,
   including corrected forward/backward Z direction
@@ -73,7 +76,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.11`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.13`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 Available atom markers poll `SuperController.singleton.GetAtoms()` on `Atom
@@ -96,14 +99,19 @@ alignRotationOnly, alignUpDown, openUI)` exists in the target VaM assembly.
 grid before it is clipped into the radar circle. A 1m movement along world Z
 changes the grid's Z offset in the matching direction modulo `Grid Step Meters`,
 so the center marker remains the user while the world grid slides underneath it.
+`Floor Area Scale` multiplies the effective radar range and height scale used
+for per-meter mapping; it does not scale the generated sphere, rings, markers,
+or HUD root.
 
 ## HUD Placement
 
-The HUD root follows `SuperController.singleton.lookCamera.transform`, with
-`Camera.main` as fallback. In `Anchor To View` mode the HUD root is parented to
-the viewer transform and uses local offset/rotation instead of chasing a
-smoothed world-space position. This is the default for desktop testing because
-it avoids navigation jitter and keeps rotation locked to the current view.
+The HUD root follows `SuperController.singleton.lookCamera.transform`, with the
+last good viewer transform retained before falling back to `Camera.main`. In
+`Anchor To View` mode the HUD root is parented to the viewer transform and uses
+local offset/rotation instead of chasing a smoothed world-space position. This
+is the default for desktop testing because it avoids navigation jitter, keeps
+rotation locked to the current view, and prevents add/remove atom churn from
+reanchoring to a transient camera.
 
 Placement uses a saved local offset:
 
@@ -111,10 +119,9 @@ Placement uses a saved local offset:
 - `HUD Offset Y`
 - `HUD Offset Z`
 - `HUD Scale`
-- `View Yaw Offset`
 - `Desktop Tilt Degrees`
-- `Axis Yaw Offset`
 - `Ground Axis Lock`
+- `Floor Area Scale`
 - `Selected Ground Drop`
 - `Height Stems`
 - `Height Scale Meters`
@@ -144,8 +151,9 @@ works through the offset sliders and reset button.
   viewer grid offset changes, and active-state diffs. In anchored mode the HUD
   position/rotation are local to the camera instead of smoothed through world
   space.
-- Grid mesh rebuilds only when `Radar Range Meters`, `Grid Step Meters`, clip
-  mode, or the quantized viewer grid offset changes.
+- Grid mesh rebuilds only when effective radar range (`Radar Range Meters`
+  multiplied by `Floor Area Scale`), `Grid Step Meters`, clip mode, or the
+  quantized viewer grid offset changes.
 - Click selection is idle unless the desktop left mouse button goes down.
   Marker hit-testing only checks the visible pooled marker list.
 - Materials use the FA Keyboard-inspired overlay pattern:
@@ -156,8 +164,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.11.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.11.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.13.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.13.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -171,10 +179,10 @@ The build helper also stages neutral candidate `.var` packages under
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.11.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.11.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.11.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.11.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.13.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.13.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.13.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.13.dll`
 
 Future `.var` product naming is undecided. Current candidates are
 `FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; current package

@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.11";
+    private const string Version = "0.1.13";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -56,10 +56,9 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat hudOffsetYField;
     private JSONStorableFloat hudOffsetZField;
     private JSONStorableFloat hudScaleField;
-    private JSONStorableFloat viewYawOffsetField;
     private JSONStorableFloat desktopTiltDegreesField;
-    private JSONStorableFloat axisYawOffsetField;
     private JSONStorableFloat radarRangeMetersField;
+    private JSONStorableFloat floorAreaScaleField;
     private JSONStorableFloat radarVisualRadiusField;
     private JSONStorableFloat gridStepMetersField;
     private JSONStorableFloat shellAlphaField;
@@ -141,6 +140,7 @@ public class FrameAngelRadar : MVRScript
     private bool haveSmoothedHudPosition;
     private Vector3 smoothedHudPosition;
     private Transform currentHudAnchor;
+    private Transform lastGoodViewerTransform;
 
     public override void Init()
     {
@@ -195,10 +195,9 @@ public class FrameAngelRadar : MVRScript
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
         hudOffsetZField = new JSONStorableFloat("HUD Offset Z", 0.78f, 0.15f, 1.5f, true, true);
         hudScaleField = new JSONStorableFloat("HUD Scale", 0.49f, 0.25f, 3.0f, true, true);
-        viewYawOffsetField = new JSONStorableFloat("View Yaw Offset", 0.0f, -180.0f, 180.0f, true, true);
         desktopTiltDegreesField = new JSONStorableFloat("Desktop Tilt Degrees", 90.0f, 0.0f, 90.0f, true, true);
-        axisYawOffsetField = new JSONStorableFloat("Axis Yaw Offset", 0.0f, -180.0f, 180.0f, true, true);
         radarRangeMetersField = new JSONStorableFloat("Radar Range Meters", 5.0f, 0.5f, 30.0f, true, true);
+        floorAreaScaleField = new JSONStorableFloat("Floor Area Scale", 1.0f, 0.25f, 6.0f, true, true);
         radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", 0.08f, 0.025f, 0.25f, true, true);
         gridStepMetersField = new JSONStorableFloat("Grid Step Meters", 1.0f, 0.25f, 5.0f, true, true);
         shellAlphaField = new JSONStorableFloat("Sphere Alpha", 0.09f, 0.0f, 0.45f, true, true);
@@ -248,10 +247,9 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(hudOffsetYField);
         RegisterFloat(hudOffsetZField);
         RegisterFloat(hudScaleField);
-        RegisterFloat(viewYawOffsetField);
         RegisterFloat(desktopTiltDegreesField);
-        RegisterFloat(axisYawOffsetField);
         RegisterFloat(radarRangeMetersField);
+        RegisterFloat(floorAreaScaleField);
         RegisterFloat(radarVisualRadiusField);
         RegisterFloat(gridStepMetersField);
         RegisterFloat(shellAlphaField);
@@ -304,16 +302,15 @@ public class FrameAngelRadar : MVRScript
         CreateTextField(statusField, true);
 
         CreateSlider(radarRangeMetersField, false);
-        CreateSlider(gridStepMetersField, true);
+        CreateSlider(floorAreaScaleField, true);
+        CreateSlider(gridStepMetersField, false);
         CreateSlider(radarVisualRadiusField, false);
         CreateSlider(hudScaleField, true);
 
         CreateSlider(hudOffsetXField, false);
         CreateSlider(hudOffsetYField, true);
         CreateSlider(hudOffsetZField, false);
-        CreateSlider(viewYawOffsetField, true);
         CreateSlider(desktopTiltDegreesField, false);
-        CreateSlider(axisYawOffsetField, true);
         CreateSlider(responseSmoothingField, true);
 
         CreateToggle(placementModeField, false);
@@ -370,8 +367,8 @@ public class FrameAngelRadar : MVRScript
         centerMarkerMesh = CreateCenterMarkerMesh();
         targetBlipMesh = CreateTargetBlipMesh();
         heightStemMesh = CreateHeightStemMesh();
-        gridMesh = CreateGridMesh(radarRangeMetersField.val, gridStepMetersField.val, Vector2.zero, gridClipCircleField.val);
-        lastGridRangeMeters = radarRangeMetersField.val;
+        gridMesh = CreateGridMesh(ResolveEffectiveRadarRangeMeters(), gridStepMetersField.val, Vector2.zero, gridClipCircleField.val);
+        lastGridRangeMeters = ResolveEffectiveRadarRangeMeters();
         lastGridStepMeters = gridStepMetersField.val;
         lastGridOffsetMeters = Vector2.zero;
         lastGridClipCircle = gridClipCircleField.val;
@@ -616,12 +613,12 @@ public class FrameAngelRadar : MVRScript
         }
 
         float yaw = ResolveWorldAxisYawDegrees(viewer);
-        return Quaternion.AngleAxis(yaw + axisYawOffsetField.val, Vector3.up);
+        return Quaternion.AngleAxis(yaw, Vector3.up);
     }
 
     private Quaternion ResolveGroundAxisWorldRotation()
     {
-        return Quaternion.AngleAxis(axisYawOffsetField.val, Vector3.up);
+        return Quaternion.identity;
     }
 
     private float ResolveWorldAxisYawDegrees(Transform viewer)
@@ -659,7 +656,7 @@ public class FrameAngelRadar : MVRScript
             }
 
             hudRoot.transform.localPosition = GetHudOffset();
-            hudRoot.transform.localRotation = Quaternion.AngleAxis(viewYawOffsetField.val, Vector3.forward);
+            hudRoot.transform.localRotation = Quaternion.identity;
             hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
             return;
         }
@@ -678,7 +675,7 @@ public class FrameAngelRadar : MVRScript
             ref haveSmoothedHudPosition);
 
         hudRoot.transform.position = smoothedHudPosition;
-        hudRoot.transform.rotation = viewer.rotation * Quaternion.AngleAxis(viewYawOffsetField.val, Vector3.forward);
+        hudRoot.transform.rotation = viewer.rotation;
         hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
     }
 
@@ -786,7 +783,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         Vector3 meterLocal = viewer.InverseTransformPoint(target.position);
-        float range = Mathf.Max(0.25f, radarRangeMetersField.val);
+        float range = ResolveEffectiveRadarRangeMeters();
         Vector3 radarLocal;
         if (desktopTopDownField.val)
         {
@@ -813,7 +810,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         Vector3 worldDelta = target.position - viewer.position;
-        float range = Mathf.Max(0.25f, radarRangeMetersField.val);
+        float range = ResolveEffectiveRadarRangeMeters();
         Vector3 radarLocal = new Vector3(
             worldDelta.x / range,
             ResolveHeightRadarY(-viewer.position.y),
@@ -837,7 +834,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         Vector3 worldDelta = target.position - viewer.position;
-        float range = Mathf.Max(0.25f, radarRangeMetersField.val);
+        float range = ResolveEffectiveRadarRangeMeters();
         Vector3 radarLocal = new Vector3(
             worldDelta.x / range,
             ResolveHeightRadarY(worldDelta.y),
@@ -855,7 +852,7 @@ public class FrameAngelRadar : MVRScript
 
     private float ResolveHeightRadarY(float worldYDeltaMeters)
     {
-        float heightScale = Mathf.Max(0.25f, heightScaleMetersField.val);
+        float heightScale = ResolveEffectiveHeightScaleMeters();
         return Mathf.Clamp(worldYDeltaMeters / heightScale, -1.0f, 1.0f);
     }
 
@@ -871,7 +868,7 @@ public class FrameAngelRadar : MVRScript
 
     private float ResolveRangeFadeAlpha(float distanceMeters)
     {
-        float range = Mathf.Max(0.25f, radarRangeMetersField.val);
+        float range = ResolveEffectiveRadarRangeMeters();
         float fadeMeters = Mathf.Max(0.0f, rangeFadeMetersField.val);
         if (distanceMeters <= range || fadeMeters <= 0.001f)
         {
@@ -888,7 +885,7 @@ public class FrameAngelRadar : MVRScript
             return 1.0f;
         }
 
-        float range = Mathf.Max(0.25f, radarRangeMetersField.val);
+        float range = ResolveEffectiveRadarRangeMeters();
         float t = Mathf.Clamp01(distanceMeters / range);
         float strength = Mathf.Clamp01(depthSizeStrengthField.val);
         float nearScale = 1.0f + strength;
@@ -1274,7 +1271,7 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        float range = Mathf.Max(0.5f, radarRangeMetersField.val);
+        float range = ResolveEffectiveRadarRangeMeters();
         float step = Mathf.Max(0.05f, gridStepMetersField.val);
         Vector2 offset = gridFollowsUserField.val ? ResolveViewerGridOffsetMeters(viewer, step) : Vector2.zero;
         bool clipCircle = gridClipCircleField.val;
@@ -1334,6 +1331,21 @@ public class FrameAngelRadar : MVRScript
         return Mathf.Max(0.01f, radarVisualRadiusField.val);
     }
 
+    private float ResolveFloorAreaScale()
+    {
+        return Mathf.Clamp(floorAreaScaleField.val, 0.25f, 6.0f);
+    }
+
+    private float ResolveEffectiveRadarRangeMeters()
+    {
+        return Mathf.Max(0.25f, radarRangeMetersField.val) * ResolveFloorAreaScale();
+    }
+
+    private float ResolveEffectiveHeightScaleMeters()
+    {
+        return Mathf.Max(0.25f, heightScaleMetersField.val) * ResolveFloorAreaScale();
+    }
+
     private Vector3 SmoothPosition(Vector3 target, Vector3 current, ref bool hasCurrent)
     {
         if (!hasCurrent)
@@ -1350,14 +1362,26 @@ public class FrameAngelRadar : MVRScript
 
     private Transform ResolveViewerTransform()
     {
+        return ResolveStableViewerTransform();
+    }
+
+    private Transform ResolveStableViewerTransform()
+    {
         if (SuperController.singleton != null && SuperController.singleton.lookCamera != null)
         {
-            return SuperController.singleton.lookCamera.transform;
+            lastGoodViewerTransform = SuperController.singleton.lookCamera.transform;
+            return lastGoodViewerTransform;
+        }
+
+        if (lastGoodViewerTransform != null)
+        {
+            return lastGoodViewerTransform;
         }
 
         if (Camera.main != null)
         {
-            return Camera.main.transform;
+            lastGoodViewerTransform = Camera.main.transform;
+            return lastGoodViewerTransform;
         }
 
         return null;
@@ -1367,6 +1391,7 @@ public class FrameAngelRadar : MVRScript
     {
         if (SuperController.singleton != null && SuperController.singleton.lookCamera != null)
         {
+            lastGoodViewerTransform = SuperController.singleton.lookCamera.transform;
             return SuperController.singleton.lookCamera;
         }
 
@@ -1883,6 +1908,7 @@ public class FrameAngelRadar : MVRScript
         ringBaseRotations = null;
         gridFilter = null;
         currentHudAnchor = null;
+        lastGoodViewerTransform = null;
 
         DestroyOwnedObject(shellMaterial);
         DestroyOwnedObject(ringMaterial);
