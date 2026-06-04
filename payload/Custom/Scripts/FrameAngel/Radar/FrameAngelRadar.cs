@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.8";
+    private const string Version = "0.1.9";
     private const int ShellRenderQueue = 4980;
     private const int GridRenderQueue = 4990;
     private const int RingRenderQueue = 5000;
@@ -14,6 +14,9 @@ public class FrameAngelRadar : MVRScript
     private const int GridSortingOrder = 32740;
     private const int RingSortingOrder = 32750;
     private const int MarkerSortingOrder = 32760;
+    private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
+    private static readonly Color AxisYColor = new Color(0.22f, 1.0f, 0.34f, 1.0f);
+    private static readonly Color AxisZColor = new Color(0.26f, 0.52f, 1.0f, 1.0f);
 
     private JSONStorableBool radarEnabledField;
     private JSONStorableBool ignoreContainingAtomField;
@@ -36,6 +39,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showCustomUnityAssetAtomsField;
     private JSONStorableBool showPersonAtomsField;
     private JSONStorableBool showOtherAtomsField;
+    private JSONStorableBool clickSelectMarkersField;
 
     private JSONStorableFloat hudOffsetXField;
     private JSONStorableFloat hudOffsetYField;
@@ -61,6 +65,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat depthSizeStrengthField;
     private JSONStorableFloat atomPollSecondsField;
     private JSONStorableFloat availableAtomAlphaField;
+    private JSONStorableFloat markerClickRadiusPixelsField;
     private JSONStorableFloat pollIntervalField;
     private JSONStorableFloat responseSmoothingField;
 
@@ -75,7 +80,6 @@ public class FrameAngelRadar : MVRScript
     private GameObject centerMarkerObject;
     private GameObject userHeightStemObject;
     private GameObject targetBlipObject;
-    private GameObject targetOutlineObject;
     private GameObject targetHeightStemObject;
     private GameObject targetGridDropObject;
     private GameObject lastTargetBlipObject;
@@ -102,7 +106,6 @@ public class FrameAngelRadar : MVRScript
     private Material centerMaterial;
     private Material userHeightStemMaterial;
     private Material targetMaterial;
-    private Material targetOutlineMaterial;
     private Material targetHeightStemMaterial;
     private Material targetDropMaterial;
     private Material lastTargetMaterial;
@@ -175,6 +178,7 @@ public class FrameAngelRadar : MVRScript
         showCustomUnityAssetAtomsField = new JSONStorableBool("Show CUA", false);
         showPersonAtomsField = new JSONStorableBool("Show People", false);
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
+        clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
@@ -200,6 +204,7 @@ public class FrameAngelRadar : MVRScript
         depthSizeStrengthField = new JSONStorableFloat("Depth Size Strength", 0.35f, 0.0f, 1.0f, true, true);
         atomPollSecondsField = new JSONStorableFloat("Atom Poll Seconds", 0.75f, 0.15f, 5.0f, true, true);
         availableAtomAlphaField = new JSONStorableFloat("Available Atom Alpha", 0.46f, 0.0f, 1.0f, true, true);
+        markerClickRadiusPixelsField = new JSONStorableFloat("Marker Click Radius Pixels", 20.0f, 4.0f, 80.0f, true, true);
         pollIntervalField = new JSONStorableFloat("Selection Poll Seconds", 0.15f, 0.03f, 1.0f, true, true);
         responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.0f, 0.0f, 1.0f, true, true);
 
@@ -226,6 +231,7 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showCustomUnityAssetAtomsField);
         RegisterBool(showPersonAtomsField);
         RegisterBool(showOtherAtomsField);
+        RegisterBool(clickSelectMarkersField);
 
         RegisterFloat(hudOffsetXField);
         RegisterFloat(hudOffsetYField);
@@ -251,6 +257,7 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(depthSizeStrengthField);
         RegisterFloat(atomPollSecondsField);
         RegisterFloat(availableAtomAlphaField);
+        RegisterFloat(markerClickRadiusPixelsField);
         RegisterFloat(pollIntervalField);
         RegisterFloat(responseSmoothingField);
 
@@ -275,6 +282,7 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(showCustomUnityAssetAtomsField, true);
         CreateToggle(showPersonAtomsField, false);
         CreateToggle(showOtherAtomsField, true);
+        CreateToggle(clickSelectMarkersField, false);
         CreateToggle(ringsEnabledField, false);
         CreateToggle(gridEnabledField, true);
         CreateToggle(gridFollowsUserField, false);
@@ -312,6 +320,7 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(rangeFadeMetersField, false);
         CreateSlider(depthSizeStrengthField, true);
         CreateSlider(availableAtomAlphaField, false);
+        CreateSlider(markerClickRadiusPixelsField, true);
         CreateSlider(shellAlphaField, false);
         CreateSlider(ringAlphaField, true);
         CreateSlider(gridAlphaField, false);
@@ -329,14 +338,13 @@ public class FrameAngelRadar : MVRScript
         }
 
         shellMaterial = CreateSphereShellMaterial("FA Radar Sphere Material", new Color(0.16f, 0.64f, 0.92f, 0.10f), ShellRenderQueue);
-        ringMaterial = CreateEmissiveOverlayMaterial("FA Radar Ring Material", new Color(0.25f, 0.90f, 1.0f, 0.34f), RingRenderQueue);
-        ringXMaterial = CreateEmissiveOverlayMaterial("FA Radar X Ring Material", new Color(0.35f, 0.96f, 0.76f, 0.34f), RingRenderQueue);
-        ringZMaterial = CreateEmissiveOverlayMaterial("FA Radar Z Ring Material", new Color(0.38f, 0.62f, 1.0f, 0.34f), RingRenderQueue);
+        ringMaterial = CreateEmissiveOverlayMaterial("FA Radar Z Axis Ring Material", WithAlpha(AxisZColor, 0.34f), RingRenderQueue);
+        ringXMaterial = CreateEmissiveOverlayMaterial("FA Radar Y Axis Ring Material", WithAlpha(AxisYColor, 0.34f), RingRenderQueue);
+        ringZMaterial = CreateEmissiveOverlayMaterial("FA Radar X Axis Ring Material", WithAlpha(AxisXColor, 0.34f), RingRenderQueue);
         gridMaterial = CreateEmissiveOverlayMaterial("FA Radar Grid Material", new Color(0.55f, 0.95f, 1.0f, 0.16f), GridRenderQueue);
         centerMaterial = CreateEmissiveOverlayMaterial("FA Radar Center Material", new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
         userHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar User Height Stem Material", new Color(0.40f, 1.0f, 0.62f, 0.42f), MarkerRenderQueue);
         targetMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Material", new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
-        targetOutlineMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Outline Material", new Color(0.02f, 0.02f, 0.025f, 0.24f), MarkerRenderQueue - 1);
         targetHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Height Stem Material", new Color(1.0f, 0.70f, 0.18f, 0.42f), MarkerRenderQueue);
         targetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Drop Material", new Color(1.0f, 0.70f, 0.18f, 0.35f), MarkerRenderQueue);
         lastTargetMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Material", new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
@@ -369,7 +377,6 @@ public class FrameAngelRadar : MVRScript
 
         centerMarkerObject = CreateMeshObject("FA Radar User Center", radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
         userHeightStemObject = CreateMeshObject("FA Radar User Height Stem", axisRoot.transform, heightStemMesh, userHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 5);
-        targetOutlineObject = CreateMeshObject("FA Radar Target Outline", axisRoot.transform, targetBlipMesh, targetOutlineMaterial, MarkerRenderQueue - 1, MarkerSortingOrder - 1);
         targetBlipObject = CreateMeshObject("FA Radar Target Blip", axisRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
         targetHeightStemObject = CreateMeshObject("FA Radar Target Height Stem", axisRoot.transform, heightStemMesh, targetHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 4);
         targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", axisRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
@@ -387,7 +394,6 @@ public class FrameAngelRadar : MVRScript
 
         SetActiveIfChanged(hudRoot, false);
         SetActiveIfChanged(userHeightStemObject, false);
-        SetActiveIfChanged(targetOutlineObject, false);
         SetActiveIfChanged(targetBlipObject, false);
         SetActiveIfChanged(targetHeightStemObject, false);
         SetActiveIfChanged(targetGridDropObject, false);
@@ -441,7 +447,6 @@ public class FrameAngelRadar : MVRScript
         bool hasSelection = target != null;
         bool showSelectedGroundDrop = hasSelection && selectedGroundDropEnabledField.val;
         SetActiveIfChanged(targetBlipObject, hasSelection);
-        SetActiveIfChanged(targetOutlineObject, hasSelection);
         SetActiveIfChanged(targetHeightStemObject, hasSelection && heightStemsEnabledField.val);
         SetActiveIfChanged(targetGridDropObject, showSelectedGroundDrop);
 
@@ -453,6 +458,7 @@ public class FrameAngelRadar : MVRScript
         SetActiveIfChanged(lastTargetBlipObject, false);
         SetActiveIfChanged(lastTargetGridDropObject, false);
         UpdateAvailableAtomMarkers(viewer);
+        HandleRadarMarkerClick();
     }
 
     private void PollSelectionIfDue()
@@ -685,9 +691,7 @@ public class FrameAngelRadar : MVRScript
         float spin = Time.time * Mathf.Max(0.0f, ringRotationSpeedField.val * 1.75f);
 
         PositionTargetSphere(targetBlipObject, radarLocal, visualRadius, markerScale, spin);
-        PositionTargetSphere(targetOutlineObject, radarLocal, visualRadius, markerScale * 1.55f, 0.0f);
         ApplyMaterialColor(targetMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val));
-        ApplyMaterialColor(targetOutlineMaterial, new Color(0.02f, 0.02f, 0.025f, 0.24f * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val) * 0.25f);
         UpdateHeightStem(targetHeightStemObject, radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && fadeAlpha > 0.01f);
 
         if (showGroundDrop)
@@ -1110,6 +1114,121 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private void HandleRadarMarkerClick()
+    {
+        if (!clickSelectMarkersField.val || !availableAtomMarkersEnabledField.val || !Input.GetMouseButtonDown(0))
+        {
+            return;
+        }
+
+        Camera camera = ResolveViewerCamera();
+        if (camera == null)
+        {
+            SetStatus("Radar click ignored: no active camera.");
+            return;
+        }
+
+        Atom atom = ResolveClickedAvailableAtom(camera);
+        if (atom != null)
+        {
+            SelectRadarAtom(atom);
+        }
+    }
+
+    private Atom ResolveClickedAvailableAtom(Camera camera)
+    {
+        if (camera == null || trackedAvailableAtoms == null || availableMarkerObjects == null)
+        {
+            return null;
+        }
+
+        Vector2 clickPosition = new Vector2(Input.mousePosition.x, Input.mousePosition.y);
+        float bestScore = float.MaxValue;
+        float bestDepth = float.MaxValue;
+        Atom bestAtom = null;
+        int visibleCount = Mathf.Min(trackedAvailableAtoms.Count, availableMarkerObjects.Length);
+
+        for (int i = 0; i < visibleCount; i++)
+        {
+            Atom atom = trackedAvailableAtoms[i];
+            GameObject markerObject = availableMarkerObjects[i];
+            if (atom == null || markerObject == null || !markerObject.activeSelf)
+            {
+                continue;
+            }
+
+            Vector3 screenPosition = camera.WorldToScreenPoint(markerObject.transform.position);
+            if (screenPosition.z <= 0.0f)
+            {
+                continue;
+            }
+
+            Vector2 markerPosition = new Vector2(screenPosition.x, screenPosition.y);
+            float clickRadius = ResolveMarkerScreenRadiusPixels(camera, markerObject);
+            float distance = Vector2.Distance(clickPosition, markerPosition);
+            if (distance > clickRadius)
+            {
+                continue;
+            }
+
+            float score = distance / Mathf.Max(1.0f, clickRadius);
+            if (score < bestScore || (Mathf.Abs(score - bestScore) < 0.001f && screenPosition.z < bestDepth))
+            {
+                bestScore = score;
+                bestDepth = screenPosition.z;
+                bestAtom = atom;
+            }
+        }
+
+        return bestAtom;
+    }
+
+    private float ResolveMarkerScreenRadiusPixels(Camera camera, GameObject markerObject)
+    {
+        float minimumRadius = Mathf.Max(2.0f, markerClickRadiusPixelsField.val);
+        if (camera == null || markerObject == null)
+        {
+            return minimumRadius;
+        }
+
+        Vector3 center = markerObject.transform.position;
+        Vector3 edge = center + (camera.transform.right * Mathf.Max(0.001f, markerObject.transform.lossyScale.x));
+        Vector3 centerScreen = camera.WorldToScreenPoint(center);
+        Vector3 edgeScreen = camera.WorldToScreenPoint(edge);
+        float projectedRadius = Vector2.Distance(
+            new Vector2(centerScreen.x, centerScreen.y),
+            new Vector2(edgeScreen.x, edgeScreen.y));
+        return Mathf.Clamp(Mathf.Max(minimumRadius, projectedRadius * 1.15f), 2.0f, 120.0f);
+    }
+
+    private void SelectRadarAtom(Atom atom)
+    {
+        if (atom == null)
+        {
+            return;
+        }
+
+        if (SuperController.singleton == null || atom.mainController == null)
+        {
+            SetStatus("Radar click could not select: missing atom controller.");
+            return;
+        }
+
+        if (selectedAtom != null && selectedAtom != atom && !string.IsNullOrEmpty(selectedUid))
+        {
+            lastSelectedAtom = selectedAtom;
+            lastSelectedUid = selectedUid;
+            lastSelectedAtTime = Time.time;
+        }
+
+        SuperController.singleton.SelectController(atom.mainController, false, false, false, true);
+        selectedAtom = atom;
+        selectedUid = atom.uid;
+        nextSelectionPollTime = 0.0f;
+        nextAtomPollTime = 0.0f;
+        SetStatus("Radar selected: " + selectedUid);
+    }
+
     private Color ResolveAvailableAtomColor(Atom atom, float alpha)
     {
         if (IsLightAtom(atom))
@@ -1224,6 +1343,16 @@ public class FrameAngelRadar : MVRScript
         return null;
     }
 
+    private Camera ResolveViewerCamera()
+    {
+        if (SuperController.singleton != null && SuperController.singleton.lookCamera != null)
+        {
+            return SuperController.singleton.lookCamera;
+        }
+
+        return Camera.main;
+    }
+
     private Transform ResolveAtomRootTransform(Atom atom)
     {
         if (atom == null)
@@ -1243,19 +1372,24 @@ public class FrameAngelRadar : MVRScript
     {
         float emission = Mathf.Max(0.0f, emissionStrengthField.val);
         ApplyMaterialColor(shellMaterial, new Color(0.14f, 0.58f, 0.86f, Mathf.Clamp01(shellAlphaField.val)), emission * 0.55f);
-        ApplyMaterialColor(ringMaterial, new Color(0.18f, 0.92f, 1.0f, Mathf.Clamp01(ringAlphaField.val)), emission);
-        ApplyMaterialColor(ringXMaterial, new Color(0.28f, 0.96f, 0.72f, Mathf.Clamp01(ringAlphaField.val)), emission);
-        ApplyMaterialColor(ringZMaterial, new Color(0.36f, 0.62f, 1.0f, Mathf.Clamp01(ringAlphaField.val)), emission);
+        ApplyMaterialColor(ringMaterial, WithAlpha(AxisZColor, Mathf.Clamp01(ringAlphaField.val)), emission);
+        ApplyMaterialColor(ringXMaterial, WithAlpha(AxisYColor, Mathf.Clamp01(ringAlphaField.val)), emission);
+        ApplyMaterialColor(ringZMaterial, WithAlpha(AxisXColor, Mathf.Clamp01(ringAlphaField.val)), emission);
         ApplyMaterialColor(gridMaterial, new Color(0.48f, 0.95f, 1.0f, Mathf.Clamp01(gridAlphaField.val)), emission);
         ApplyMaterialColor(centerMaterial, new Color(0.38f, 1.0f, 0.60f, Mathf.Clamp01(markerAlphaField.val)), emission);
         ApplyMaterialColor(userHeightStemMaterial, new Color(0.38f, 1.0f, 0.60f, Mathf.Clamp01(heightStemAlphaField.val)), emission);
         ApplyMaterialColor(targetMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val)), emission);
-        ApplyMaterialColor(targetOutlineMaterial, new Color(0.02f, 0.02f, 0.025f, 0.24f), emission * 0.25f);
         ApplyMaterialColor(targetHeightStemMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(heightStemAlphaField.val)), emission);
         ApplyMaterialColor(targetDropMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * 0.18f), emission);
         ApplyMaterialColor(lastTargetMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.26f), emission);
         ApplyMaterialColor(lastTargetDropMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.12f), emission);
         ApplyMaterialColor(availableHeightStemMaterial, new Color(0.78f, 0.88f, 1.0f, Mathf.Clamp01(heightStemAlphaField.val) * 0.72f), emission);
+    }
+
+    private Color WithAlpha(Color color, float alpha)
+    {
+        color.a = alpha;
+        return color;
     }
 
     private Material CreateEmissiveOverlayMaterial(string materialName, Color color, int renderQueue)
@@ -1719,7 +1853,6 @@ public class FrameAngelRadar : MVRScript
         centerMarkerObject = null;
         userHeightStemObject = null;
         targetBlipObject = null;
-        targetOutlineObject = null;
         targetHeightStemObject = null;
         targetGridDropObject = null;
         lastTargetBlipObject = null;
@@ -1739,7 +1872,6 @@ public class FrameAngelRadar : MVRScript
         DestroyOwnedObject(centerMaterial);
         DestroyOwnedObject(userHeightStemMaterial);
         DestroyOwnedObject(targetMaterial);
-        DestroyOwnedObject(targetOutlineMaterial);
         DestroyOwnedObject(targetHeightStemMaterial);
         DestroyOwnedObject(targetDropMaterial);
         DestroyOwnedObject(lastTargetMaterial);
@@ -1760,7 +1892,6 @@ public class FrameAngelRadar : MVRScript
         centerMaterial = null;
         userHeightStemMaterial = null;
         targetMaterial = null;
-        targetOutlineMaterial = null;
         targetHeightStemMaterial = null;
         targetDropMaterial = null;
         lastTargetMaterial = null;
