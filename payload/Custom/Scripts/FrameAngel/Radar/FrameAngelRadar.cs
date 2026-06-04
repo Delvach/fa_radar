@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.14";
+    private const string Version = "0.1.15";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -33,6 +33,11 @@ public class FrameAngelRadar : MVRScript
     private const string FrameAngelRadarProPreferencesPath = "Custom\\PluginData\\FrameAngel\\Radar\\preferences_pro.json";
     private const string FrameAngelRadarCommonPreferencesSchemaVersion = "frameangel_radar_common_preferences_v1";
     private const string FrameAngelRadarProPreferencesSchemaVersion = "frameangel_radar_pro_preferences_v1";
+    private const string FilmSubjectIdentifier = "favr.hud.radar";
+    private const string AnchorModeHud = "HUD / View";
+    private const string AnchorModeWorldStatic = "World Static";
+    private const string AnchorModeContainingAtom = "Containing Atom";
+    private const string AnchorModeAtomUid = "Anchor Atom UID";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
     private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
@@ -95,8 +100,19 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat markerClickRadiusPixelsField;
     private JSONStorableFloat pollIntervalField;
     private JSONStorableFloat responseSmoothingField;
+    private JSONStorableFloat anchorRotationXField;
+    private JSONStorableFloat anchorRotationYField;
+    private JSONStorableFloat anchorRotationZField;
+    private JSONStorableFloat staticWorldXField;
+    private JSONStorableFloat staticWorldYField;
+    private JSONStorableFloat staticWorldZField;
+    private JSONStorableFloat staticWorldPitchField;
+    private JSONStorableFloat staticWorldYawField;
+    private JSONStorableFloat staticWorldRollField;
 
     private JSONStorableString statusField;
+    private JSONStorableString anchorAtomUidField;
+    private JSONStorableStringChooser anchorModeField;
 
     private GameObject hudRoot;
     private GameObject radarRoot;
@@ -218,6 +234,12 @@ public class FrameAngelRadar : MVRScript
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
         globalPrefsAutoSaveField = new JSONStorableBool("Global Prefs Auto Save", true);
+        anchorModeField = new JSONStorableStringChooser(
+            "Anchor Mode",
+            new List<string> { AnchorModeHud, AnchorModeWorldStatic, AnchorModeContainingAtom, AnchorModeAtomUid },
+            AnchorModeHud,
+            "Anchor Mode");
+        anchorModeField.displayChoices = new List<string> { "HUD / View", "World Static", "Containing Atom", "Anchor Atom UID" };
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
@@ -245,8 +267,18 @@ public class FrameAngelRadar : MVRScript
         markerClickRadiusPixelsField = new JSONStorableFloat("Marker Click Radius Pixels", 20.0f, 4.0f, 80.0f, true, true);
         pollIntervalField = new JSONStorableFloat("Selection Poll Seconds", 0.15f, 0.03f, 1.0f, true, true);
         responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.0f, 0.0f, 1.0f, true, true);
+        anchorRotationXField = new JSONStorableFloat("Anchor Rot X", 0.0f, -180.0f, 180.0f, true, true);
+        anchorRotationYField = new JSONStorableFloat("Anchor Rot Y", 0.0f, -180.0f, 180.0f, true, true);
+        anchorRotationZField = new JSONStorableFloat("Anchor Rot Z", 0.0f, -180.0f, 180.0f, true, true);
+        staticWorldXField = new JSONStorableFloat("Static World X", 0.0f, -20.0f, 20.0f, true, true);
+        staticWorldYField = new JSONStorableFloat("Static World Y", 1.5f, -5.0f, 20.0f, true, true);
+        staticWorldZField = new JSONStorableFloat("Static World Z", 1.0f, -20.0f, 20.0f, true, true);
+        staticWorldPitchField = new JSONStorableFloat("Static Pitch", 0.0f, -180.0f, 180.0f, true, true);
+        staticWorldYawField = new JSONStorableFloat("Static Yaw", 0.0f, -180.0f, 180.0f, true, true);
+        staticWorldRollField = new JSONStorableFloat("Static Roll", 0.0f, -180.0f, 180.0f, true, true);
 
         statusField = new JSONStorableString("Status", "");
+        anchorAtomUidField = new JSONStorableString("Anchor Atom UID", "");
 
         RegisterBool(radarEnabledField);
         RegisterBool(ignoreContainingAtomField);
@@ -271,6 +303,7 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showOtherAtomsField);
         RegisterBool(clickSelectMarkersField);
         RegisterBool(globalPrefsAutoSaveField);
+        RegisterStringChooser(anchorModeField);
 
         RegisterFloat(hudOffsetXField);
         RegisterFloat(hudOffsetYField);
@@ -298,14 +331,27 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(markerClickRadiusPixelsField);
         RegisterFloat(pollIntervalField);
         RegisterFloat(responseSmoothingField);
+        RegisterFloat(anchorRotationXField);
+        RegisterFloat(anchorRotationYField);
+        RegisterFloat(anchorRotationZField);
+        RegisterFloat(staticWorldXField);
+        RegisterFloat(staticWorldYField);
+        RegisterFloat(staticWorldZField);
+        RegisterFloat(staticWorldPitchField);
+        RegisterFloat(staticWorldYawField);
+        RegisterFloat(staticWorldRollField);
 
         RegisterString(statusField);
+        RegisterString(anchorAtomUidField);
 
         RegisterAction(new JSONStorableAction("Capture HUD Offset From Atom", CaptureHudOffsetFromAttachedAtom));
         RegisterAction(new JSONStorableAction("Reset HUD Offset", ResetHudOffset));
         RegisterAction(new JSONStorableAction("Save Global Prefs", SaveGlobalPreferencesAction));
         RegisterAction(new JSONStorableAction("Load Global Prefs", LoadGlobalPreferencesAction));
         RegisterAction(new JSONStorableAction("Reset Global Prefs", ResetGlobalPreferencesAction));
+        RegisterAction(new JSONStorableAction("Use Selected As Anchor", UseSelectedAsAnchor));
+        RegisterAction(new JSONStorableAction("Use Containing Atom Anchor", UseContainingAtomAnchor));
+        RegisterAction(new JSONStorableAction("Capture Static From Current View", CaptureStaticFromCurrentView));
         ConfigureGlobalPreferenceCallbacks();
     }
 
@@ -313,6 +359,8 @@ public class FrameAngelRadar : MVRScript
     {
         CreateToggle(radarEnabledField, false);
         CreateToggle(globalPrefsAutoSaveField, true);
+        CreatePopup(anchorModeField, false);
+        CreateTextField(anchorAtomUidField, true);
         CreateToggle(desktopTopDownField, true);
         CreateToggle(anchorToViewField, false);
         CreateToggle(selectedGroundDropEnabledField, false);
@@ -346,6 +394,18 @@ public class FrameAngelRadar : MVRScript
         {
             ResetGlobalPreferencesAction();
         });
+        CreateButton("Use Selected As Anchor", true).button.onClick.AddListener(delegate
+        {
+            UseSelectedAsAnchor();
+        });
+        CreateButton("Use Containing Atom Anchor", false).button.onClick.AddListener(delegate
+        {
+            UseContainingAtomAnchor();
+        });
+        CreateButton("Capture Static From Current View", true).button.onClick.AddListener(delegate
+        {
+            CaptureStaticFromCurrentView();
+        });
 
         CreateSlider(radarRangeMetersField, false);
         CreateSlider(floorAreaScaleField, true);
@@ -358,6 +418,15 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(hudOffsetZField, false);
         CreateSlider(desktopTiltDegreesField, false);
         CreateSlider(responseSmoothingField, true);
+        CreateSlider(anchorRotationXField, false);
+        CreateSlider(anchorRotationYField, true);
+        CreateSlider(anchorRotationZField, false);
+        CreateSlider(staticWorldXField, false);
+        CreateSlider(staticWorldYField, true);
+        CreateSlider(staticWorldZField, false);
+        CreateSlider(staticWorldPitchField, false);
+        CreateSlider(staticWorldYawField, true);
+        CreateSlider(staticWorldRollField, false);
 
         CreateToggle(placementModeField, false);
         CreateButton("Capture HUD Offset From Atom", false).button.onClick.AddListener(delegate
@@ -441,6 +510,17 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(markerClickRadiusPixelsField);
         ConfigureGlobalPreferenceCallback(pollIntervalField);
         ConfigureGlobalPreferenceCallback(responseSmoothingField);
+        ConfigureGlobalPreferenceCallback(anchorRotationXField);
+        ConfigureGlobalPreferenceCallback(anchorRotationYField);
+        ConfigureGlobalPreferenceCallback(anchorRotationZField);
+        ConfigureGlobalPreferenceCallback(staticWorldXField);
+        ConfigureGlobalPreferenceCallback(staticWorldYField);
+        ConfigureGlobalPreferenceCallback(staticWorldZField);
+        ConfigureGlobalPreferenceCallback(staticWorldPitchField);
+        ConfigureGlobalPreferenceCallback(staticWorldYawField);
+        ConfigureGlobalPreferenceCallback(staticWorldRollField);
+        ConfigureGlobalPreferenceCallback(anchorModeField);
+        ConfigureGlobalPreferenceCallback(anchorAtomUidField);
 
         ConfigureGlobalPreferenceCallback(showLightAtomsField);
         ConfigureGlobalPreferenceCallback(showCustomUnityAssetAtomsField);
@@ -482,6 +562,34 @@ public class FrameAngelRadar : MVRScript
         }
 
         field.setCallbackFunction = delegate(float value)
+        {
+            MarkGlobalPreferencesDirty();
+        };
+    }
+
+    private void ConfigureGlobalPreferenceCallback(JSONStorableString field)
+    {
+        ConfigureGlobalPreferenceField(field);
+        if (field == null)
+        {
+            return;
+        }
+
+        field.setCallbackFunction = delegate(string value)
+        {
+            MarkGlobalPreferencesDirty();
+        };
+    }
+
+    private void ConfigureGlobalPreferenceCallback(JSONStorableStringChooser field)
+    {
+        ConfigureGlobalPreferenceField(field);
+        if (field == null)
+        {
+            return;
+        }
+
+        field.setCallbackFunction = delegate(string value)
         {
             MarkGlobalPreferencesDirty();
         };
@@ -790,6 +898,8 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "depthSizeCue", depthSizeCueField);
             ApplyBoolPreference(preferencesJson, "availableAtomMarkers", availableAtomMarkersEnabledField);
             ApplyBoolPreference(preferencesJson, "clickSelectMarkers", clickSelectMarkersField);
+            ApplyStringPreference(preferencesJson, "anchorMode", anchorModeField);
+            ApplyStringPreference(preferencesJson, "anchorAtomUid", anchorAtomUidField);
 
             ApplyFloatPreference(preferencesJson, "hudOffsetX", hudOffsetXField);
             ApplyFloatPreference(preferencesJson, "hudOffsetY", hudOffsetYField);
@@ -816,6 +926,15 @@ public class FrameAngelRadar : MVRScript
             ApplyFloatPreference(preferencesJson, "markerClickRadiusPixels", markerClickRadiusPixelsField);
             ApplyFloatPreference(preferencesJson, "selectionPollSeconds", pollIntervalField);
             ApplyFloatPreference(preferencesJson, "responseSmoothing", responseSmoothingField);
+            ApplyFloatPreference(preferencesJson, "anchorRotationX", anchorRotationXField);
+            ApplyFloatPreference(preferencesJson, "anchorRotationY", anchorRotationYField);
+            ApplyFloatPreference(preferencesJson, "anchorRotationZ", anchorRotationZField);
+            ApplyFloatPreference(preferencesJson, "staticWorldX", staticWorldXField);
+            ApplyFloatPreference(preferencesJson, "staticWorldY", staticWorldYField);
+            ApplyFloatPreference(preferencesJson, "staticWorldZ", staticWorldZField);
+            ApplyFloatPreference(preferencesJson, "staticWorldPitch", staticWorldPitchField);
+            ApplyFloatPreference(preferencesJson, "staticWorldYaw", staticWorldYawField);
+            ApplyFloatPreference(preferencesJson, "staticWorldRoll", staticWorldRollField);
         }
         finally
         {
@@ -885,6 +1004,8 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(showCustomUnityAssetAtomsField, false);
         SetBoolNoCallback(showPersonAtomsField, false);
         SetBoolNoCallback(showOtherAtomsField, false);
+        SetStringNoCallback(anchorModeField, AnchorModeHud);
+        SetStringNoCallback(anchorAtomUidField, "");
 
         SetFloatNoCallback(hudOffsetXField, -0.59f);
         SetFloatNoCallback(hudOffsetYField, 0.22f);
@@ -911,6 +1032,15 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(markerClickRadiusPixelsField, 20.0f);
         SetFloatNoCallback(pollIntervalField, 0.15f);
         SetFloatNoCallback(responseSmoothingField, 0.0f);
+        SetFloatNoCallback(anchorRotationXField, 0.0f);
+        SetFloatNoCallback(anchorRotationYField, 0.0f);
+        SetFloatNoCallback(anchorRotationZField, 0.0f);
+        SetFloatNoCallback(staticWorldXField, 0.0f);
+        SetFloatNoCallback(staticWorldYField, 1.5f);
+        SetFloatNoCallback(staticWorldZField, 1.0f);
+        SetFloatNoCallback(staticWorldPitchField, 0.0f);
+        SetFloatNoCallback(staticWorldYawField, 0.0f);
+        SetFloatNoCallback(staticWorldRollField, 0.0f);
     }
 
     private string BuildCommonGlobalPreferencesJson()
@@ -936,6 +1066,8 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "depthSizeCue", ReadBool(depthSizeCueField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "availableAtomMarkers", ReadBool(availableAtomMarkersEnabledField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "clickSelectMarkers", ReadBool(clickSelectMarkersField, true));
+        AppendJsonStringProperty(sb, ref wroteProperty, "anchorMode", ResolveAnchorMode());
+        AppendJsonStringProperty(sb, ref wroteProperty, "anchorAtomUid", ReadString(anchorAtomUidField, ""));
 
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetX", ReadFloat(hudOffsetXField, -0.59f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetY", ReadFloat(hudOffsetYField, 0.22f));
@@ -962,6 +1094,15 @@ public class FrameAngelRadar : MVRScript
         AppendJsonFloatProperty(sb, ref wroteProperty, "markerClickRadiusPixels", ReadFloat(markerClickRadiusPixelsField, 20.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "selectionPollSeconds", ReadFloat(pollIntervalField, 0.15f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "responseSmoothing", ReadFloat(responseSmoothingField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "anchorRotationX", ReadFloat(anchorRotationXField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "anchorRotationY", ReadFloat(anchorRotationYField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "anchorRotationZ", ReadFloat(anchorRotationZField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "staticWorldX", ReadFloat(staticWorldXField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "staticWorldY", ReadFloat(staticWorldYField, 1.5f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "staticWorldZ", ReadFloat(staticWorldZField, 1.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "staticWorldPitch", ReadFloat(staticWorldPitchField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "staticWorldYaw", ReadFloat(staticWorldYawField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "staticWorldRoll", ReadFloat(staticWorldRollField, 0.0f));
         sb.Append('}');
         return sb.ToString();
     }
@@ -999,6 +1140,24 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private void ApplyStringPreference(string preferencesJson, string key, JSONStorableString field)
+    {
+        string value;
+        if (field != null && TryReadStringPreference(preferencesJson, key, out value))
+        {
+            field.valNoCallback = value ?? "";
+        }
+    }
+
+    private void ApplyStringPreference(string preferencesJson, string key, JSONStorableStringChooser field)
+    {
+        string value;
+        if (field != null && TryReadStringPreference(preferencesJson, key, out value))
+        {
+            field.valNoCallback = NormalizeAnchorMode(value);
+        }
+    }
+
     private static void SetBoolNoCallback(JSONStorableBool field, bool value)
     {
         if (field != null)
@@ -1015,6 +1174,22 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private static void SetStringNoCallback(JSONStorableString field, string value)
+    {
+        if (field != null)
+        {
+            field.valNoCallback = value ?? "";
+        }
+    }
+
+    private static void SetStringNoCallback(JSONStorableStringChooser field, string value)
+    {
+        if (field != null)
+        {
+            field.valNoCallback = NormalizeAnchorMode(value);
+        }
+    }
+
     private static bool ReadBool(JSONStorableBool field, bool fallback)
     {
         return field != null ? field.val : fallback;
@@ -1023,6 +1198,11 @@ public class FrameAngelRadar : MVRScript
     private static float ReadFloat(JSONStorableFloat field, float fallback)
     {
         return field != null ? field.val : fallback;
+    }
+
+    private static string ReadString(JSONStorableString field, string fallback)
+    {
+        return field != null ? (field.val ?? "") : fallback;
     }
 
     private static void AppendJsonStringProperty(StringBuilder sb, ref bool wroteProperty, string key, string value)
@@ -1257,19 +1437,19 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        shellMaterial = CreateSphereShellMaterial("FA Radar Sphere Material", new Color(0.16f, 0.64f, 0.92f, 0.10f), ShellRenderQueue);
-        ringMaterial = CreateEmissiveOverlayMaterial("FA Radar Z Axis Ring Material", WithAlpha(AxisZColor, 0.34f), RingRenderQueue);
-        ringXMaterial = CreateEmissiveOverlayMaterial("FA Radar Y Axis Ring Material", WithAlpha(AxisYColor, 0.34f), RingRenderQueue);
-        ringZMaterial = CreateEmissiveOverlayMaterial("FA Radar X Axis Ring Material", WithAlpha(AxisXColor, 0.34f), RingRenderQueue);
-        gridMaterial = CreateEmissiveOverlayMaterial("FA Radar Grid Material", new Color(0.55f, 0.95f, 1.0f, 0.16f), GridRenderQueue);
-        centerMaterial = CreateEmissiveOverlayMaterial("FA Radar Center Material", new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
-        userHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar User Height Stem Material", new Color(0.40f, 1.0f, 0.62f, 0.42f), MarkerRenderQueue);
-        targetMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Material", new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
-        targetHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Height Stem Material", new Color(1.0f, 0.70f, 0.18f, 0.42f), MarkerRenderQueue);
-        targetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Target Drop Material", new Color(1.0f, 0.70f, 0.18f, 0.35f), MarkerRenderQueue);
-        lastTargetMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Material", new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
-        lastTargetDropMaterial = CreateEmissiveOverlayMaterial("FA Radar Last Target Drop Material", new Color(1.0f, 0.48f, 0.12f, 0.15f), MarkerRenderQueue);
-        availableHeightStemMaterial = CreateEmissiveOverlayMaterial("FA Radar Available Height Stem Material", new Color(0.78f, 0.88f, 1.0f, 0.28f), MarkerRenderQueue);
+        shellMaterial = CreateSphereShellMaterial(BuildFilmSubjectName("Sphere Material"), new Color(0.16f, 0.64f, 0.92f, 0.10f), ShellRenderQueue);
+        ringMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Z Axis Ring Material"), WithAlpha(AxisZColor, 0.34f), RingRenderQueue);
+        ringXMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Y Axis Ring Material"), WithAlpha(AxisYColor, 0.34f), RingRenderQueue);
+        ringZMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("X Axis Ring Material"), WithAlpha(AxisXColor, 0.34f), RingRenderQueue);
+        gridMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Grid Material"), new Color(0.55f, 0.95f, 1.0f, 0.16f), GridRenderQueue);
+        centerMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Center Material"), new Color(0.40f, 1.0f, 0.62f, 0.9f), MarkerRenderQueue);
+        userHeightStemMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("User Height Stem Material"), new Color(0.40f, 1.0f, 0.62f, 0.42f), MarkerRenderQueue);
+        targetMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Target Material"), new Color(1.0f, 0.70f, 0.18f, 0.9f), MarkerRenderQueue);
+        targetHeightStemMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Target Height Stem Material"), new Color(1.0f, 0.70f, 0.18f, 0.42f), MarkerRenderQueue);
+        targetDropMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Target Drop Material"), new Color(1.0f, 0.70f, 0.18f, 0.35f), MarkerRenderQueue);
+        lastTargetMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Last Target Material"), new Color(1.0f, 0.48f, 0.12f, 0.32f), MarkerRenderQueue);
+        lastTargetDropMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Last Target Drop Material"), new Color(1.0f, 0.48f, 0.12f, 0.15f), MarkerRenderQueue);
+        availableHeightStemMaterial = CreateEmissiveOverlayMaterial(BuildFilmSubjectName("Available Height Stem Material"), new Color(0.78f, 0.88f, 1.0f, 0.28f), MarkerRenderQueue);
 
         sphereMesh = CreateSphereMesh(16, 32, 1.0f);
         flatCircleMesh = CreateDesktopDiskMesh(72, 1.0f);
@@ -1284,33 +1464,33 @@ public class FrameAngelRadar : MVRScript
         lastGridClipCircle = gridClipCircleField.val;
         haveLastGridOffset = true;
 
-        hudRoot = new GameObject("FA Radar HUD");
-        radarRoot = new GameObject("FA Radar Dish");
+        hudRoot = new GameObject(BuildFilmSubjectName("HUD"));
+        radarRoot = new GameObject(BuildFilmSubjectName("Dish"));
         radarRoot.transform.SetParent(hudRoot.transform, false);
         axisRoot = new GameObject("FA Radar World Axis");
         axisRoot.transform.SetParent(radarRoot.transform, false);
 
-        flatCircleObject = CreateMeshObject("FA Radar Flat Desktop Circle", axisRoot.transform, flatCircleMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
-        sphereObject = CreateMeshObject("FA Radar Sphere", radarRoot.transform, sphereMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
-        gridObject = CreateMeshObject("FA Radar Meter Grid", axisRoot.transform, gridMesh, gridMaterial, GridRenderQueue, GridSortingOrder);
+        flatCircleObject = CreateMeshObject(BuildFilmSubjectName("Flat Desktop Circle"), axisRoot.transform, flatCircleMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
+        sphereObject = CreateMeshObject(BuildFilmSubjectName("Sphere"), radarRoot.transform, sphereMesh, shellMaterial, ShellRenderQueue, ShellSortingOrder);
+        gridObject = CreateMeshObject(BuildFilmSubjectName("Meter Grid"), axisRoot.transform, gridMesh, gridMaterial, GridRenderQueue, GridSortingOrder);
         gridFilter = gridObject.GetComponent<MeshFilter>();
 
-        centerMarkerObject = CreateMeshObject("FA Radar User Center", radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        userHeightStemObject = CreateMeshObject("FA Radar User Height Stem", axisRoot.transform, heightStemMesh, userHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 5);
-        targetBlipObject = CreateMeshObject("FA Radar Target Blip", axisRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
-        targetHeightStemObject = CreateMeshObject("FA Radar Target Height Stem", axisRoot.transform, heightStemMesh, targetHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 4);
-        targetGridDropObject = CreateMeshObject("FA Radar Target Grid Drop", axisRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
-        lastTargetBlipObject = CreateMeshObject("FA Radar Last Target Blip", radarRoot.transform, targetBlipMesh, lastTargetMaterial, MarkerRenderQueue, MarkerSortingOrder - 2);
-        lastTargetGridDropObject = CreateMeshObject("FA Radar Last Target Grid Drop", axisRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
+        centerMarkerObject = CreateMeshObject(BuildFilmSubjectName("User Center"), radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        userHeightStemObject = CreateMeshObject(BuildFilmSubjectName("User Height Stem"), axisRoot.transform, heightStemMesh, userHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 5);
+        targetBlipObject = CreateMeshObject(BuildFilmSubjectName("Target Blip"), axisRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        targetHeightStemObject = CreateMeshObject(BuildFilmSubjectName("Target Height Stem"), axisRoot.transform, heightStemMesh, targetHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 4);
+        targetGridDropObject = CreateMeshObject(BuildFilmSubjectName("Target Grid Drop"), axisRoot.transform, targetBlipMesh, targetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 1);
+        lastTargetBlipObject = CreateMeshObject(BuildFilmSubjectName("Last Target Blip"), radarRoot.transform, targetBlipMesh, lastTargetMaterial, MarkerRenderQueue, MarkerSortingOrder - 2);
+        lastTargetGridDropObject = CreateMeshObject(BuildFilmSubjectName("Last Target Grid Drop"), axisRoot.transform, targetBlipMesh, lastTargetDropMaterial, MarkerRenderQueue, MarkerSortingOrder - 3);
 
         ringObjects = new GameObject[3];
         ringBaseRotations = new Quaternion[3];
         ringBaseRotations[0] = Quaternion.identity;
         ringBaseRotations[1] = Quaternion.Euler(90.0f, 0.0f, 0.0f);
         ringBaseRotations[2] = Quaternion.Euler(0.0f, 90.0f, 0.0f);
-        ringObjects[0] = CreateMeshObject("FA Radar Ring XY", axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[1] = CreateMeshObject("FA Radar Ring XZ", axisRoot.transform, ringMesh, ringXMaterial, RingRenderQueue, RingSortingOrder);
-        ringObjects[2] = CreateMeshObject("FA Radar Ring YZ", axisRoot.transform, ringMesh, ringZMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[0] = CreateMeshObject(BuildFilmSubjectName("Ring XY"), axisRoot.transform, ringMesh, ringMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[1] = CreateMeshObject(BuildFilmSubjectName("Ring XZ"), axisRoot.transform, ringMesh, ringXMaterial, RingRenderQueue, RingSortingOrder);
+        ringObjects[2] = CreateMeshObject(BuildFilmSubjectName("Ring YZ"), axisRoot.transform, ringMesh, ringZMaterial, RingRenderQueue, RingSortingOrder);
 
         SetActiveIfChanged(hudRoot, false);
         SetActiveIfChanged(userHeightStemObject, false);
@@ -1333,6 +1513,11 @@ public class FrameAngelRadar : MVRScript
         renderer.sharedMaterial = material;
         ApplyRendererOverlaySettings(renderer, renderQueue, sortingOrder);
         return target;
+    }
+
+    private static string BuildFilmSubjectName(string role)
+    {
+        return FilmSubjectIdentifier + "." + role;
     }
 
     private void TickRadar()
@@ -1437,7 +1622,10 @@ public class FrameAngelRadar : MVRScript
         }
 
         Vector3 worldPosition = containingAtom.mainController.transform.position;
-        Vector3 localOffset = viewer.InverseTransformPoint(worldPosition);
+        Transform anchor = ResolveRadarAnchorTransform(ResolveAnchorMode());
+        Vector3 localOffset = anchor != null
+            ? anchor.InverseTransformPoint(worldPosition)
+            : viewer.InverseTransformPoint(worldPosition);
         SetHudOffset(localOffset);
     }
 
@@ -1556,6 +1744,33 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
+        string anchorMode = ResolveAnchorMode();
+        if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
+        {
+            ApplyWorldStaticAnchor();
+            return;
+        }
+
+        if (!string.Equals(anchorMode, AnchorModeHud, StringComparison.Ordinal))
+        {
+            Transform anchor = ResolveRadarAnchorTransform(anchorMode);
+            if (anchor != null)
+            {
+                ApplyTransformAnchor(anchor);
+                return;
+            }
+        }
+
+        ApplyViewAnchor(viewer);
+    }
+
+    private void ApplyViewAnchor(Transform viewer)
+    {
+        if (hudRoot == null || viewer == null)
+        {
+            return;
+        }
+
         if (anchorToViewField.val)
         {
             if (currentHudAnchor != viewer || hudRoot.transform.parent != viewer)
@@ -1587,6 +1802,141 @@ public class FrameAngelRadar : MVRScript
         hudRoot.transform.position = smoothedHudPosition;
         hudRoot.transform.rotation = viewer.rotation;
         hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+    }
+
+    private void ApplyWorldStaticAnchor()
+    {
+        if (hudRoot == null)
+        {
+            return;
+        }
+
+        if (hudRoot.transform.parent != null)
+        {
+            hudRoot.transform.SetParent(null, true);
+            currentHudAnchor = null;
+            haveSmoothedHudPosition = false;
+        }
+
+        hudRoot.transform.position = GetStaticWorldPosition();
+        hudRoot.transform.rotation = GetStaticWorldRotation();
+        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+    }
+
+    private void ApplyTransformAnchor(Transform anchor)
+    {
+        if (hudRoot == null || anchor == null)
+        {
+            return;
+        }
+
+        if (currentHudAnchor != anchor || hudRoot.transform.parent != anchor)
+        {
+            hudRoot.transform.SetParent(anchor, false);
+            currentHudAnchor = anchor;
+            haveSmoothedHudPosition = false;
+        }
+
+        hudRoot.transform.localPosition = GetHudOffset();
+        hudRoot.transform.localRotation = GetAnchorLocalRotation();
+        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+    }
+
+    private Transform ResolveRadarAnchorTransform(string anchorMode)
+    {
+        if (string.Equals(anchorMode, AnchorModeContainingAtom, StringComparison.Ordinal))
+        {
+            return ResolveAtomRootTransform(containingAtom);
+        }
+
+        if (string.Equals(anchorMode, AnchorModeAtomUid, StringComparison.Ordinal))
+        {
+            return ResolveAtomRootTransform(ResolveAnchorAtom());
+        }
+
+        return null;
+    }
+
+    private Atom ResolveAnchorAtom()
+    {
+        string uid = anchorAtomUidField != null ? (anchorAtomUidField.val ?? "") : "";
+        return FindAtomByUid(uid);
+    }
+
+    private Atom FindAtomByUid(string uid)
+    {
+        if (string.IsNullOrEmpty(uid) || SuperController.singleton == null)
+        {
+            return null;
+        }
+
+        List<Atom> atoms = SuperController.singleton.GetAtoms();
+        if (atoms == null)
+        {
+            return null;
+        }
+
+        string trimmedUid = uid.Trim();
+        for (int i = 0; i < atoms.Count; i++)
+        {
+            Atom atom = atoms[i];
+            if (atom != null && string.Equals(atom.uid, trimmedUid, StringComparison.OrdinalIgnoreCase))
+            {
+                return atom;
+            }
+        }
+
+        return null;
+    }
+
+    private string ResolveAnchorMode()
+    {
+        string value = anchorModeField != null ? anchorModeField.val : "";
+        return NormalizeAnchorMode(value);
+    }
+
+    private static string NormalizeAnchorMode(string value)
+    {
+        if (string.Equals(value, AnchorModeWorldStatic, StringComparison.OrdinalIgnoreCase))
+        {
+            return AnchorModeWorldStatic;
+        }
+
+        if (string.Equals(value, AnchorModeContainingAtom, StringComparison.OrdinalIgnoreCase))
+        {
+            return AnchorModeContainingAtom;
+        }
+
+        if (string.Equals(value, AnchorModeAtomUid, StringComparison.OrdinalIgnoreCase))
+        {
+            return AnchorModeAtomUid;
+        }
+
+        return AnchorModeHud;
+    }
+
+    private Quaternion GetAnchorLocalRotation()
+    {
+        return Quaternion.Euler(
+            anchorRotationXField != null ? anchorRotationXField.val : 0.0f,
+            anchorRotationYField != null ? anchorRotationYField.val : 0.0f,
+            anchorRotationZField != null ? anchorRotationZField.val : 0.0f);
+    }
+
+    private Vector3 GetStaticWorldPosition()
+    {
+        return new Vector3(
+            staticWorldXField != null ? staticWorldXField.val : 0.0f,
+            staticWorldYField != null ? staticWorldYField.val : 1.5f,
+            staticWorldZField != null ? staticWorldZField.val : 1.0f);
+    }
+
+    private Quaternion GetStaticWorldRotation()
+    {
+        return Quaternion.Euler(
+            staticWorldPitchField != null ? staticWorldPitchField.val : 0.0f,
+            staticWorldYawField != null ? staticWorldYawField.val : 0.0f,
+            staticWorldRollField != null ? staticWorldRollField.val : 0.0f);
     }
 
     private Quaternion ResolveDishLocalRotation()
@@ -2761,9 +3111,137 @@ public class FrameAngelRadar : MVRScript
         }
 
         Vector3 offset = viewer.InverseTransformPoint(containingAtom.mainController.transform.position);
+        Transform anchor = ResolveRadarAnchorTransform(ResolveAnchorMode());
+        if (anchor != null)
+        {
+            offset = anchor.InverseTransformPoint(containingAtom.mainController.transform.position);
+        }
         SetHudOffset(offset);
         haveSmoothedHudPosition = false;
         SetStatus("Captured HUD offset from attached atom.");
+    }
+
+    private void UseSelectedAsAnchor()
+    {
+        Atom selected = selectedAtom;
+        if (selected == null && SuperController.singleton != null)
+        {
+            selected = SuperController.singleton.GetSelectedAtom();
+        }
+
+        if (selected == null)
+        {
+            SetStatus("No selected atom to use as anchor.");
+            return;
+        }
+
+        if (anchorAtomUidField != null)
+        {
+            anchorAtomUidField.SetVal(selected.uid ?? "");
+        }
+        if (anchorModeField != null)
+        {
+            anchorModeField.SetVal(AnchorModeAtomUid);
+        }
+
+        haveSmoothedHudPosition = false;
+        SetStatus("Anchor atom set: " + (selected.uid ?? ""));
+    }
+
+    private void UseContainingAtomAnchor()
+    {
+        if (containingAtom == null)
+        {
+            SetStatus("Containing atom anchor needs the plugin loaded on an atom or CUA.");
+            return;
+        }
+
+        if (anchorAtomUidField != null)
+        {
+            anchorAtomUidField.SetVal(containingAtom.uid ?? "");
+        }
+        if (anchorModeField != null)
+        {
+            anchorModeField.SetVal(AnchorModeContainingAtom);
+        }
+
+        haveSmoothedHudPosition = false;
+        SetStatus("Using containing atom anchor.");
+    }
+
+    private void CaptureStaticFromCurrentView()
+    {
+        Transform viewer = ResolveViewerTransform();
+        Vector3 position;
+        Quaternion rotation;
+        if (hudRoot != null)
+        {
+            position = hudRoot.transform.position;
+            rotation = hudRoot.transform.rotation;
+        }
+        else if (viewer != null)
+        {
+            position = viewer.TransformPoint(GetHudOffset());
+            rotation = viewer.rotation;
+        }
+        else
+        {
+            SetStatus("Cannot capture static anchor: no current view.");
+            return;
+        }
+
+        SetStaticWorldPose(position, rotation);
+        if (anchorModeField != null)
+        {
+            anchorModeField.SetVal(AnchorModeWorldStatic);
+        }
+
+        haveSmoothedHudPosition = false;
+        SetStatus("Captured static world anchor.");
+    }
+
+    private void SetStaticWorldPose(Vector3 position, Quaternion rotation)
+    {
+        Vector3 euler = rotation.eulerAngles;
+        if (staticWorldXField != null)
+        {
+            staticWorldXField.SetVal(position.x);
+        }
+        if (staticWorldYField != null)
+        {
+            staticWorldYField.SetVal(position.y);
+        }
+        if (staticWorldZField != null)
+        {
+            staticWorldZField.SetVal(position.z);
+        }
+        if (staticWorldPitchField != null)
+        {
+            staticWorldPitchField.SetVal(NormalizeEulerDegrees(euler.x));
+        }
+        if (staticWorldYawField != null)
+        {
+            staticWorldYawField.SetVal(NormalizeEulerDegrees(euler.y));
+        }
+        if (staticWorldRollField != null)
+        {
+            staticWorldRollField.SetVal(NormalizeEulerDegrees(euler.z));
+        }
+    }
+
+    private static float NormalizeEulerDegrees(float degrees)
+    {
+        float normalized = degrees;
+        while (normalized > 180.0f)
+        {
+            normalized -= 360.0f;
+        }
+        while (normalized < -180.0f)
+        {
+            normalized += 360.0f;
+        }
+
+        return normalized;
     }
 
     private void ResetHudOffset()

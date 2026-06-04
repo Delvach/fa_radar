@@ -1,11 +1,11 @@
 {
   "schemaVersion": "fa_radar_version_v2",
   "product": "fa_radar",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "channel": "dev",
-  "branch": "codex/0.1.14-global-prefs",
-  "status": "global-prefs",
-  "versionNote": "0.1.14 adds global Radar preferences under Custom\\PluginData\\FrameAngel\\Radar using VaM FileManagerSecure, flat scalar JSON, non-scene-stored preference controls, shared in-process cache, and separate common/Pro preference files so Free never overwrites Pro filters.",
+  "branch": "codex/0.1.15-anchor-modes",
+  "status": "anchor-modes",
+  "versionNote": "0.1.15 adds shared runtime anchor modes so the same Radar core can run as HUD/view, static world object, containing-atom/CUA utility, or explicit atom-UID anchored utility without duplicating Free/Pro logic. It also preserves the favr.hud.radar filming identifier contract.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
@@ -14,7 +14,7 @@
     "lineageNote": "FA Keyboard informed camera-relative placement and generated overlay visuals. FAP informs build, obfuscation, and package receipt shape. No source from either repo is copied into the runtime plugin."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.pro.0.1.14.dll",
+    "pluginFileName": "fa_radar.pro.0.1.15.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -28,8 +28,8 @@
       "compileSymbols": [
         "FA_RADAR_FREE"
       ],
-      "pluginFileName": "fa_radar.free.0.1.14.dll",
-      "packageFileName": "fa_radar.free.0.1.14.var",
+      "pluginFileName": "fa_radar.free.0.1.15.dll",
+      "packageFileName": "fa_radar.free.0.1.15.var",
       "packageName": "FrameAngel.RadarFree",
       "packageCreator": "FrameAngel",
       "summary": "Movable, scalable, visually tunable radar that shows every eligible radar atom together.",
@@ -43,8 +43,8 @@
       "compileSymbols": [
         "FA_RADAR_PRO"
       ],
-      "pluginFileName": "fa_radar.pro.0.1.14.dll",
-      "packageFileName": "fa_radar.pro.0.1.14.var",
+      "pluginFileName": "fa_radar.pro.0.1.15.dll",
+      "packageFileName": "fa_radar.pro.0.1.15.var",
       "packageName": "FrameAngel.RadarPro",
       "packageCreator": "FrameAngel",
       "summary": "Operational radar controls with native VaM plugin UI filters, category colors, and the foundation for light visuals.",
@@ -82,5 +82,5 @@
     "profile": "vam_compat",
     "pluginKey": "fa_radar"
   },
-  "updatedAt": "2026-06-04T11:19:00-06:00"
+  "updatedAt": "2026-06-04T13:26:00-06:00"
 }
