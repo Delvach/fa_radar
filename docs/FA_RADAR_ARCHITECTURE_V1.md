@@ -10,11 +10,11 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.7` on branch
-  `codex/0.1.7-marker-clarity-sphere-smooth`.
+- Version: `0.1.8` on branch
+  `codex/0.1.8-height-depth-fade`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as a compiled VaM plugin DLL:
-  `Custom/Plugins/fa_radar.0.1.7.dll`.
+  `Custom/Plugins/fa_radar.0.1.8.dll`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
   works for placement capture, but the operator target is scene/session.
 - No Unity project, asset bundles, external JSON, runtime file IO, or
@@ -22,7 +22,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.7` branch is deliberately prototype-first. It uses generated emissive
+The `0.1.8` branch is deliberately prototype-first. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -41,7 +41,14 @@ polygons so targeting can be tested before any art polish:
 - orange selected-atom sphere
 - optional selected world-ground grid drop marker, disabled by default so the
   current selection does not read as a duplicate highlight
-- faded orange last-selected sphere plus a faded world-ground grid drop marker
+- height stems from the scaled ground plane to user, selected, and visible
+  available atom marker heights
+- range-edge fade so markers just outside the radar range fade instead of
+  popping on the boundary
+- depth size cues so closer markers render larger and far markers render
+  smaller
+- filterable available atom markers, starting with lights enabled by default
+  and CUA, people, and other atom filters available as toggles
 
 The selected atom is resolved with
 `SuperController.singleton.GetSelectedAtom()` on a configurable poll interval.
@@ -62,10 +69,14 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-The faded prior-selection behavior is independent of the selected ground-drop
-projection. `Last Selected Enabled` shows the previous atom after selection
-changes; `Selected Ground Drop` controls only the current atom's ground
-projection dot.
+Previous-selection rendering is parked in `0.1.8`. `Selected Ground Drop`
+controls only the current atom's optional ground projection dot.
+
+Available atom markers poll `SuperController.singleton.GetAtoms()` on `Atom
+Poll Seconds`, filter by type/category/uid buckets, sort nearby atoms first, and
+use pooled generated marker/stem objects. With all filters enabled, the marker
+pool can represent the full currently available atom list; normal operation can
+stay focused by leaving only the useful lanes enabled.
 
 `Grid Follows User` uses the viewer's world X/Z position to offset the meter
 grid before it is clipped into the radar circle. A 1m movement along world Z
@@ -91,6 +102,15 @@ Placement uses a saved local offset:
 - `Axis Yaw Offset`
 - `Ground Axis Lock`
 - `Selected Ground Drop`
+- `Height Stems`
+- `Height Scale Meters`
+- `Range Fade Meters`
+- `Depth Size Cue`
+- `Available Atom Markers`
+- `Show Lights`
+- `Show CUA`
+- `Show People`
+- `Show Other Atoms`
 - `Grid Follows User`
 - `Grid Clip Circle`
 
@@ -119,8 +139,8 @@ works through the offset sliders and reset button.
 `scripts/Deploy-FaRadar.ps1` is the future deploy helper. Its default targets
 are direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.7.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.7.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.8.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.8.dll`
 
 The operator clarified that deploy instructions are forward-looking for now,
 so this branch should not be treated as live-deployed until a receipt proves

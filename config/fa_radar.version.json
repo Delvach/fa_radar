@@ -1,18 +1,18 @@
 {
   "schemaVersion": "fa_radar_version_v1",
   "product": "fa_radar",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "channel": "dev",
-  "branch": "codex/0.1.7-marker-clarity-sphere-smooth",
-  "status": "prototype-marker-clarity-sphere-smooth",
-  "versionNote": "0.1.7 makes the selected ground-drop marker opt-in by default to avoid double selected highlights, keeps faded last-selected behavior separate, and increases sphere shell and marker mesh subdivisions.",
+  "branch": "codex/0.1.8-height-depth-fade",
+  "status": "prototype-height-depth-fade",
+  "versionNote": "0.1.8 adds user, selected, and available-atom height stems, moves the grid to the user's scaled ground plane, adds range-edge fade and depth size cues, parks previous-selection rendering, and starts filterable available atom markers with lights enabled by default.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
     "lineageNote": "FA Keyboard informed camera-relative placement, render queues, transparent emissive materials, and direct Custom\\Plugins deploy receipts. No keyboard source is copied into this repo."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.0.1.7.dll",
+    "pluginFileName": "fa_radar.0.1.8.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -20,5 +20,5 @@
     "pluginRelativePath": "Custom\\Plugins",
     "policy": "Future builds deploy the compiled DLL directly to each VaM root's Custom\\Plugins folder. No subfolders."
   },
-  "updatedAt": "2026-06-03T20:10:00-06:00"
+  "updatedAt": "2026-06-03T20:35:00-06:00"
 }
