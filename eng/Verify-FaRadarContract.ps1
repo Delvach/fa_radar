@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.7"',
+        'private const string Version = "0.1.8"',
         "GetSelectedAtom()",
         "lookCamera",
         "CreateSphereMesh",
@@ -59,8 +59,22 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "View Yaw Offset",
         "Desktop Tilt Degrees",
         "Axis Yaw Offset",
-        "Last Selected Enabled",
-        "Last Selected Fade Seconds",
+        "Height Stems",
+        'new JSONStorableBool("Height Stems", true)',
+        "Height Scale Meters",
+        "Height Stem Alpha",
+        "Range Fade Meters",
+        "Depth Size Cue",
+        "Depth Size Strength",
+        "Available Atom Markers",
+        "Show Lights",
+        "Show CUA",
+        "Show People",
+        "Show Other Atoms",
+        "Atom Poll Seconds",
+        "Available Atom Alpha",
+        "Previous Selection Disabled",
+        'new JSONStorableBool("Last Selected Enabled", false)',
         "axisRoot",
         "lastGridOffsetMeters",
         "ResolveViewerGridOffsetMeters",
@@ -73,6 +87,26 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CreateSphereMesh(16, 32, 1.0f)",
         "CreateSphereMesh(8, 16, 1.0f)",
         "hasSelection && selectedGroundDropEnabledField.val",
+        "CreateHeightStemMesh",
+        "UpdateHeightStem",
+        "userHeightStemObject",
+        "targetHeightStemObject",
+        "targetOutlineObject",
+        "ResolveHeightRadarY",
+        "ResolveRangeFadeAlpha",
+        "ResolveDepthScale",
+        "PollAvailableAtomsIfDue",
+        "UpdateAvailableAtomMarkers",
+        "IsLightAtom",
+        "IsCustomUnityAssetAtom",
+        "IsPersonAtom",
+        "IsAtomVisibleByFilter",
+        "EnsureAvailableMarkerCapacity",
+        "availableMarkerObjects",
+        "availableStemObjects",
+        "availableMarkerMaterials",
+        "trackedAvailableAtoms",
+        'new JSONStorableFloat("Ring Rotation Speed", 0.0f',
         "AddClippedGridLine",
         "ResolveAxisLocalRotation",
         "ResolveGroundAxisWorldRotation",
@@ -124,7 +158,7 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "FrameAngelRadar.dll",
-        "fa_radar.0.1.7.dll",
+        "fa_radar.0.1.8.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -159,11 +193,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.7") {
-        Add-Failure "Version config must declare version 0.1.7."
+    if ($version.version -ne "0.1.8") {
+        Add-Failure "Version config must declare version 0.1.8."
     }
-    if ($version.branch -ne "codex/0.1.7-marker-clarity-sphere-smooth") {
-        Add-Failure "Version config branch must match codex/0.1.7-marker-clarity-sphere-smooth."
+    if ($version.branch -ne "codex/0.1.8-height-depth-fade") {
+        Add-Failure "Version config branch must match codex/0.1.8-height-depth-fade."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -197,7 +231,7 @@ foreach ($file in $unityFiles) {
 if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
-        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.7.dll"
+        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.8.dll"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
         if (-not (Test-Path -LiteralPath $deployedDll -PathType Leaf)) {
             Add-Failure "Live radar DLL was not deployed: $deployedDll"
@@ -211,6 +245,16 @@ if ($ValidateLiveDeploy.IsPresent) {
         if (Test-Path -LiteralPath $legacyLooseScript -PathType Leaf) {
             Add-Failure "Legacy loose radar .cs remains in VaM script load path: $legacyLooseScript"
         }
+    }
+}
+
+if (Test-Path -LiteralPath $pluginPath) {
+    $plugin = Get-Content -Raw -LiteralPath $pluginPath
+    if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.8."
+    }
+    if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
+        Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
     }
 }
 

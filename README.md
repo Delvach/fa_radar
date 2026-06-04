@@ -3,7 +3,7 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.7`.
+Current branch version: `0.1.8`.
 
 The current slice is compiled C# only:
 
@@ -25,6 +25,10 @@ The current slice is compiled C# only:
 - selected-atom and faded last-selected sphere markers
 - selected ground-drop projection is opt-in so a current selection does not
   read as a duplicate highlight by default
+- height stems for user, selected atom, and visible available atoms
+- range-edge fade and depth size cues for selected/available markers
+- filterable available atom markers, with lights enabled by default
+- previous-selection rendering parked for now
 
 ## Files
 
@@ -45,8 +49,8 @@ each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.7.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.7.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.0.1.8.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.0.1.8.dll`
 
 The operator clarified these are instructions for going forward; this branch is
 not live-deployed unless a deploy receipt says so.
