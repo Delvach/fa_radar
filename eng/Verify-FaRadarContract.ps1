@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.8"',
+        'private const string Version = "0.1.9"',
         "GetSelectedAtom()",
         "lookCamera",
         "CreateSphereMesh",
@@ -71,6 +71,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Show CUA",
         "Show People",
         "Show Other Atoms",
+        "Click Select Markers",
+        "Marker Click Radius Pixels",
         "Atom Poll Seconds",
         "Available Atom Alpha",
         "Previous Selection Disabled",
@@ -81,8 +83,12 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "PositiveModulo",
         "PositiveModulo(worldPosition.z",
         "gridY = 0.0f",
-        "ringXMaterial",
-        "ringZMaterial",
+        "AxisXColor",
+        "AxisYColor",
+        "AxisZColor",
+        "FA Radar X Axis Ring Material",
+        "FA Radar Y Axis Ring Material",
+        "FA Radar Z Axis Ring Material",
         "CreateSphereShellMaterial",
         "CreateSphereMesh(16, 32, 1.0f)",
         "CreateSphereMesh(8, 16, 1.0f)",
@@ -91,10 +97,17 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "UpdateHeightStem",
         "userHeightStemObject",
         "targetHeightStemObject",
-        "targetOutlineObject",
         "ResolveHeightRadarY",
         "ResolveRangeFadeAlpha",
         "ResolveDepthScale",
+        "HandleRadarMarkerClick",
+        "ResolveViewerCamera",
+        "ResolveClickedAvailableAtom",
+        "ResolveMarkerScreenRadiusPixels",
+        "SelectRadarAtom",
+        "Input.GetMouseButtonDown(0)",
+        "WorldToScreenPoint",
+        "SuperController.singleton.SelectController(atom.mainController, false, false, false, true)",
         "PollAvailableAtomsIfDue",
         "UpdateAvailableAtomMarkers",
         "IsLightAtom",
@@ -142,7 +155,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "\bDirectory\.",
         "\bPath\.",
         "\bSystem\.Reflection\b",
-        "\bReflection\b"
+        "\bReflection\b",
+        "\btargetOutlineObject\b",
+        "\btargetOutlineMaterial\b"
     )
 
     foreach ($pattern in $forbiddenPatterns) {
@@ -158,7 +173,7 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "FrameAngelRadar.dll",
-        "fa_radar.0.1.8.dll",
+        "fa_radar.0.1.9.dll",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -193,11 +208,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.8") {
-        Add-Failure "Version config must declare version 0.1.8."
+    if ($version.version -ne "0.1.9") {
+        Add-Failure "Version config must declare version 0.1.9."
     }
-    if ($version.branch -ne "codex/0.1.8-height-depth-fade") {
-        Add-Failure "Version config branch must match codex/0.1.8-height-depth-fade."
+    if ($version.branch -ne "codex/0.1.9-click-select-axis-polish") {
+        Add-Failure "Version config branch must match codex/0.1.9-click-select-axis-polish."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -205,6 +220,61 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     }
     if ($targets -notcontains "C:\vam\virgin-recordable-02") {
         Add-Failure "Version config missing C:\vam\virgin-recordable-02 deploy root."
+    }
+}
+
+$vamManagedDir = Join-Path $VamRoot "VaM_Data\Managed"
+$cecilPath = Join-Path $vamManagedDir "Mono.Cecil.dll"
+$vamAssemblyPath = Join-Path $vamManagedDir "Assembly-CSharp.dll"
+if (-not (Test-Path -LiteralPath $cecilPath -PathType Leaf)) {
+    Add-Failure "Cannot prove VaM selection API; missing Mono.Cecil: $cecilPath"
+} elseif (-not (Test-Path -LiteralPath $vamAssemblyPath -PathType Leaf)) {
+    Add-Failure "Cannot prove VaM selection API; missing VaM Assembly-CSharp.dll: $vamAssemblyPath"
+} else {
+    Add-Type -Path $cecilPath
+    $resolver = New-Object Mono.Cecil.DefaultAssemblyResolver
+    $resolver.AddSearchDirectory($vamManagedDir)
+    $readerParameters = New-Object Mono.Cecil.ReaderParameters
+    $readerParameters.AssemblyResolver = $resolver
+    $vamAssembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($vamAssemblyPath, $readerParameters)
+    $superControllerType = $vamAssembly.MainModule.Types |
+        Where-Object { $_.FullName -eq "SuperController" } |
+        Select-Object -First 1
+    $atomType = $vamAssembly.MainModule.Types |
+        Where-Object { $_.FullName -eq "Atom" } |
+        Select-Object -First 1
+
+    if ($null -eq $superControllerType) {
+        Add-Failure "Cannot prove VaM selection API; missing SuperController type."
+    } else {
+        $selectControllerMethod = $superControllerType.Methods |
+            Where-Object {
+                $_.Name -eq "SelectController" -and
+                $_.Parameters.Count -eq 5 -and
+                $_.Parameters[0].ParameterType.FullName -eq "FreeControllerV3" -and
+                $_.Parameters[1].Name -eq "alignView" -and
+                $_.Parameters[2].Name -eq "alignRotationOnly" -and
+                $_.Parameters[3].Name -eq "alignUpDown" -and
+                $_.Parameters[4].Name -eq "openUI"
+            } |
+            Select-Object -First 1
+        if ($null -eq $selectControllerMethod) {
+            Add-Failure "VaM SuperController selection API proof failed: SelectController(FreeControllerV3, alignView, alignRotationOnly, alignUpDown, openUI) not found."
+        }
+    }
+
+    if ($null -eq $atomType) {
+        Add-Failure "Cannot prove VaM selection API; missing Atom type."
+    } else {
+        $mainControllerField = $atomType.Fields |
+            Where-Object {
+                $_.Name -eq "mainController" -and
+                $_.FieldType.FullName -eq "FreeControllerV3"
+            } |
+            Select-Object -First 1
+        if ($null -eq $mainControllerField) {
+            Add-Failure "VaM atom selection API proof failed: Atom.mainController FreeControllerV3 field not found."
+        }
     }
 }
 
@@ -231,7 +301,7 @@ foreach ($file in $unityFiles) {
 if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
-        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.8.dll"
+        $deployedDll = Join-Path $root "Custom\Plugins\fa_radar.0.1.9.dll"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
         if (-not (Test-Path -LiteralPath $deployedDll -PathType Leaf)) {
             Add-Failure "Live radar DLL was not deployed: $deployedDll"
@@ -251,7 +321,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.8."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.9."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
