@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.17` on branch
-  `codex/0.1.17-ground-axis-sign-fix`.
+- Version: `0.1.18` on branch
+  `codex/0.1.18-session-grab-handles`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.17.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.17.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.18.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.18.dll`.
 - Pro also ships a thin CustomUnityAsset preset:
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,8 +27,8 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.17` branch preserves the prototype-first generated visual treatment
-and fixes grid-follow panning along the world Z/blue axis. It uses generated emissive
+The `0.1.18` branch preserves the prototype-first generated visual treatment
+and adds session-plugin VR grab handles. It uses generated emissive
 polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
@@ -61,6 +61,9 @@ polygons so targeting can be tested before any art polish:
   together with a neutral marker color; Pro exposes lights, CUA, people, and
   other atom filters and keeps category colors
 - click-to-select for visible available CUA/light/person/other atom markers
+- session-plugin-only invisible grab handles: one primary handle for moving,
+  an active-only resize handle that follows the free controller, distance-ratio
+  two-hand resizing, haptic pulses, and a cached dotted resize guide
 - generated HUD objects and materials carry the `favr.hud.radar` filming
   identifier so FAAR/recorder tooling can locate the radar in final-recording
   workflows without adding a recorder dependency or scene-stored control data
@@ -84,8 +87,33 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.17`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.18`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
+
+## Session Grab Handles
+
+`Grab Handles Enabled` is for the session/scene plugin path only. The CUA
+preference profile and CustomUnityAsset-containing atom path skip this system
+so creator-anchor CUA behavior remains separate.
+
+When enabled, the plugin creates a disposable dynamic `Empty` atom as the
+primary invisible VaM grab target. The radar visuals are not parented to that
+atom; the handle is only an input affordance. While the primary handle is
+grabbed, movement writes the same HUD/static/anchor offset storables that the
+native UI sliders use.
+
+During a primary grab, a second disposable `Empty` atom is created only while
+the resize affordance is active. It follows the free motion controller so the
+operator can grab it close for fast coarse scaling or farther away for precise
+scaling. Once the second handle is grabbed, `HUD Scale` is set from
+`currentHandDistance / startingHandDistance`, clamped by the existing scale
+slider limits. Releasing the resize handle removes it for the rest of that
+primary grab; releasing the primary handle removes all resize affordances.
+
+`Show Grab Handle Debug` temporarily makes the otherwise hidden controller
+meshes visible for hitbox tuning. `Grab Haptics` uses guarded OVR haptic pulses
+on move start, resize start, and apply/release. The dotted resize guide is a
+generated mesh that is inactive when no grab interaction is underway.
 
 ## Global Preferences
 
@@ -227,8 +255,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.17.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.17.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.18.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.18.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -244,11 +272,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.17.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.17.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.18.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.18.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.17.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.17.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.18.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.18.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are
