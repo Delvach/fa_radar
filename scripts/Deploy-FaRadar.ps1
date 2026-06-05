@@ -76,11 +76,11 @@ if (-not (Test-Path -LiteralPath $VamManagedDir -PathType Container)) {
     throw "VaM managed directory does not exist: $VamManagedDir"
 }
 
-# Explicit 0.1.18 filenames keep this deploy helper auditable while version
+# Explicit 0.1.19 filenames keep this deploy helper auditable while version
 # metadata remains the source of truth consumed by Build-FaRadar.ps1.
 $expectedPluginFileNames = @(
-    "fa_radar.free.0.1.18.dll",
-    "fa_radar.pro.0.1.18.dll"
+    "fa_radar.free.0.1.19.dll",
+    "fa_radar.pro.0.1.19.dll"
 )
 $cuaPresetFileName = "Preset_FrameAngel_Radar_CUA.vap"
 $cuaPresetSource = Join-Path $resolvedRepoRoot "payload\Custom\Atom\CustomUnityAsset\$cuaPresetFileName"

@@ -1,17 +1,17 @@
 # FA Radar Product Editions V1
 
-Updated: 2026-06-04
+Updated: 2026-06-05
 
 ## Decision
 
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.18`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.19`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.18.dll`
-- `fa_radar.pro.0.1.18.dll`
+- `fa_radar.free.0.1.19.dll`
+- `fa_radar.pro.0.1.19.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -37,7 +37,8 @@ Free is the radar.
 
 - same generated HUD radar foundation
 - free movement, scale, placement, and appearance controls
-- session-plugin invisible grab handles for VR move/resize
+- session-plugin invisible grab handles with OVR grip-proximity fallback for
+  VR move/resize
 - shared HUD/static/atom anchor modes
 - global placement/scale/look preferences under
   `Custom\PluginData\FrameAngel\Radar`
@@ -109,8 +110,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.18.var`
-- `fa_radar.pro.0.1.18.var`
+- `fa_radar.free.0.1.19.var`
+- `fa_radar.pro.0.1.19.var`
 
 The Pro candidate package includes the CUA preset under
 `Custom/Atom/CustomUnityAsset`; Free does not ship creator-facing CUA resources.
