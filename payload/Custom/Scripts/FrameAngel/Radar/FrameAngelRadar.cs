@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.21";
+    private const string Version = "0.1.22";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -209,6 +209,7 @@ public class FrameAngelRadar : MVRScript
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
     private bool primaryGrabHandleCreatePending;
+    private bool primaryGrabHandleFollowArmed;
     private bool resizeGrabHandleCreatePending;
     private bool moveGrabActive;
     private bool resizeGrabActive;
@@ -437,6 +438,17 @@ public class FrameAngelRadar : MVRScript
     {
         CreateToggle(radarEnabledField, false);
         CreateToggle(globalPrefsAutoSaveField, true);
+        BuildPlacementUi();
+        CreateTextField(statusField, true);
+        CreateButton("Load Global Prefs", false).button.onClick.AddListener(delegate
+        {
+            LoadGlobalPreferencesAction();
+        });
+        CreateButton("Reset Global Prefs", true).button.onClick.AddListener(delegate
+        {
+            ResetGlobalPreferencesAction();
+        });
+
         CreatePopup(anchorModeField, false);
         CreateTextField(anchorAtomUidField, true);
         CreateToggle(desktopTopDownField, true);
@@ -462,19 +474,6 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(gridFollowsUserField, false);
         CreateToggle(gridClipCircleField, true);
         CreateToggle(ignoreContainingAtomField, false);
-        CreateTextField(statusField, true);
-        CreateButton("Load Global Prefs", false).button.onClick.AddListener(delegate
-        {
-            LoadGlobalPreferencesAction();
-        });
-        CreateButton("Save Global Prefs", true).button.onClick.AddListener(delegate
-        {
-            SaveGlobalPreferencesAction();
-        });
-        CreateButton("Reset Global Prefs", false).button.onClick.AddListener(delegate
-        {
-            ResetGlobalPreferencesAction();
-        });
         CreateToggle(cuaAnchorPresetField, true);
         CreateButton("Use Selected As Anchor", true).button.onClick.AddListener(delegate
         {
@@ -493,11 +492,6 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(floorAreaScaleField, true);
         CreateSlider(gridStepMetersField, false);
         CreateSlider(radarVisualRadiusField, false);
-        CreateSlider(hudScaleField, true);
-
-        CreateSlider(hudOffsetXField, false);
-        CreateSlider(hudOffsetYField, true);
-        CreateSlider(hudOffsetZField, false);
         CreateSlider(desktopTiltDegreesField, false);
         CreateSlider(responseSmoothingField, true);
         CreateSlider(anchorRotationXField, false);
@@ -511,13 +505,9 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(staticWorldRollField, false);
 
         CreateToggle(placementModeField, false);
-        CreateButton("Capture HUD Offset From Atom", false).button.onClick.AddListener(delegate
+        CreateButton("Capture HUD Offset From Atom", true).button.onClick.AddListener(delegate
         {
             CaptureHudOffsetFromAttachedAtom();
-        });
-        CreateButton("Reset HUD Offset", false).button.onClick.AddListener(delegate
-        {
-            ResetHudOffset();
         });
 
         CreateSlider(ringRotationSpeedField, false);
@@ -536,6 +526,22 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(emissionStrengthField, false);
         CreateSlider(pollIntervalField, true);
         CreateSlider(atomPollSecondsField, true);
+    }
+
+    private void BuildPlacementUi()
+    {
+        CreateSlider(hudOffsetXField, false);
+        CreateSlider(hudOffsetYField, true);
+        CreateSlider(hudOffsetZField, false);
+        CreateSlider(hudScaleField, true);
+        CreateButton("Save Global Prefs", false).button.onClick.AddListener(delegate
+        {
+            SaveGlobalPreferencesAction();
+        });
+        CreateButton("Reset HUD Offset", true).button.onClick.AddListener(delegate
+        {
+            ResetHudOffset();
+        });
     }
 
     private void ConfigureGlobalPreferenceCallbacks()
@@ -571,10 +577,10 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(grabHandleDebugVisibleField);
         ConfigureGlobalPreferenceCallback(grabHapticsEnabledField);
 
-        ConfigureGlobalPreferenceCallback(hudOffsetXField);
-        ConfigureGlobalPreferenceCallback(hudOffsetYField);
-        ConfigureGlobalPreferenceCallback(hudOffsetZField);
-        ConfigureGlobalPreferenceCallback(hudScaleField);
+        ConfigureImmediatePlacementPreferenceCallback(hudOffsetXField);
+        ConfigureImmediatePlacementPreferenceCallback(hudOffsetYField);
+        ConfigureImmediatePlacementPreferenceCallback(hudOffsetZField);
+        ConfigureImmediatePlacementPreferenceCallback(hudScaleField);
         ConfigureGlobalPreferenceCallback(desktopTiltDegreesField);
         ConfigureGlobalPreferenceCallback(radarRangeMetersField);
         ConfigureGlobalPreferenceCallback(floorAreaScaleField);
@@ -651,6 +657,21 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(float value)
         {
             MarkGlobalPreferencesDirty();
+        };
+    }
+
+    private void ConfigureImmediatePlacementPreferenceCallback(JSONStorableFloat field)
+    {
+        ConfigureGlobalPreferenceField(field);
+        if (field == null)
+        {
+            return;
+        }
+
+        field.setCallbackFunction = delegate(float value)
+        {
+            MarkGlobalPreferencesDirty();
+            FlushGlobalPreferencesIfDue(true);
         };
     }
 
@@ -2720,6 +2741,14 @@ public class FrameAngelRadar : MVRScript
 
         FreeControllerV3 primaryController = primaryGrabHandleAtom.mainController;
         ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+        if (!primaryGrabHandleFollowArmed)
+        {
+            ArmPrimaryGrabHandleFollow(radarCenter);
+            DestroyResizeGrabHandleAtom();
+            SetResizeGuideLineVisible(false);
+            return;
+        }
+
         if (TryApplyPrimaryHandleDisplacement(viewer, radarCenter, primaryController))
         {
             radarCenter = ResolveRadarWorldCenter(viewer);
@@ -2792,12 +2821,19 @@ public class FrameAngelRadar : MVRScript
     private void EnsurePrimaryGrabHandleAtom(Vector3 worldPosition)
     {
         primaryGrabHandleUid = BuildGrabHandleUid(GrabHandlePrimarySuffix);
-        primaryGrabHandleAtom = ResolveGrabHandleAtom(primaryGrabHandleUid, primaryGrabHandleAtom);
+        Atom resolvedAtom = ResolveGrabHandleAtom(primaryGrabHandleUid, primaryGrabHandleAtom);
+        if (resolvedAtom != primaryGrabHandleAtom)
+        {
+            primaryGrabHandleFollowArmed = false;
+        }
+
+        primaryGrabHandleAtom = resolvedAtom;
         if (primaryGrabHandleAtom != null || primaryGrabHandleCreatePending)
         {
             return;
         }
 
+        primaryGrabHandleFollowArmed = false;
         primaryGrabHandleCreatePending = true;
         StartCoroutine(CreateGrabHandleAtomCoroutine(primaryGrabHandleUid, true, worldPosition));
     }
@@ -2833,8 +2869,10 @@ public class FrameAngelRadar : MVRScript
         if (atom != null)
         {
             ConfigureGrabHandleAtom(atom, worldPosition);
+            MoveGrabHandleAtom(atom, worldPosition);
             if (primary)
             {
+                primaryGrabHandleFollowArmed = false;
                 primaryGrabHandleAtom = atom;
             }
             else
@@ -2929,6 +2967,12 @@ public class FrameAngelRadar : MVRScript
 
         int unusedHand;
         TryResolveGrabbedHand(controller, out unusedHand);
+    }
+
+    private void ArmPrimaryGrabHandleFollow(Vector3 radarCenter)
+    {
+        MoveGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+        primaryGrabHandleFollowArmed = true;
     }
 
     private void MoveGrabHandleAtom(Atom atom, Vector3 worldPosition)
@@ -3697,6 +3741,7 @@ public class FrameAngelRadar : MVRScript
         resizeGrabHand = GrabHandUnknown;
         DestroyGrabHandleAtom(ref primaryGrabHandleAtom, primaryGrabHandleUid);
         primaryGrabHandleCreatePending = false;
+        primaryGrabHandleFollowArmed = false;
         DestroyResizeGrabHandleAtom();
         SetResizeGuideLineVisible(false);
         StopGrabHandleOvrHaptic(true);

@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.21` on branch
-  `codex/0.1.21-handle-displacement-follow`.
+- Version: `0.1.22` on branch
+  `codex/0.1.22-placement-ui-save-and-grab-arm`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.21.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.21.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.22.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.22.dll`.
 - Pro also ships a thin CustomUnityAsset preset:
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,9 +27,10 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.21` branch preserves the prototype-first generated visual treatment
-and makes the session-plugin VR grab handle displacement drive Radar offsets. It uses generated emissive
-polygons so targeting can be tested before any art polish:
+The `0.1.22` branch preserves the prototype-first generated visual treatment,
+promotes placement controls, and guards grab-handle follow so stale handle
+positions cannot move the radar on enable. It uses generated emissive polygons
+so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
   target markers
@@ -90,7 +91,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.21`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.22`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
@@ -107,9 +108,9 @@ handle as grabbed, Grip Grab Fallback starts from an OVR grip press near the
 radar sphere and moves from the live controller-camera transform. The
 controller itself remains `hidden=false`, `canGrabPosition=true`, and
 `controlMode=Position` with physics/collision disabled, so VaM's built-in grab
-mechanics can move the handle directly. In 0.1.21, the primary handle's world
-displacement from the radar center is accepted even when VaM does not expose a
-grab state to the plugin; that displacement writes the same HUD/static/anchor
+mechanics can move the handle directly. In 0.1.22, the primary handle is first
+synced to the radar center and armed before any world displacement can be
+accepted; after arming, handle displacement writes the same HUD/static/anchor
 offset storables that the native UI sliders use.
 
 During a primary grab, a second disposable `Empty` atom is created only while
@@ -267,8 +268,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.21.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.21.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.22.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.22.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -284,11 +285,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.21.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.21.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.22.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.22.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.21.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.21.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.22.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.22.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are
