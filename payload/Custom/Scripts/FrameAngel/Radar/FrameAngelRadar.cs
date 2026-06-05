@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.19";
+    private const string Version = "0.1.20";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -2900,12 +2900,23 @@ public class FrameAngelRadar : MVRScript
         bool debugVisible = ReadBool(grabHandleDebugVisibleField, false);
         try
         {
+            // Built-In Grab Target: keep the controller active for VaM grabbing while suppressing physics/collision noise.
             controller.currentPositionState = FreeControllerV3.PositionState.On;
             controller.currentRotationState = FreeControllerV3.RotationState.Off;
+            controller.controlMode = FreeControllerV3.ControlMode.Position;
             controller.canGrabPosition = true;
             controller.canGrabRotation = false;
-            controller.hidden = !debugVisible;
+            controller.hidden = false;
             controller.guihidden = !debugVisible;
+            controller.collisionEnabled = false;
+            controller.physicsEnabled = false;
+            controller.controlsCollisionEnabled = false;
+            controller.controlsOn = true;
+            controller.freezeAtomPhysicsWhenGrabbed = false;
+            controller.GUIalwaysVisibleWhenSelected = debugVisible;
+            controller.drawMeshWhenDeselected = true;
+            controller.deselectedMeshScale = ResolveBuiltInGrabHandleScaleMeters();
+            controller.selectedScale = ResolveBuiltInGrabHandleScaleMeters();
         }
         catch
         {
@@ -2973,7 +2984,13 @@ public class FrameAngelRadar : MVRScript
 
         try
         {
-            return controller.isGrabbing;
+            if (controller.isGrabbing)
+            {
+                hand = ResolveNearestGripControllerHand(GetControllerWorldPosition(controller));
+                return true;
+            }
+
+            return false;
         }
         catch
         {
@@ -3236,21 +3253,22 @@ public class FrameAngelRadar : MVRScript
 
     private float ReadLeftGripValue()
     {
-        return ReadGripValue(OVRInput.Axis1D.PrimaryHandTrigger, OVRInput.Button.PrimaryHandTrigger, OVRInput.RawButton.LHandTrigger);
+        return ReadGripValue(OVRInput.Axis1D.PrimaryHandTrigger, OVRInput.Button.PrimaryHandTrigger, OVRInput.RawButton.LHandTrigger, OVRInput.Controller.LTouch);
     }
 
     private float ReadRightGripValue()
     {
-        return ReadGripValue(OVRInput.Axis1D.SecondaryHandTrigger, OVRInput.Button.SecondaryHandTrigger, OVRInput.RawButton.RHandTrigger);
+        return ReadGripValue(OVRInput.Axis1D.SecondaryHandTrigger, OVRInput.Button.SecondaryHandTrigger, OVRInput.RawButton.RHandTrigger, OVRInput.Controller.RTouch);
     }
 
-    private float ReadGripValue(OVRInput.Axis1D axis, OVRInput.Button button, OVRInput.RawButton rawButton)
+    private float ReadGripValue(OVRInput.Axis1D axis, OVRInput.Button button, OVRInput.RawButton rawButton, OVRInput.Controller controller)
     {
         float value = 0.0f;
         try
         {
             value = Mathf.Clamp01(OVRInput.Get(axis));
-            if (OVRInput.Get(button) || OVRInput.Get(rawButton))
+            value = Mathf.Max(value, Mathf.Clamp01(OVRInput.Get(axis, controller)));
+            if (OVRInput.Get(button) || OVRInput.Get(button, controller) || OVRInput.Get(rawButton))
             {
                 value = 1.0f;
             }
@@ -3341,6 +3359,37 @@ public class FrameAngelRadar : MVRScript
     private float ResolveGripGrabHitRadiusMeters()
     {
         return Mathf.Clamp(ReadFloat(grabHitRadiusMetersField, 0.16f), 0.04f, 0.45f);
+    }
+
+    private float ResolveBuiltInGrabHandleScaleMeters()
+    {
+        return Mathf.Clamp(ResolveGripGrabHitRadiusMeters(), 0.06f, 0.22f);
+    }
+
+    private int ResolveNearestGripControllerHand(Vector3 worldPosition)
+    {
+        Vector3 leftPosition;
+        Vector3 rightPosition;
+        bool haveLeft = GetGripControllerWorldPosition(GrabHandLeft, out leftPosition);
+        bool haveRight = GetGripControllerWorldPosition(GrabHandRight, out rightPosition);
+        if (haveLeft && haveRight)
+        {
+            return Vector3.SqrMagnitude(worldPosition - leftPosition) <= Vector3.SqrMagnitude(worldPosition - rightPosition)
+                ? GrabHandLeft
+                : GrabHandRight;
+        }
+
+        if (haveLeft)
+        {
+            return GrabHandLeft;
+        }
+
+        if (haveRight)
+        {
+            return GrabHandRight;
+        }
+
+        return GrabHandUnknown;
     }
 
     private bool GetGripControllerWorldPosition(int hand, out Vector3 position)
