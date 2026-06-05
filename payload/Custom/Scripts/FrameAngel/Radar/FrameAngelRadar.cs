@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.18";
+    private const string Version = "0.1.19";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -51,6 +51,8 @@ public class FrameAngelRadar : MVRScript
     private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
     private const float GrabResizeMinimumStartDistanceMeters = 0.05f;
     private const float GrabHapticCooldownSeconds = 0.08f;
+    private const float GripGrabPressThreshold = 0.62f;
+    private const float GripGrabReleaseThreshold = 0.34f;
     private const int GrabHandUnknown = -1;
     private const int GrabHandLeft = 0;
     private const int GrabHandRight = 1;
@@ -122,6 +124,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat atomPollSecondsField;
     private JSONStorableFloat availableAtomAlphaField;
     private JSONStorableFloat markerClickRadiusPixelsField;
+    private JSONStorableFloat grabHitRadiusMetersField;
     private JSONStorableFloat pollIntervalField;
     private JSONStorableFloat responseSmoothingField;
     private JSONStorableFloat anchorRotationXField;
@@ -209,6 +212,8 @@ public class FrameAngelRadar : MVRScript
     private bool resizeGrabHandleCreatePending;
     private bool moveGrabActive;
     private bool resizeGrabActive;
+    private bool moveGrabUsesGripFallback;
+    private bool resizeGrabUsesGripFallback;
     private bool resizeHandleDismissedUntilMoveRelease;
     private bool ovrLeftGrabHapticActive;
     private bool ovrRightGrabHapticActive;
@@ -223,6 +228,10 @@ public class FrameAngelRadar : MVRScript
     private float nextRecorderVisibilityPollTime;
     private float resizeStartScale;
     private float resizeStartDistance;
+    private float leftGripValue;
+    private float rightGripValue;
+    private float previousLeftGripValue;
+    private float previousRightGripValue;
     private float lastGrabHandleHapticAt;
     private float ovrLeftGrabHapticStopAt;
     private float ovrRightGrabHapticStopAt;
@@ -290,6 +299,7 @@ public class FrameAngelRadar : MVRScript
         showPersonAtomsField = new JSONStorableBool("Show People", false);
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
+        // Grip Grab Fallback: keep session handles visual/debug-only when VaM does not report them as grabbed.
         // Session Grab Handles are a disposable VR interaction aid for the session/scene plugin path only.
         grabHandlesEnabledField = new JSONStorableBool("Grab Handles Enabled", false);
         grabHandleDebugVisibleField = new JSONStorableBool("Show Grab Handle Debug", false);
@@ -327,6 +337,7 @@ public class FrameAngelRadar : MVRScript
         atomPollSecondsField = new JSONStorableFloat("Atom Poll Seconds", 0.75f, 0.15f, 5.0f, true, true);
         availableAtomAlphaField = new JSONStorableFloat("Available Atom Alpha", 0.46f, 0.0f, 1.0f, true, true);
         markerClickRadiusPixelsField = new JSONStorableFloat("Marker Click Radius Pixels", 20.0f, 4.0f, 80.0f, true, true);
+        grabHitRadiusMetersField = new JSONStorableFloat("Grab Hit Radius Meters", 0.16f, 0.04f, 0.45f, true, true);
         pollIntervalField = new JSONStorableFloat("Selection Poll Seconds", 0.15f, 0.03f, 1.0f, true, true);
         responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.0f, 0.0f, 1.0f, true, true);
         anchorRotationXField = new JSONStorableFloat("Anchor Rot X", 0.0f, -180.0f, 180.0f, true, true);
@@ -395,6 +406,7 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(atomPollSecondsField);
         RegisterFloat(availableAtomAlphaField);
         RegisterFloat(markerClickRadiusPixelsField);
+        RegisterFloat(grabHitRadiusMetersField);
         RegisterFloat(pollIntervalField);
         RegisterFloat(responseSmoothingField);
         RegisterFloat(anchorRotationXField);
@@ -516,6 +528,7 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(depthSizeStrengthField, true);
         CreateSlider(availableAtomAlphaField, false);
         CreateSlider(markerClickRadiusPixelsField, true);
+        CreateSlider(grabHitRadiusMetersField, false);
         CreateSlider(shellAlphaField, false);
         CreateSlider(ringAlphaField, true);
         CreateSlider(gridAlphaField, false);
@@ -581,6 +594,7 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(atomPollSecondsField);
         ConfigureGlobalPreferenceCallback(availableAtomAlphaField);
         ConfigureGlobalPreferenceCallback(markerClickRadiusPixelsField);
+        ConfigureGlobalPreferenceCallback(grabHitRadiusMetersField);
         ConfigureGlobalPreferenceCallback(pollIntervalField);
         ConfigureGlobalPreferenceCallback(responseSmoothingField);
         ConfigureGlobalPreferenceCallback(anchorRotationXField);
@@ -1075,6 +1089,7 @@ public class FrameAngelRadar : MVRScript
             ApplyFloatPreference(preferencesJson, "atomPollSeconds", atomPollSecondsField);
             ApplyFloatPreference(preferencesJson, "availableAtomAlpha", availableAtomAlphaField);
             ApplyFloatPreference(preferencesJson, "markerClickRadiusPixels", markerClickRadiusPixelsField);
+            ApplyFloatPreference(preferencesJson, "grabHitRadiusMeters", grabHitRadiusMetersField);
             ApplyFloatPreference(preferencesJson, "selectionPollSeconds", pollIntervalField);
             ApplyFloatPreference(preferencesJson, "responseSmoothing", responseSmoothingField);
             ApplyFloatPreference(preferencesJson, "anchorRotationX", anchorRotationXField);
@@ -1184,6 +1199,7 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(atomPollSecondsField, 0.75f);
         SetFloatNoCallback(availableAtomAlphaField, 0.46f);
         SetFloatNoCallback(markerClickRadiusPixelsField, 20.0f);
+        SetFloatNoCallback(grabHitRadiusMetersField, 0.16f);
         SetFloatNoCallback(pollIntervalField, 0.15f);
         SetFloatNoCallback(responseSmoothingField, 0.0f);
         SetFloatNoCallback(anchorRotationXField, 0.0f);
@@ -1249,6 +1265,7 @@ public class FrameAngelRadar : MVRScript
         AppendJsonFloatProperty(sb, ref wroteProperty, "atomPollSeconds", ReadFloat(atomPollSecondsField, 0.75f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "availableAtomAlpha", ReadFloat(availableAtomAlphaField, 0.46f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "markerClickRadiusPixels", ReadFloat(markerClickRadiusPixelsField, 20.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "grabHitRadiusMeters", ReadFloat(grabHitRadiusMetersField, 0.16f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "selectionPollSeconds", ReadFloat(pollIntervalField, 0.15f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "responseSmoothing", ReadFloat(responseSmoothingField, 0.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "anchorRotationX", ReadFloat(anchorRotationXField, 0.0f));
@@ -2686,6 +2703,7 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateSessionGrabHandles(Transform viewer)
     {
+        RefreshGripGrabState();
         if (!ShouldUseSessionGrabHandles(viewer))
         {
             DestroySessionGrabHandles();
@@ -2704,18 +2722,39 @@ public class FrameAngelRadar : MVRScript
         FreeControllerV3 primaryController = primaryGrabHandleAtom.mainController;
         int grabbedHand;
         bool primaryGrabbed = TryResolveGrabbedHand(primaryController, out grabbedHand);
-        if (primaryGrabbed && !moveGrabActive)
+        if (!moveGrabActive)
         {
-            StartMoveGrab(primaryController, grabbedHand);
+            if (primaryGrabbed)
+            {
+                StartMoveGrab(primaryController, grabbedHand);
+            }
+            else
+            {
+                TryStartFauxPrimaryGrab(radarCenter);
+            }
         }
-        else if (!primaryGrabbed && moveGrabActive)
+        else if (moveGrabUsesGripFallback)
+        {
+            if (!IsGripHeld(moveGrabHand))
+            {
+                EndMoveGrab();
+            }
+        }
+        else if (!primaryGrabbed)
         {
             EndMoveGrab();
         }
 
         if (moveGrabActive)
         {
-            UpdateMoveGrab(viewer, primaryController);
+            if (moveGrabUsesGripFallback)
+            {
+                UpdateFauxMoveGrab(viewer);
+            }
+            else
+            {
+                UpdateMoveGrab(viewer, primaryController);
+            }
             UpdateResizeGrabHandle(viewer, primaryController);
             return;
         }
@@ -2944,12 +2983,19 @@ public class FrameAngelRadar : MVRScript
 
     private void StartMoveGrab(FreeControllerV3 primaryController, int hand)
     {
+        StartMoveGrabAtPosition(GetControllerWorldPosition(primaryController), hand, false);
+    }
+
+    private void StartMoveGrabAtPosition(Vector3 handlePosition, int hand, bool gripFallback)
+    {
         moveGrabActive = true;
         resizeGrabActive = false;
+        moveGrabUsesGripFallback = gripFallback;
+        resizeGrabUsesGripFallback = false;
         resizeHandleDismissedUntilMoveRelease = false;
         moveGrabHand = hand;
         resizeGrabHand = GrabHandUnknown;
-        moveStartHandlePosition = GetControllerWorldPosition(primaryController);
+        moveStartHandlePosition = handlePosition;
         moveStartHudOffset = GetHudOffset();
         moveStartStaticPosition = GetStaticWorldPosition();
         haveSmoothedHudPosition = false;
@@ -2968,6 +3014,22 @@ public class FrameAngelRadar : MVRScript
         ApplyMoveGrabDelta(viewer, worldDelta);
     }
 
+    private void UpdateFauxMoveGrab(Transform viewer)
+    {
+        if (!moveGrabActive)
+        {
+            return;
+        }
+
+        Vector3 controllerPosition;
+        if (!GetGripControllerWorldPosition(moveGrabHand, out controllerPosition))
+        {
+            return;
+        }
+
+        ApplyMoveGrabDelta(viewer, controllerPosition - moveStartHandlePosition);
+    }
+
     private void EndMoveGrab()
     {
         if (moveGrabActive)
@@ -2978,6 +3040,8 @@ public class FrameAngelRadar : MVRScript
 
         moveGrabActive = false;
         resizeGrabActive = false;
+        moveGrabUsesGripFallback = false;
+        resizeGrabUsesGripFallback = false;
         resizeHandleDismissedUntilMoveRelease = false;
         moveGrabHand = GrabHandUnknown;
         resizeGrabHand = GrabHandUnknown;
@@ -3021,11 +3085,21 @@ public class FrameAngelRadar : MVRScript
         }
 
         int freeHand = moveGrabHand == GrabHandLeft ? GrabHandRight : GrabHandLeft;
-        Transform freeController = ResolveMotionControllerTransform(freeHand);
         Vector3 primaryPosition = GetControllerWorldPosition(primaryController);
-        Vector3 resizeTarget = freeController != null
-            ? freeController.position
-            : primaryPosition + ((viewer != null ? viewer.right : Vector3.right) * 0.25f);
+        Vector3 gripPrimaryPosition;
+        if (moveGrabUsesGripFallback && GetGripControllerWorldPosition(moveGrabHand, out gripPrimaryPosition))
+        {
+            primaryPosition = gripPrimaryPosition;
+        }
+
+        Vector3 resizeTarget;
+        if (!GetGripControllerWorldPosition(freeHand, out resizeTarget))
+        {
+            Transform freeController = ResolveMotionControllerTransform(freeHand);
+            resizeTarget = freeController != null
+                ? freeController.position
+                : primaryPosition + ((viewer != null ? viewer.right : Vector3.right) * 0.25f);
+        }
 
         EnsureResizeGrabHandleAtom(resizeTarget);
         if (resizeGrabHandleAtom == null || resizeGrabHandleAtom.mainController == null)
@@ -3042,15 +3116,35 @@ public class FrameAngelRadar : MVRScript
         {
             StartResizeGrab(primaryController, resizeController, grabbedHand);
         }
+        else if (!resizeGrabActive)
+        {
+            TryStartFauxResizeGrab(primaryPosition, resizeTarget, freeHand);
+        }
+        else if (resizeGrabUsesGripFallback)
+        {
+            if (!IsGripHeld(resizeGrabHand))
+            {
+                EndResizeGrab(true);
+                return;
+            }
+        }
         else if ((!resizeGrabbed || grabbedHand == moveGrabHand) && resizeGrabActive)
         {
             EndResizeGrab(true);
+            return;
         }
 
         if (resizeGrabActive)
         {
-            UpdateResizeGrab(primaryController, resizeController);
-            UpdateResizeGuideLine(GetControllerWorldPosition(primaryController), GetControllerWorldPosition(resizeController), true);
+            if (resizeGrabUsesGripFallback)
+            {
+                UpdateFauxResizeGrab();
+            }
+            else
+            {
+                UpdateResizeGrab(primaryController, resizeController);
+                UpdateResizeGuideLine(GetControllerWorldPosition(primaryController), GetControllerWorldPosition(resizeController), true);
+            }
             return;
         }
 
@@ -3060,11 +3154,17 @@ public class FrameAngelRadar : MVRScript
 
     private void StartResizeGrab(FreeControllerV3 primaryController, FreeControllerV3 resizeController, int hand)
     {
+        StartResizeGrabAtPositions(GetControllerWorldPosition(primaryController), GetControllerWorldPosition(resizeController), hand, false);
+    }
+
+    private void StartResizeGrabAtPositions(Vector3 primaryPosition, Vector3 resizePosition, int hand, bool gripFallback)
+    {
         resizeGrabActive = true;
+        resizeGrabUsesGripFallback = gripFallback;
         resizeGrabHand = hand;
         resizeStartScale = Mathf.Max(0.01f, ReadFloat(hudScaleField, 0.49f));
-        resizeStartPrimaryPosition = GetControllerWorldPosition(primaryController);
-        resizeStartHandlePosition = GetControllerWorldPosition(resizeController);
+        resizeStartPrimaryPosition = primaryPosition;
+        resizeStartHandlePosition = resizePosition;
         resizeStartDistance = Mathf.Max(
             GrabResizeMinimumStartDistanceMeters,
             Vector3.Distance(resizeStartPrimaryPosition, resizeStartHandlePosition));
@@ -3086,6 +3186,29 @@ public class FrameAngelRadar : MVRScript
         SetHudScaleNoCallback(resizeStartScale * ratio);
     }
 
+    private void UpdateFauxResizeGrab()
+    {
+        if (!resizeGrabActive)
+        {
+            return;
+        }
+
+        Vector3 primaryPosition;
+        Vector3 resizePosition;
+        if (!GetGripControllerWorldPosition(moveGrabHand, out primaryPosition)
+            || !GetGripControllerWorldPosition(resizeGrabHand, out resizePosition))
+        {
+            return;
+        }
+
+        float currentDistance = Mathf.Max(
+            GrabResizeMinimumStartDistanceMeters,
+            Vector3.Distance(primaryPosition, resizePosition));
+        float ratio = currentDistance / Mathf.Max(GrabResizeMinimumStartDistanceMeters, resizeStartDistance);
+        SetHudScaleNoCallback(resizeStartScale * ratio);
+        UpdateResizeGuideLine(primaryPosition, resizePosition, true);
+    }
+
     private void EndResizeGrab(bool dismissUntilMoveRelease)
     {
         if (resizeGrabActive)
@@ -3095,11 +3218,142 @@ public class FrameAngelRadar : MVRScript
         }
 
         resizeGrabActive = false;
+        resizeGrabUsesGripFallback = false;
         resizeGrabHand = GrabHandUnknown;
         resizeHandleDismissedUntilMoveRelease = dismissUntilMoveRelease;
         DestroyResizeGrabHandleAtom();
         SetResizeGuideLineVisible(false);
         SetStatus("Radar grab resize applied.");
+    }
+
+    private void RefreshGripGrabState()
+    {
+        previousLeftGripValue = leftGripValue;
+        previousRightGripValue = rightGripValue;
+        leftGripValue = ReadLeftGripValue();
+        rightGripValue = ReadRightGripValue();
+    }
+
+    private float ReadLeftGripValue()
+    {
+        return ReadGripValue(OVRInput.Axis1D.PrimaryHandTrigger, OVRInput.Button.PrimaryHandTrigger, OVRInput.RawButton.LHandTrigger);
+    }
+
+    private float ReadRightGripValue()
+    {
+        return ReadGripValue(OVRInput.Axis1D.SecondaryHandTrigger, OVRInput.Button.SecondaryHandTrigger, OVRInput.RawButton.RHandTrigger);
+    }
+
+    private float ReadGripValue(OVRInput.Axis1D axis, OVRInput.Button button, OVRInput.RawButton rawButton)
+    {
+        float value = 0.0f;
+        try
+        {
+            value = Mathf.Clamp01(OVRInput.Get(axis));
+            if (OVRInput.Get(button) || OVRInput.Get(rawButton))
+            {
+                value = 1.0f;
+            }
+        }
+        catch
+        {
+            value = 0.0f;
+        }
+
+        return value;
+    }
+
+    private bool TryStartFauxPrimaryGrab(Vector3 radarCenter)
+    {
+        Vector3 leftPosition = Vector3.zero;
+        Vector3 rightPosition = Vector3.zero;
+        bool leftPressed = IsGripPressedThisFrame(GrabHandLeft) && GetGripControllerWorldPosition(GrabHandLeft, out leftPosition);
+        bool rightPressed = IsGripPressedThisFrame(GrabHandRight) && GetGripControllerWorldPosition(GrabHandRight, out rightPosition);
+        float hitRadius = ResolveGripGrabHitRadiusMeters();
+
+        if (leftPressed && Vector3.Distance(leftPosition, radarCenter) <= hitRadius)
+        {
+            StartMoveGrabAtPosition(leftPosition, GrabHandLeft, true);
+            return true;
+        }
+
+        if (rightPressed && Vector3.Distance(rightPosition, radarCenter) <= hitRadius)
+        {
+            StartMoveGrabAtPosition(rightPosition, GrabHandRight, true);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryStartFauxResizeGrab(Vector3 primaryPosition, Vector3 resizePosition, int hand)
+    {
+        if (hand == GrabHandUnknown || hand == moveGrabHand || !IsGripHeld(moveGrabHand) || !IsGripPressedThisFrame(hand))
+        {
+            return false;
+        }
+
+        StartResizeGrabAtPositions(primaryPosition, resizePosition, hand, true);
+        UpdateResizeGuideLine(primaryPosition, resizePosition, true);
+        return true;
+    }
+
+    private bool IsGripPressedThisFrame(int hand)
+    {
+        return GetGripValue(hand) >= GripGrabPressThreshold && GetPreviousGripValue(hand) < GripGrabPressThreshold;
+    }
+
+    private bool IsGripHeld(int hand)
+    {
+        return GetGripValue(hand) > GripGrabReleaseThreshold;
+    }
+
+    private float GetGripValue(int hand)
+    {
+        if (hand == GrabHandLeft)
+        {
+            return leftGripValue;
+        }
+
+        if (hand == GrabHandRight)
+        {
+            return rightGripValue;
+        }
+
+        return 0.0f;
+    }
+
+    private float GetPreviousGripValue(int hand)
+    {
+        if (hand == GrabHandLeft)
+        {
+            return previousLeftGripValue;
+        }
+
+        if (hand == GrabHandRight)
+        {
+            return previousRightGripValue;
+        }
+
+        return 0.0f;
+    }
+
+    private float ResolveGripGrabHitRadiusMeters()
+    {
+        return Mathf.Clamp(ReadFloat(grabHitRadiusMetersField, 0.16f), 0.04f, 0.45f);
+    }
+
+    private bool GetGripControllerWorldPosition(int hand, out Vector3 position)
+    {
+        position = Vector3.zero;
+        Transform controller = ResolveMotionControllerTransform(hand);
+        if (controller == null)
+        {
+            return false;
+        }
+
+        position = controller.position;
+        return true;
     }
 
     private Transform ResolveMotionControllerTransform(int hand)

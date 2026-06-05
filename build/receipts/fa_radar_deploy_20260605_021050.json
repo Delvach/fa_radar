@@ -1,0 +1,97 @@
+﻿{
+    "schemaVersion":  "fa_radar_deploy_receipt_v1",
+    "createdAtUtc":  "2026-06-05T08:10:50.5002252Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "branch":  "codex/0.1.19-grip-grab-fallback",
+    "commit":  "dce3eaeafb3991c13858eb28682a64c74b9f8a79",
+    "dirtyState":  [
+                       " M README.md",
+                       " M config/fa_radar.version.json",
+                       " M docs/FA_RADAR_ARCHITECTURE_V1.md",
+                       " M docs/FA_RADAR_PRODUCT_EDITIONS_V1.md",
+                       " M eng/Verify-FaRadarContract.ps1",
+                       " M payload/Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap",
+                       " M payload/Custom/Scripts/FrameAngel/Radar/FrameAngelRadar.cs",
+                       " M scripts/Build-FaRadar.ps1",
+                       " M scripts/Deploy-FaRadar.ps1",
+                       "?? build/receipts/fa_radar_build_20260605_021049.json"
+                   ],
+    "version":  "0.1.19",
+    "editionRequest":  "All",
+    "expectedPluginFileNames":  [
+                                    "fa_radar.free.0.1.19.dll",
+                                    "fa_radar.pro.0.1.19.dll"
+                                ],
+    "cuaPresetFileName":  "Preset_FrameAngel_Radar_CUA.vap",
+    "configuration":  "Release",
+    "buildReceiptPath":  "C:\\projects\\fa_radar\\build\\receipts\\fa_radar_build_20260605_021049.json",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "skipBuild":  false,
+    "skipObfuscation":  false,
+    "skipPackage":  false,
+    "deployedDlls":  [
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.free.0.1.19.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.19.dll",
+                             "sha256":  "2132B6F3CF61E7DA4EF28306C8B92AA8EFF55F411C234F80DDA0B3B915478DC1",
+                             "sourceSha256":  "2132B6F3CF61E7DA4EF28306C8B92AA8EFF55F411C234F80DDA0B3B915478DC1",
+                             "bytes":  75264
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.pro.0.1.19.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.19.dll",
+                             "sha256":  "C85C51173B82C19549A70702C8B4E1B2681D993A32AD2EC38DC1623BDE9E5E0C",
+                             "sourceSha256":  "C85C51173B82C19549A70702C8B4E1B2681D993A32AD2EC38DC1623BDE9E5E0C",
+                             "bytes":  75776
+                         },
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.free.0.1.19.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.19.dll",
+                             "sha256":  "2132B6F3CF61E7DA4EF28306C8B92AA8EFF55F411C234F80DDA0B3B915478DC1",
+                             "sourceSha256":  "2132B6F3CF61E7DA4EF28306C8B92AA8EFF55F411C234F80DDA0B3B915478DC1",
+                             "bytes":  75264
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.pro.0.1.19.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.19.dll",
+                             "sha256":  "C85C51173B82C19549A70702C8B4E1B2681D993A32AD2EC38DC1623BDE9E5E0C",
+                             "sourceSha256":  "C85C51173B82C19549A70702C8B4E1B2681D993A32AD2EC38DC1623BDE9E5E0C",
+                             "bytes":  75776
+                         }
+                     ],
+    "deployedPresets":  [
+                            {
+                                "vamRoot":  "F:\\sim\\vam",
+                                "presetDirectory":  "F:\\sim\\vam\\Custom\\Atom\\CustomUnityAsset",
+                                "path":  "F:\\sim\\vam\\Custom\\Atom\\CustomUnityAsset\\Preset_FrameAngel_Radar_CUA.vap",
+                                "presetFileName":  "Preset_FrameAngel_Radar_CUA.vap",
+                                "sha256":  "B8197D42B62013833CF45B19245B75F7751AE793D7BF4D38E19DA610B738E0CD",
+                                "sourceSha256":  "B8197D42B62013833CF45B19245B75F7751AE793D7BF4D38E19DA610B738E0CD",
+                                "bytes":  2273
+                            },
+                            {
+                                "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                                "presetDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Atom\\CustomUnityAsset",
+                                "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Atom\\CustomUnityAsset\\Preset_FrameAngel_Radar_CUA.vap",
+                                "presetFileName":  "Preset_FrameAngel_Radar_CUA.vap",
+                                "sha256":  "B8197D42B62013833CF45B19245B75F7751AE793D7BF4D38E19DA610B738E0CD",
+                                "sourceSha256":  "B8197D42B62013833CF45B19245B75F7751AE793D7BF4D38E19DA610B738E0CD",
+                                "bytes":  2273
+                            }
+                        ],
+    "archivedLegacyScripts":  [
+
+                              ]
+}
