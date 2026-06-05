@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.20";
+    private const string Version = "0.1.21";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -2718,8 +2718,13 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
         FreeControllerV3 primaryController = primaryGrabHandleAtom.mainController;
+        ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+        if (TryApplyPrimaryHandleDisplacement(viewer, radarCenter, primaryController))
+        {
+            radarCenter = ResolveRadarWorldCenter(viewer);
+        }
+
         int grabbedHand;
         bool primaryGrabbed = TryResolveGrabbedHand(primaryController, out grabbedHand);
         if (!moveGrabActive)
@@ -2923,10 +2928,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         int unusedHand;
-        if (!TryResolveGrabbedHand(controller, out unusedHand))
-        {
-            MoveGrabHandleAtom(atom, worldPosition);
-        }
+        TryResolveGrabbedHand(controller, out unusedHand);
     }
 
     private void MoveGrabHandleAtom(Atom atom, Vector3 worldPosition)
@@ -3090,6 +3092,57 @@ public class FrameAngelRadar : MVRScript
         Vector3 localDelta = reference != null ? reference.InverseTransformVector(worldDelta) : worldDelta;
         SetHudOffsetNoCallback(moveStartHudOffset + localDelta);
         haveSmoothedHudPosition = false;
+    }
+
+    private bool TryApplyPrimaryHandleDisplacement(Transform viewer, Vector3 radarCenter, FreeControllerV3 primaryController)
+    {
+        if (primaryController == null || moveGrabActive)
+        {
+            return false;
+        }
+
+        Vector3 handlePosition = GetControllerWorldPosition(primaryController);
+        Vector3 handleDelta = handlePosition - radarCenter;
+        float epsilon = ResolveGrabHandleMovementEpsilonMeters();
+        if (handleDelta.sqrMagnitude <= epsilon * epsilon)
+        {
+            return false;
+        }
+
+        // Handle Displacement Follow: VaM may move the grab handle without exposing a plugin-visible grab state.
+        ApplyHandleWorldDisplacement(viewer, handleDelta);
+        MarkGlobalPreferencesDirty();
+        return true;
+    }
+
+    private void ApplyHandleWorldDisplacement(Transform viewer, Vector3 worldDelta)
+    {
+        string anchorMode = ResolveAnchorMode();
+        if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
+        {
+            SetStaticWorldPositionNoCallback(GetStaticWorldPosition() + worldDelta);
+            haveSmoothedHudPosition = false;
+            return;
+        }
+
+        Transform reference = viewer;
+        if (!string.Equals(anchorMode, AnchorModeHud, StringComparison.Ordinal))
+        {
+            Transform anchor = ResolveRadarAnchorTransform(anchorMode);
+            if (anchor != null)
+            {
+                reference = anchor;
+            }
+        }
+
+        Vector3 localDelta = reference != null ? reference.InverseTransformVector(worldDelta) : worldDelta;
+        SetHudOffsetNoCallback(GetHudOffset() + localDelta);
+        haveSmoothedHudPosition = false;
+    }
+
+    private float ResolveGrabHandleMovementEpsilonMeters()
+    {
+        return 0.002f;
     }
 
     private void UpdateResizeGrabHandle(Transform viewer, FreeControllerV3 primaryController)
