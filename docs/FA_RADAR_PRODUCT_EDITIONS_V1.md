@@ -7,11 +7,11 @@ Updated: 2026-06-05
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.22`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.23`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.22.dll`
-- `fa_radar.pro.0.1.22.dll`
+- `fa_radar.free.0.1.23.dll`
+- `fa_radar.pro.0.1.23.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -112,8 +112,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.22.var`
-- `fa_radar.pro.0.1.22.var`
+- `fa_radar.free.0.1.23.var`
+- `fa_radar.pro.0.1.23.var`
 
 The Pro candidate package includes the CUA preset under
 `Custom/Atom/CustomUnityAsset`; Free does not ship creator-facing CUA resources.

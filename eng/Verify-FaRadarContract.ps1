@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.22"',
+        'private const string Version = "0.1.23"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -249,20 +249,17 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CompareFunction.Always",
         "DestroyRuntimeVisuals",
         "Session Grab Handles",
-        'new JSONStorableBool("Grab Handles Enabled", false)',
+        'new JSONStorableBool("Grab Handles Enabled", true)',
         'new JSONStorableBool("Show Grab Handle Debug", false)',
         'new JSONStorableBool("Grab Haptics", true)',
         "UpdateSessionGrabHandles",
-        'SuperController.singleton.AddAtomByType("Empty", uid, false, false, false)',
-        "SuperController.singleton.RemoveAtom(atom)",
-        "LeftGrabbedController",
-        "RightGrabbedController",
+        "Direct Grip Grab",
+        "directGripGrabDefaulted",
+        "hasDirectGripDefaultMarker",
+        "UpdateDirectGripGrab",
         "leftControllerCamera",
         "rightControllerCamera",
         "StartMoveGrab",
-        "UpdateMoveGrab",
-        "StartResizeGrab",
-        "UpdateResizeGrab",
         "DestroyResizeGrabHandleAtom",
         "CreateDottedLineMesh",
         "UpdateResizeGuideLine",
@@ -270,26 +267,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "OVRInput.SetControllerVibration",
         "if (IsCuaPreferenceProfileActive())",
         "Grip Grab Fallback",
-        "Built-In Grab Target",
-        "Handle Displacement Follow",
-        "primaryGrabHandleFollowArmed",
-        "ArmPrimaryGrabHandleFollow",
-        "if (!primaryGrabHandleFollowArmed)",
-        "TryApplyPrimaryHandleDisplacement",
-        "ApplyHandleWorldDisplacement",
-        "ResolveGrabHandleMovementEpsilonMeters",
-        "Vector3 handleDelta = handlePosition - radarCenter",
-        "SetHudOffsetNoCallback(GetHudOffset() + localDelta)",
-        "SetStaticWorldPositionNoCallback(GetStaticWorldPosition() + worldDelta)",
-        "ResolveBuiltInGrabHandleScaleMeters",
-        "controller.hidden = false",
-        "controller.drawMeshWhenDeselected = true",
-        "controller.deselectedMeshScale = ResolveBuiltInGrabHandleScaleMeters()",
-        "controller.selectedScale = ResolveBuiltInGrabHandleScaleMeters()",
-        "controller.controlMode = FreeControllerV3.ControlMode.Position",
-        "controller.collisionEnabled = false",
-        "controller.physicsEnabled = false",
-        "ResolveNearestGripControllerHand",
         'new JSONStorableFloat("Grab Hit Radius Meters", 0.16f',
         "ReadLeftGripValue",
         "ReadRightGripValue",
@@ -298,11 +275,10 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "OVRInput.RawButton.LHandTrigger",
         "OVRInput.RawButton.RHandTrigger",
         "TryStartFauxPrimaryGrab",
+        "TryStartFauxPrimaryGrab(radarCenter)",
         "moveGrabUsesGripFallback",
-        "resizeGrabUsesGripFallback",
         "UpdateFauxMoveGrab",
-        "TryStartFauxResizeGrab",
-        "UpdateFauxResizeGrab",
+        "UpdateFauxMoveGrab(viewer)",
         "ResolveGripGrabHitRadiusMeters",
         "IsGripPressedThisFrame",
         "GetGripControllerWorldPosition"
@@ -320,6 +296,20 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         Add-Failure "Plugin menu must expose placement controls near the top via BuildPlacementUi."
     } elseif ($grabUiIndex -ge 0 -and $placementUiIndex -gt $grabUiIndex) {
         Add-Failure "Placement controls must appear before grab-handle/advanced controls in the plugin menu."
+    }
+
+    $forbiddenActiveGrabSnippets = @(
+        "EnsurePrimaryGrabHandleAtom(radarCenter);",
+        "ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);",
+        "UpdateResizeGrabHandle(viewer, primaryController);",
+        "controller.drawMeshWhenDeselected = true",
+        "controller.hidden = false"
+    )
+
+    foreach ($snippet in $forbiddenActiveGrabSnippets) {
+        if ($plugin.Contains($snippet)) {
+            Add-Failure "Direct grip path must not retain visible/active built-in handle snippet: $snippet"
+        }
     }
 
     $forbiddenPatterns = @(
@@ -356,8 +346,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.22.dll",
-        "fa_radar.pro.0.1.22.dll",
+        "fa_radar.free.0.1.23.dll",
+        "fa_radar.pro.0.1.23.dll",
         "Preset_FrameAngel_Radar_CUA.vap",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
@@ -402,8 +392,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.22.dll",
-        "fa_radar.pro.0.1.22.dll",
+        "fa_radar.free.0.1.23.dll",
+        "fa_radar.pro.0.1.23.dll",
         "Preset_FrameAngel_Radar_CUA.vap",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
@@ -440,7 +430,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.22.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.23.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"HUD Offset X"',
@@ -486,11 +476,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.22") {
-        Add-Failure "Version config must declare version 0.1.22."
+    if ($version.version -ne "0.1.23") {
+        Add-Failure "Version config must declare version 0.1.23."
     }
-    if ($version.branch -ne "codex/0.1.22-placement-ui-save-and-grab-arm") {
-        Add-Failure "Version config branch must match codex/0.1.22-placement-ui-save-and-grab-arm."
+    if ($version.branch -ne "codex/0.1.23-direct-grip-move") {
+        Add-Failure "Version config branch must match codex/0.1.23-direct-grip-move."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -591,8 +581,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.22.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.22.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.23.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.23.dll")
         )
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
@@ -621,7 +611,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.22."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.23."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."

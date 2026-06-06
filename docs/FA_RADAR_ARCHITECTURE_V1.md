@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.22` on branch
-  `codex/0.1.22-placement-ui-save-and-grab-arm`.
+- Version: `0.1.23` on branch
+  `codex/0.1.23-direct-grip-move`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.22.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.22.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.23.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.23.dll`.
 - Pro also ships a thin CustomUnityAsset preset:
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,10 +27,10 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.22` branch preserves the prototype-first generated visual treatment,
-promotes placement controls, and guards grab-handle follow so stale handle
-positions cannot move the radar on enable. It uses generated emissive polygons
-so targeting can be tested before any art polish:
+The `0.1.23` branch preserves the prototype-first generated visual treatment,
+promotes placement controls, and replaces visible grab handles with direct grip
+movement. It uses generated emissive polygons so targeting can be tested before
+any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
   target markers
@@ -91,42 +91,22 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.22`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.23`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
 
-`Grab Handles Enabled` is for the session/scene plugin path only. The CUA
-preference profile and CustomUnityAsset-containing atom path skip this system
-so creator-anchor CUA behavior remains separate.
+`Grab Handles Enabled` is default-on for the session/scene plugin path only. The
+CUA preference profile and CustomUnityAsset-containing atom path skip this
+system so creator-anchor CUA behavior remains separate.
 
-When enabled, the plugin creates a disposable dynamic `Empty` atom as the
-primary invisible VaM grab target. The radar visuals are not parented to that
-atom; the handle is only an input affordance. If VaM reports the handle as
-grabbed, movement uses that controller. If VaM does not report the dynamic
-handle as grabbed, Grip Grab Fallback starts from an OVR grip press near the
-radar sphere and moves from the live controller-camera transform. The
-controller itself remains `hidden=false`, `canGrabPosition=true`, and
-`controlMode=Position` with physics/collision disabled, so VaM's built-in grab
-mechanics can move the handle directly. In 0.1.22, the primary handle is first
-synced to the radar center and armed before any world displacement can be
-accepted; after arming, handle displacement writes the same HUD/static/anchor
-offset storables that the native UI sliders use.
-
-During a primary grab, a second disposable `Empty` atom is created only while
-the resize affordance is active. It follows the free motion controller so the
-operator can grab it close for fast coarse scaling or farther away for precise
-scaling. VaM-grabbed resize handles still work when available; otherwise the
-free-hand OVR grip press starts resize. `HUD Scale` is set from
-`currentHandDistance / startingHandDistance`, with both ends sampled from the
-live controller endpoints, then clamped by the existing scale slider limits.
-Releasing the resize grip/handle removes it for the rest of that primary grab;
-releasing the primary grip/handle removes all resize affordances.
-
-`Show Grab Handle Debug` temporarily makes the otherwise hidden controller
-meshes visible for hitbox tuning. `Grab Haptics` uses guarded OVR haptic pulses
-on move start, resize start, and apply/release. The dotted resize guide is a
-generated mesh that is inactive when no grab interaction is underway.
+The active 0.1.23 session path is direct grip only: when a controller grip press
+starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
+that controller position, tracks its world delta each frame, and writes the same
+HUD/static/anchor offset storables that the native UI sliders use until the grip
+is released. No visible VaM grab atom is drawn, no resize handle is spawned, and
+no dynamic handle displacement is consumed. `Grab Haptics` uses guarded OVR
+haptic pulses on move start and apply/release.
 
 ## Global Preferences
 
@@ -268,8 +248,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.22.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.22.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.23.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.23.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -285,11 +265,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.22.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.22.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.23.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.23.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.22.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.22.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.23.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.23.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are
