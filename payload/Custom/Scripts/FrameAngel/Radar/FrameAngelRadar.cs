@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.22";
+    private const string Version = "0.1.23";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -300,9 +300,9 @@ public class FrameAngelRadar : MVRScript
         showPersonAtomsField = new JSONStorableBool("Show People", false);
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
-        // Grip Grab Fallback: keep session handles visual/debug-only when VaM does not report them as grabbed.
-        // Session Grab Handles are a disposable VR interaction aid for the session/scene plugin path only.
-        grabHandlesEnabledField = new JSONStorableBool("Grab Handles Enabled", false);
+        // Session Grab Handles: Direct Grip Grab replaces the old visible-handle behavior.
+        // Grip Grab Fallback is now active: grip near the radar, track controller movement, release to apply placement.
+        grabHandlesEnabledField = new JSONStorableBool("Grab Handles Enabled", true);
         grabHandleDebugVisibleField = new JSONStorableBool("Show Grab Handle Debug", false);
         grabHapticsEnabledField = new JSONStorableBool("Grab Haptics", true);
         globalPrefsAutoSaveField = new JSONStorableBool("Global Prefs Auto Save", true);
@@ -1081,7 +1081,12 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "depthSizeCue", depthSizeCueField);
             ApplyBoolPreference(preferencesJson, "availableAtomMarkers", availableAtomMarkersEnabledField);
             ApplyBoolPreference(preferencesJson, "clickSelectMarkers", clickSelectMarkersField);
+            bool hasDirectGripDefaultMarker = preferencesJson.Contains("\"directGripGrabDefaulted\"");
             ApplyBoolPreference(preferencesJson, "grabHandlesEnabled", grabHandlesEnabledField);
+            if (!hasDirectGripDefaultMarker)
+            {
+                SetBoolNoCallback(grabHandlesEnabledField, true);
+            }
             ApplyBoolPreference(preferencesJson, "grabHandleDebugVisible", grabHandleDebugVisibleField);
             ApplyBoolPreference(preferencesJson, "grabHaptics", grabHapticsEnabledField);
             ApplyStringPreference(preferencesJson, "anchorMode", anchorModeField);
@@ -1187,7 +1192,7 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(depthSizeCueField, true);
         SetBoolNoCallback(availableAtomMarkersEnabledField, true);
         SetBoolNoCallback(clickSelectMarkersField, true);
-        SetBoolNoCallback(grabHandlesEnabledField, false);
+        SetBoolNoCallback(grabHandlesEnabledField, true);
         SetBoolNoCallback(grabHandleDebugVisibleField, false);
         SetBoolNoCallback(grabHapticsEnabledField, true);
         SetBoolNoCallback(showLightAtomsField, true);
@@ -1257,7 +1262,8 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "depthSizeCue", ReadBool(depthSizeCueField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "availableAtomMarkers", ReadBool(availableAtomMarkersEnabledField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "clickSelectMarkers", ReadBool(clickSelectMarkersField, true));
-        AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandlesEnabled", ReadBool(grabHandlesEnabledField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandlesEnabled", ReadBool(grabHandlesEnabledField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "directGripGrabDefaulted", true);
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandleDebugVisible", ReadBool(grabHandleDebugVisibleField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHaptics", ReadBool(grabHapticsEnabledField, true));
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorMode", ResolveAnchorMode());
@@ -2732,75 +2738,39 @@ public class FrameAngelRadar : MVRScript
         }
 
         Vector3 radarCenter = ResolveRadarWorldCenter(viewer);
-        EnsurePrimaryGrabHandleAtom(radarCenter);
-        if (primaryGrabHandleAtom == null || primaryGrabHandleAtom.mainController == null)
-        {
-            SetResizeGuideLineVisible(false);
-            return;
-        }
+        UpdateDirectGripGrab(viewer, radarCenter);
+    }
 
-        FreeControllerV3 primaryController = primaryGrabHandleAtom.mainController;
-        ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
-        if (!primaryGrabHandleFollowArmed)
-        {
-            ArmPrimaryGrabHandleFollow(radarCenter);
-            DestroyResizeGrabHandleAtom();
-            SetResizeGuideLineVisible(false);
-            return;
-        }
+    private void UpdateDirectGripGrab(Transform viewer, Vector3 radarCenter)
+    {
+        DestroySessionGrabHandleAtoms();
 
-        if (TryApplyPrimaryHandleDisplacement(viewer, radarCenter, primaryController))
-        {
-            radarCenter = ResolveRadarWorldCenter(viewer);
-        }
-
-        int grabbedHand;
-        bool primaryGrabbed = TryResolveGrabbedHand(primaryController, out grabbedHand);
         if (!moveGrabActive)
         {
-            if (primaryGrabbed)
-            {
-                StartMoveGrab(primaryController, grabbedHand);
-            }
-            else
-            {
-                TryStartFauxPrimaryGrab(radarCenter);
-            }
-        }
-        else if (moveGrabUsesGripFallback)
-        {
-            if (!IsGripHeld(moveGrabHand))
-            {
-                EndMoveGrab();
-            }
-        }
-        else if (!primaryGrabbed)
-        {
-            EndMoveGrab();
-        }
-
-        if (moveGrabActive)
-        {
-            if (moveGrabUsesGripFallback)
-            {
-                UpdateFauxMoveGrab(viewer);
-            }
-            else
-            {
-                UpdateMoveGrab(viewer, primaryController);
-            }
-            UpdateResizeGrabHandle(viewer, primaryController);
+            TryStartFauxPrimaryGrab(radarCenter);
+            SetResizeGuideLineVisible(false);
             return;
         }
 
-        MoveGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
-        DestroyResizeGrabHandleAtom();
+        if (!moveGrabUsesGripFallback)
+        {
+            EndMoveGrab();
+            return;
+        }
+
+        if (!IsGripHeld(moveGrabHand))
+        {
+            EndMoveGrab();
+            return;
+        }
+
+        UpdateFauxMoveGrab(viewer);
         SetResizeGuideLineVisible(false);
     }
 
     private bool ShouldUseSessionGrabHandles(Transform viewer)
     {
-        if (viewer == null || hudRoot == null || !ReadBool(grabHandlesEnabledField, false))
+        if (viewer == null || hudRoot == null || !ReadBool(grabHandlesEnabledField, true))
         {
             return false;
         }
@@ -2928,7 +2898,7 @@ public class FrameAngelRadar : MVRScript
         try
         {
             atom.SetOn(true);
-            atom.hidden = false;
+            atom.hidden = true;
         }
         catch
         {
@@ -2943,13 +2913,13 @@ public class FrameAngelRadar : MVRScript
         bool debugVisible = ReadBool(grabHandleDebugVisibleField, false);
         try
         {
-            // Built-In Grab Target: keep the controller active for VaM grabbing while suppressing physics/collision noise.
+            // Built-In Grab Target is kept invisible and inactive for compatibility while direct grip owns session movement.
             controller.currentPositionState = FreeControllerV3.PositionState.On;
             controller.currentRotationState = FreeControllerV3.RotationState.Off;
             controller.controlMode = FreeControllerV3.ControlMode.Position;
             controller.canGrabPosition = true;
             controller.canGrabRotation = false;
-            controller.hidden = false;
+            controller.hidden = true;
             controller.guihidden = !debugVisible;
             controller.collisionEnabled = false;
             controller.physicsEnabled = false;
@@ -2957,9 +2927,9 @@ public class FrameAngelRadar : MVRScript
             controller.controlsOn = true;
             controller.freezeAtomPhysicsWhenGrabbed = false;
             controller.GUIalwaysVisibleWhenSelected = debugVisible;
-            controller.drawMeshWhenDeselected = true;
-            controller.deselectedMeshScale = ResolveBuiltInGrabHandleScaleMeters();
-            controller.selectedScale = ResolveBuiltInGrabHandleScaleMeters();
+            controller.drawMeshWhenDeselected = false;
+            controller.deselectedMeshScale = 0.01f;
+            controller.selectedScale = 0.01f;
         }
         catch
         {
@@ -3739,18 +3709,25 @@ public class FrameAngelRadar : MVRScript
         resizeHandleDismissedUntilMoveRelease = false;
         moveGrabHand = GrabHandUnknown;
         resizeGrabHand = GrabHandUnknown;
-        DestroyGrabHandleAtom(ref primaryGrabHandleAtom, primaryGrabHandleUid);
-        primaryGrabHandleCreatePending = false;
-        primaryGrabHandleFollowArmed = false;
-        DestroyResizeGrabHandleAtom();
+        DestroySessionGrabHandleAtoms();
         SetResizeGuideLineVisible(false);
         StopGrabHandleOvrHaptic(true);
         StopGrabHandleOvrHaptic(false);
     }
 
+    private void DestroySessionGrabHandleAtoms()
+    {
+        DestroyGrabHandleAtom(ref primaryGrabHandleAtom, primaryGrabHandleUid);
+        primaryGrabHandleUid = "";
+        primaryGrabHandleCreatePending = false;
+        primaryGrabHandleFollowArmed = false;
+        DestroyResizeGrabHandleAtom();
+    }
+
     private void DestroyResizeGrabHandleAtom()
     {
         DestroyGrabHandleAtom(ref resizeGrabHandleAtom, resizeGrabHandleUid);
+        resizeGrabHandleUid = "";
         resizeGrabHandleCreatePending = false;
     }
 

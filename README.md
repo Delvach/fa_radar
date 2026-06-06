@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.22`.
+Current branch version: `0.1.23`.
 
-Current product contract version: `0.1.22`.
+Current product contract version: `0.1.23`.
 
 The current slice is compiled C# only:
 
@@ -31,6 +31,8 @@ The current slice is compiled C# only:
   placement, and explicit atom UID placement without duplicating radar logic
 - promoted HUD X/Y/Z and scale controls near the top of the native plugin UI,
   with immediate global preference saves while autosave is enabled
+- session grab movement is default-on and direct: grip near the radar, move the
+  controller, release to apply placement; no visible grab handles are drawn
 - Pro CUA preset at
   `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 - FAAR visibility handshake reads
@@ -95,11 +97,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.22.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.22.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.23.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.23.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.22.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.22.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.23.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.23.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral
