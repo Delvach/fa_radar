@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.23`.
+Current branch version: `0.1.24`.
 
-Current product contract version: `0.1.23`.
+Current product contract version: `0.1.24`.
 
 The current slice is compiled C# only:
 
@@ -33,6 +33,11 @@ The current slice is compiled C# only:
   with immediate global preference saves while autosave is enabled
 - session grab movement is default-on and direct: grip near the radar, move the
   controller, release to apply placement; no visible grab handles are drawn
+- optional `Radar Mode` values: `HUD`, `wrist-left`, `wrist-right`,
+  `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
+  modes start hidden until the outward wrist-twist reveal is active
+- wrist modes use their own wrist-relative offset/scale prefs and can hand off
+  to the opposing controller with a grip drag across the body
 - Pro CUA preset at
   `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 - FAAR visibility handshake reads
@@ -50,11 +55,9 @@ The current slice is compiled C# only:
 - edition-gated available atom markers: Free shows every eligible atom together,
   Pro exposes category filters
 - click-to-select for visible available CUA/light/person/other atom markers
-- session-plugin-only invisible VR grab handles plus OVR grip-proximity
-  fallback for one-hand move, two-hand distance-ratio resize, haptics, and an
-  active dotted resize guide; the built-in VaM grab controller remains
-  unhidden/position-grabbable so VaM mechanics can move the handle, and
-  handle displacement is accepted directly into HUD/static offsets
+- session-plugin-only direct grip movement with OVR haptics; grip near the
+  radar, move the controller, and release to apply HUD/static/wrist-relative
+  offsets
 - global non-scene-stored preferences under
   `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
 - CUA preset instances use separate global preference files:
@@ -97,11 +100,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.23.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.23.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.24.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.24.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.23.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.23.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.24.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.24.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral

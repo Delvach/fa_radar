@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.23` on branch
-  `codex/0.1.23-direct-grip-move`.
+- Version: `0.1.24` on branch
+  `codex/0.1.24-wrist-compass-prototype`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.23.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.23.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.24.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.24.dll`.
 - Pro also ships a thin CustomUnityAsset preset:
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,10 +27,10 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.23` branch preserves the prototype-first generated visual treatment,
-promotes placement controls, and replaces visible grab handles with direct grip
-movement. It uses generated emissive polygons so targeting can be tested before
-any art polish:
+The `0.1.24` branch preserves the prototype-first generated visual treatment,
+promotes placement controls, and adds optional wrist compass projection modes
+that can reveal on an outward twist or stay always-on per hand. It uses
+generated emissive polygons so targeting can be tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
   target markers
@@ -62,12 +62,10 @@ any art polish:
   together with a neutral marker color; Pro exposes lights, CUA, people, and
   other atom filters and keeps category colors
 - click-to-select for visible available CUA/light/person/other atom markers
-- session-plugin-only invisible grab handles: one primary handle for moving,
-  an active-only resize handle that follows the free controller, OVR
-  grip-proximity fallback for move/resize when VaM does not report the dynamic
-  handles as grabbed, an unhidden position-grabbable VaM controller for
-  built-in handle movement, direct primary-handle displacement follow, haptic
-  pulses, and a cached dotted resize guide
+- session-plugin-only direct grip movement with OVR haptics: grip near the
+  radar, move the controller, and release to apply placement; wrist modes write
+  wrist-relative offset/scale while HUD/static/atom modes keep their own
+  placement state
 - generated HUD objects and materials carry the `favr.hud.radar` filming
   identifier so FAAR/recorder tooling can locate the radar in final-recording
   workflows without adding a recorder dependency or scene-stored control data
@@ -91,7 +89,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.23`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.24`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
@@ -100,13 +98,41 @@ controls only the current atom's optional ground projection dot.
 CUA preference profile and CustomUnityAsset-containing atom path skip this
 system so creator-anchor CUA behavior remains separate.
 
-The active 0.1.23 session path is direct grip only: when a controller grip press
+The active 0.1.24 session path is direct grip only: when a controller grip press
 starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
 that controller position, tracks its world delta each frame, and writes the same
 HUD/static/anchor offset storables that the native UI sliders use until the grip
 is released. No visible VaM grab atom is drawn, no resize handle is spawned, and
 no dynamic handle displacement is consumed. `Grab Haptics` uses guarded OVR
 haptic pulses on move start and apply/release.
+
+## Wrist Compass
+
+`Radar Mode` is a session/scene-only projection selector with these values:
+`HUD`, `wrist-left`, `wrist-right`, `wrist-left-always-on`, and
+`wrist-right-always-on`. It does not alter the CUA preset path and wrist modes
+are ignored while the CUA preference profile is active.
+
+In `HUD`, the existing HUD/static/atom anchor behavior is unchanged. In wrist
+modes, the HUD root position is anchored to the selected hand/controller
+transform plus the wrist-relative `Wrist Offset X/Y/Z` and `Wrist Scale`
+preferences. Wrist mode does not inherit the live wrist rotation for display;
+rotation stays view-facing while the wrist transform only supplies the position
+anchor and twist reveal signal.
+
+`wrist-left` and `wrist-right` start hidden and reveal only when the selected
+hand's up vector rolls outward far enough to pass `Wrist Twist Degrees`; the
+reveal uses a small hysteresis band and pulses haptics once when it begins. The
+two `always-on` wrist modes stay visible whenever the selected hand/controller
+transform exists. Show/hide is a short alpha fade, and hand-off placement uses a
+short reveal grace so the radar can pop to the destination wrist before fading
+again if that wrist is not in the reveal pose.
+
+While in wrist mode, the opposing controller can grip the visible radar and
+adjust the current wrist-relative offset. If the drag carries the radar closer
+to the opposing hand past the hand-off threshold, `Radar Mode` switches to that
+hand, the pre-grab wrist offset is restored, preferences are marked dirty, and
+the grab event ends.
 
 ## Global Preferences
 
@@ -248,8 +274,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.23.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.23.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.24.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.24.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -265,11 +291,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.23.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.23.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.24.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.24.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.23.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.23.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.24.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.24.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are
