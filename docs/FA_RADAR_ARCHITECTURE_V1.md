@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.24` on branch
-  `codex/0.1.24-wrist-compass-prototype`.
+- Version: `0.1.25` on branch
+  `codex/0.1.25-ui-prune-grab-scale`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.24.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.24.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.25.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.25.dll`.
 - Pro also ships a thin CustomUnityAsset preset:
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,8 +27,8 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.24` branch preserves the prototype-first generated visual treatment,
-promotes placement controls, and adds optional wrist compass projection modes
+The `0.1.25` branch preserves the generated visual treatment, trims the normal
+plugin UI to daily controls, and keeps optional wrist compass projection modes
 that can reveal on an outward twist or stay always-on per hand. It uses
 generated emissive polygons so targeting can be tested before any art polish:
 
@@ -41,12 +41,12 @@ generated emissive polygons so targeting can be tested before any art polish:
 - VaM/world axis ring colors: X is red, Y is green, and Z is blue
 - faded meter grid centered through the sphere on the actual world X/Z ground
   plane
-- `Floor Area Scale` expands or contracts the represented meter range for the
+- `Radar Range Meters` expands or contracts the represented meter range for the
   grid, marker mapping, and height mapping without changing the compass visual
   radius
 - grid lines clipped to the radar circle
-- grid panning from viewer world X/Z movement when `Grid Follows User` is on,
-  including corrected forward/backward Z direction
+- one-meter grid panning from viewer world X/Z movement without relying on a
+  visible toggle or stale scene/global pref
 - green center marker for the user
 - orange selected-atom sphere without an extra outer outline, so marker size
   remains a proximity/depth cue
@@ -63,9 +63,10 @@ generated emissive polygons so targeting can be tested before any art polish:
   other atom filters and keeps category colors
 - click-to-select for visible available CUA/light/person/other atom markers
 - session-plugin-only direct grip movement with OVR haptics: grip near the
-  radar, move the controller, and release to apply placement; wrist modes write
-  wrist-relative offset/scale while HUD/static/atom modes keep their own
-  placement state
+  radar, move the controller, and release to apply placement; the active
+  controller owns world-space movement until release or wrist hand-off
+- two-hand outward-twist accordion scaling for HUD and wrist modes, using the
+  current hand distance as the scale ratio
 - generated HUD objects and materials carry the `favr.hud.radar` filming
   identifier so FAAR/recorder tooling can locate the radar in final-recording
   workflows without adding a recorder dependency or scene-stored control data
@@ -89,7 +90,7 @@ radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
 is available for VR comparison. Markers remain POV-relative; grid-drop markers
 are projected onto the ground-axis root from target world X/Z delta.
 
-Previous-selection rendering is parked in `0.1.24`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.25`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
@@ -98,13 +99,21 @@ controls only the current atom's optional ground projection dot.
 CUA preference profile and CustomUnityAsset-containing atom path skip this
 system so creator-anchor CUA behavior remains separate.
 
-The active 0.1.24 session path is direct grip only: when a controller grip press
+The active 0.1.25 session path is direct grip only: when a controller grip press
 starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
-that controller position, tracks its world delta each frame, and writes the same
-HUD/static/anchor offset storables that the native UI sliders use until the grip
-is released. No visible VaM grab atom is drawn, no resize handle is spawned, and
-no dynamic handle displacement is consumed. `Grab Haptics` uses guarded OVR
-haptic pulses on move start and apply/release.
+that controller position plus the radar world center. During the grab, the
+controller owns the radar's world-space center; HUD, static, atom-anchor, and
+wrist-relative preferences are updated only when the grip is released. In wrist
+mode, dragging past the hand-off threshold switches to the opposing hand and
+restores the pre-grab wrist offset instead of continuing to solve against both
+hands.
+
+No visible VaM grab atom is drawn, no resize handle is spawned, and no dynamic
+handle displacement is consumed. `Grab Haptics` uses guarded OVR haptic pulses
+on move start, hand-off, and apply/release. When both hands perform the outward
+twist pose, their current distance starts an accordion scale gesture; changing
+that distance scales the active HUD or wrist mode until either hand leaves the
+pose.
 
 ## Wrist Compass
 
@@ -152,10 +161,11 @@ The runtime writes only flat scalar JSON through `MVR.FileManagementSecure`:
 - `Custom\PluginData\FrameAngel\Radar\preferences_cua_pro.json` for CUA Pro
   filter controls
 
-Writes are debounced behind `Global Prefs Auto Save`. The plugin also exposes
-`Load Global Prefs`, `Save Global Prefs`, and `Reset Global Prefs` buttons.
-Loaded values are applied with `valNoCallback`, and a small shared in-process
-cache keeps multiple Radar instances from repeatedly reading the same files.
+Writes are debounced behind `Global Prefs Auto Save`. The normal plugin UI
+exposes `Save Global Prefs` and `Reset Global Prefs`; `Load Global Prefs`
+remains registered as an action for compatibility. Loaded values are applied
+with `valNoCallback`, and a small shared in-process cache keeps multiple Radar
+instances from repeatedly reading the same files.
 The CUA preset uses `CUA Anchor Preset` to select the CUA preference profile,
 so creator-anchor tuning does not pollute the normal HUD/session Radar profile.
 
@@ -175,13 +185,13 @@ VaM metadata inspection: `Atom.mainController` is `FreeControllerV3`, and
 `SuperController.SelectController(FreeControllerV3, alignView,
 alignRotationOnly, alignUpDown, openUI)` exists in the target VaM assembly.
 
-`Grid Follows User` uses the viewer's world X/Z position to offset the meter
-grid before it is clipped into the radar circle. A 1m movement along world Z
-changes the grid's Z offset in the matching direction modulo `Grid Step Meters`,
-so the center marker remains the user while the world grid slides underneath it.
-`Floor Area Scale` multiplies the effective radar range and height scale used
-for per-meter mapping; it does not scale the generated sphere, rings, markers,
-or HUD root.
+The grid uses the viewer's world X/Z position to offset the one-meter mesh
+before it is clipped into the radar circle. A 1m movement along world Z changes
+the grid's Z offset, so the center marker remains the user while the world grid
+slides underneath it. `Grid Follows User`, `Grid Step Meters`, and
+`Floor Area Scale` remain registered legacy prefs, but 0.1.25 makes panning
+always-on, keeps the visible grid at one meter, and makes `Radar Range Meters`
+the authority for how much world the sphere represents.
 
 ## HUD Placement
 
@@ -215,33 +225,32 @@ The Pro CUA preset loads the same plugin on a CustomUnityAsset atom, sets
 restorable from the preset, but it is not part of the normal global preference
 profile. When active, it uses the separate CUA preference files listed above.
 
-Placement uses a saved local offset:
+The normal plugin UI exposes the daily placement and operation controls:
 
 - `HUD Offset X`
 - `HUD Offset Y`
 - `HUD Offset Z`
 - `HUD Scale`
-- `Desktop Tilt Degrees`
-- `Ground Axis Lock`
-- `Floor Area Scale`
-- `Selected Ground Drop`
-- `Height Stems`
-- `Height Scale Meters`
-- `Range Fade Meters`
-- `Depth Size Cue`
+- `Radar Mode`
+- `Wrist Scale`
+- `Wrist Offset X`
+- `Wrist Offset Y`
+- `Wrist Offset Z`
+- `Radar Range Meters`
 - `Available Atom Markers`
 - `Show Lights`
 - `Show CUA`
 - `Show People`
 - `Show Other Atoms`
-- `Click Select Markers`
-- `Marker Click Radius Pixels`
-- `Grid Follows User`
-- `Grid Clip Circle`
+- `Grid Enabled`
+- `Grab Handles Enabled`
+- `Grab Haptics`
 
-When the plugin is loaded on a movable atom, `Placement Mode` can capture that
-atom's current position relative to the look camera. Scene/session use still
-works through the offset sliders and reset button.
+The older calibration and anchor controls remain registered so existing prefs
+and CUA presets load, but they are not part of the normal plugin UI. When the
+plugin is loaded on a movable atom, the hidden `Placement Mode` and capture
+actions still exist for compatibility; scene/session use works through the
+offset sliders and reset button.
 
 ## Performance Posture
 
@@ -253,9 +262,8 @@ works through the offset sliders and reset button.
   viewer grid offset changes, and active-state diffs. In anchored mode the HUD
   position/rotation are local to the camera instead of smoothed through world
   space.
-- Grid mesh rebuilds only when effective radar range (`Radar Range Meters`
-  multiplied by `Floor Area Scale`), `Grid Step Meters`, clip mode, or the
-  quantized viewer grid offset changes.
+- Grid mesh rebuilds only when effective radar range (`Radar Range Meters`),
+  clip mode, or the quantized viewer grid offset changes.
 - Click selection is idle unless the desktop left mouse button goes down.
   Marker hit-testing only checks the visible pooled marker list.
 - Materials use the FA Keyboard-inspired overlay pattern:
@@ -274,8 +282,8 @@ works through the offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.24.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.24.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.25.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.25.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -291,11 +299,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.24.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.24.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.25.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.25.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.24.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.24.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.25.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.25.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future `.var` product naming is undecided. Current candidates are

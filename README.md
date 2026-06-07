@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.24`.
+Current branch version: `0.1.25`.
 
-Current product contract version: `0.1.24`.
+Current product contract version: `0.1.25`.
 
 The current slice is compiled C# only:
 
@@ -20,8 +20,8 @@ The current slice is compiled C# only:
   storage or a product dependency
 - three generated rotating rings, colored to match VaM/world axes
 - faded generated meter grid
-- floor-only area scale that expands or contracts represented meters without
-  changing the compass visual size
+- visible `Radar Range Meters` control that expands or contracts represented
+  meters without changing the compass visual size
 - user center marker
 - unified desktop/VR sphere-grid treatment
 - camera-local anchoring to reduce desktop navigation jitter
@@ -46,7 +46,8 @@ The current slice is compiled C# only:
 - optional world-axis alignment for the grid and rings
 - ground-axis lock so the grid represents real world X/Z and camera roll does
   not roll the radar Z axis
-- circular-clipped grid centered with the sphere and panned from user world X/Z movement
+- circular-clipped one-meter grid centered with the sphere and always panned
+  from user world X/Z movement
 - selected-atom sphere marker without an extra outer outline
 - selected ground-drop projection is opt-in so a current selection does not
   read as a duplicate highlight by default
@@ -58,6 +59,7 @@ The current slice is compiled C# only:
 - session-plugin-only direct grip movement with OVR haptics; grip near the
   radar, move the controller, and release to apply HUD/static/wrist-relative
   offsets
+- two-hand outward-twist accordion scaling for HUD and wrist modes
 - global non-scene-stored preferences under
   `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
 - CUA preset instances use separate global preference files:
@@ -100,11 +102,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.24.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.24.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.25.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.25.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.24.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.24.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.25.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.25.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral

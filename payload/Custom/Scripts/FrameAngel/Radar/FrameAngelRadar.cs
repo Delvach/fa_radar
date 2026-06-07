@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.24";
+    private const string Version = "0.1.25";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -59,6 +59,7 @@ public class FrameAngelRadar : MVRScript
     private const float WristHandOffDistanceMeters = 0.61f;
     private const float WristHandOffMinimumTravelMeters = 0.30f;
     private const float GrabResizeMinimumStartDistanceMeters = 0.05f;
+    private const float AccordionResizeMinimumStartDistanceMeters = 0.08f;
     private const float GrabHapticCooldownSeconds = 0.08f;
     private const float GripGrabPressThreshold = 0.62f;
     private const float GripGrabReleaseThreshold = 0.34f;
@@ -237,6 +238,8 @@ public class FrameAngelRadar : MVRScript
     private bool ovrRightGrabHapticActive;
     private Vector3 smoothedHudPosition;
     private Vector3 moveStartHandlePosition;
+    private Vector3 moveGrabStartRadarWorldCenter;
+    private Vector3 moveGrabCurrentRadarWorldCenter;
     private Vector3 moveStartHudOffset;
     private Vector3 moveStartWristOffset;
     private Vector3 moveStartStaticPosition;
@@ -249,6 +252,8 @@ public class FrameAngelRadar : MVRScript
     private float radarVisibilityTargetAlpha = 1.0f;
     private float resizeStartScale;
     private float resizeStartDistance;
+    private float accordionResizeStartScale;
+    private float accordionResizeStartDistance;
     private float wristRevealGraceUntil;
     private float leftGripValue;
     private float rightGripValue;
@@ -260,6 +265,8 @@ public class FrameAngelRadar : MVRScript
     private float radarMaterialAlphaMultiplier = 1.0f;
     private int moveGrabHand = GrabHandUnknown;
     private int resizeGrabHand = GrabHandUnknown;
+    private bool moveGrabWorldOverrideActive;
+    private bool accordionResizeActive;
     private string lastAppliedCommonPreferencesJson = "";
     private string lastAppliedProPreferencesJson = "";
     private string primaryGrabHandleUid = "";
@@ -492,25 +499,7 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(globalPrefsAutoSaveField, true);
         BuildPlacementUi();
         BuildWristCompassUi();
-        CreateTextField(statusField, true);
-        CreateButton("Load Global Prefs", false).button.onClick.AddListener(delegate
-        {
-            LoadGlobalPreferencesAction();
-        });
-        CreateButton("Reset Global Prefs", true).button.onClick.AddListener(delegate
-        {
-            ResetGlobalPreferencesAction();
-        });
-
-        CreatePopup(anchorModeField, false);
-        CreateTextField(anchorAtomUidField, true);
-        CreateToggle(desktopTopDownField, true);
-        CreateToggle(anchorToViewField, false);
-        CreateToggle(selectedGroundDropEnabledField, false);
-        CreateToggle(heightStemsEnabledField, true);
-        CreateToggle(depthSizeCueField, false);
-        CreateToggle(worldAxisAlignField, true);
-        CreateToggle(groundAxisLockField, false);
+        CreateSlider(radarRangeMetersField, false);
         CreateToggle(availableAtomMarkersEnabledField, true);
 #if FA_RADAR_PRO
         CreateToggle(showLightAtomsField, false);
@@ -518,67 +507,14 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(showPersonAtomsField, false);
         CreateToggle(showOtherAtomsField, true);
 #endif
-        CreateToggle(clickSelectMarkersField, false);
-        CreateToggle(grabHandlesEnabledField, true);
-        CreateToggle(grabHandleDebugVisibleField, false);
+        CreateToggle(gridEnabledField, false);
+        CreateToggle(grabHandlesEnabledField, false);
         CreateToggle(grabHapticsEnabledField, true);
-        CreateToggle(ringsEnabledField, false);
-        CreateToggle(gridEnabledField, true);
-        CreateToggle(gridFollowsUserField, false);
-        CreateToggle(gridClipCircleField, true);
-        CreateToggle(ignoreContainingAtomField, false);
-        CreateToggle(cuaAnchorPresetField, true);
-        CreateButton("Use Selected As Anchor", true).button.onClick.AddListener(delegate
+        CreateButton("Reset Global Prefs", false).button.onClick.AddListener(delegate
         {
-            UseSelectedAsAnchor();
+            ResetGlobalPreferencesAction();
         });
-        CreateButton("Use Containing Atom Anchor", false).button.onClick.AddListener(delegate
-        {
-            UseContainingAtomAnchor();
-        });
-        CreateButton("Capture Static From Current View", true).button.onClick.AddListener(delegate
-        {
-            CaptureStaticFromCurrentView();
-        });
-
-        CreateSlider(radarRangeMetersField, false);
-        CreateSlider(floorAreaScaleField, true);
-        CreateSlider(gridStepMetersField, false);
-        CreateSlider(radarVisualRadiusField, false);
-        CreateSlider(desktopTiltDegreesField, false);
-        CreateSlider(responseSmoothingField, true);
-        CreateSlider(anchorRotationXField, false);
-        CreateSlider(anchorRotationYField, true);
-        CreateSlider(anchorRotationZField, false);
-        CreateSlider(staticWorldXField, false);
-        CreateSlider(staticWorldYField, true);
-        CreateSlider(staticWorldZField, false);
-        CreateSlider(staticWorldPitchField, false);
-        CreateSlider(staticWorldYawField, true);
-        CreateSlider(staticWorldRollField, false);
-
-        CreateToggle(placementModeField, false);
-        CreateButton("Capture HUD Offset From Atom", true).button.onClick.AddListener(delegate
-        {
-            CaptureHudOffsetFromAttachedAtom();
-        });
-
-        CreateSlider(ringRotationSpeedField, false);
-        CreateSlider(targetMarkerScaleField, true);
-        CreateSlider(heightScaleMetersField, false);
-        CreateSlider(heightStemAlphaField, true);
-        CreateSlider(rangeFadeMetersField, false);
-        CreateSlider(depthSizeStrengthField, true);
-        CreateSlider(availableAtomAlphaField, false);
-        CreateSlider(markerClickRadiusPixelsField, true);
-        CreateSlider(grabHitRadiusMetersField, false);
-        CreateSlider(shellAlphaField, false);
-        CreateSlider(ringAlphaField, true);
-        CreateSlider(gridAlphaField, false);
-        CreateSlider(markerAlphaField, true);
-        CreateSlider(emissionStrengthField, false);
-        CreateSlider(pollIntervalField, true);
-        CreateSlider(atomPollSecondsField, true);
+        CreateTextField(statusField, true);
     }
 
     private void BuildPlacementUi()
@@ -586,12 +522,12 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(hudOffsetXField, false);
         CreateSlider(hudOffsetYField, false);
         CreateSlider(hudOffsetZField, false);
-        CreateSlider(hudScaleField, true);
+        CreateSlider(hudScaleField, false);
         CreateButton("Save Global Prefs", false).button.onClick.AddListener(delegate
         {
             SaveGlobalPreferencesAction();
         });
-        CreateButton("Reset HUD Offset", true).button.onClick.AddListener(delegate
+        CreateButton("Reset HUD Offset", false).button.onClick.AddListener(delegate
         {
             ResetHudOffset();
         });
@@ -599,12 +535,11 @@ public class FrameAngelRadar : MVRScript
 
     private void BuildWristCompassUi()
     {
-        CreatePopup(radarModeField, false);
+        CreatePopup(radarModeField, true);
         CreateSlider(wristScaleField, true);
-        CreateSlider(wristOffsetXField, false);
-        CreateSlider(wristOffsetYField, false);
-        CreateSlider(wristOffsetZField, false);
-        CreateSlider(wristTwistDegreesField, true);
+        CreateSlider(wristOffsetXField, true);
+        CreateSlider(wristOffsetYField, true);
+        CreateSlider(wristOffsetZField, true);
     }
 
     private void ConfigureGlobalPreferenceCallbacks()
@@ -1796,9 +1731,9 @@ public class FrameAngelRadar : MVRScript
         centerMarkerMesh = CreateCenterMarkerMesh();
         targetBlipMesh = CreateTargetBlipMesh();
         heightStemMesh = CreateHeightStemMesh();
-        gridMesh = CreateGridMesh(ResolveEffectiveRadarRangeMeters(), gridStepMetersField.val, Vector2.zero, gridClipCircleField.val);
+        gridMesh = CreateGridMesh(ResolveEffectiveRadarRangeMeters(), ResolveGridStepMeters(), Vector2.zero, gridClipCircleField.val);
         lastGridRangeMeters = ResolveEffectiveRadarRangeMeters();
-        lastGridStepMeters = gridStepMetersField.val;
+        lastGridStepMeters = ResolveGridStepMeters();
         lastGridOffsetMeters = Vector2.zero;
         lastGridClipCircle = gridClipCircleField.val;
         haveLastGridOffset = true;
@@ -2210,6 +2145,12 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
+        if (moveGrabWorldOverrideActive)
+        {
+            ApplyMoveGrabWorldAnchor(viewer);
+            return;
+        }
+
         string anchorMode = ResolveAnchorMode();
         if (IsWristCompassModeActive())
         {
@@ -2335,6 +2276,25 @@ public class FrameAngelRadar : MVRScript
         hudRoot.transform.position = wristAnchor.TransformPoint(GetWristOffset());
         hudRoot.transform.rotation = viewer != null ? viewer.rotation : Quaternion.identity;
         hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, ReadFloat(wristScaleField, 0.35f));
+    }
+
+    private void ApplyMoveGrabWorldAnchor(Transform viewer)
+    {
+        if (hudRoot == null)
+        {
+            return;
+        }
+
+        if (hudRoot.transform.parent != null)
+        {
+            hudRoot.transform.SetParent(null, true);
+            currentHudAnchor = null;
+            haveSmoothedHudPosition = false;
+        }
+
+        hudRoot.transform.position = moveGrabCurrentRadarWorldCenter;
+        hudRoot.transform.rotation = viewer != null ? viewer.rotation : Quaternion.identity;
+        hudRoot.transform.localScale = Vector3.one * ResolveActivePlacementScale();
     }
 
     private Transform ResolveRadarAnchorTransform(string anchorMode)
@@ -3146,12 +3106,17 @@ public class FrameAngelRadar : MVRScript
         {
             if (radarVisibilityAlpha <= 0.08f)
             {
+                EndDirectGripAccordionResize(false);
                 SetResizeGuideLineVisible(false);
                 return;
             }
 
+            bool accordionResizeVisible = UpdateDirectGripAccordionResize(viewer);
             TryStartFauxPrimaryGrab(radarCenter);
-            SetResizeGuideLineVisible(false);
+            if (!accordionResizeVisible)
+            {
+                SetResizeGuideLineVisible(false);
+            }
             return;
         }
 
@@ -3168,6 +3133,85 @@ public class FrameAngelRadar : MVRScript
         }
 
         UpdateFauxMoveGrab(viewer);
+        bool moveAccordionResizeVisible = UpdateDirectGripAccordionResize(viewer);
+        if (!moveAccordionResizeVisible)
+        {
+            SetResizeGuideLineVisible(false);
+        }
+    }
+
+    private bool UpdateDirectGripAccordionResize(Transform viewer)
+    {
+        Vector3 leftPosition;
+        Vector3 rightPosition;
+        if (!TryResolveAccordionResizeHands(viewer, out leftPosition, out rightPosition))
+        {
+            EndDirectGripAccordionResize(true);
+            return false;
+        }
+
+        float currentDistance = Mathf.Max(
+            AccordionResizeMinimumStartDistanceMeters,
+            Vector3.Distance(leftPosition, rightPosition));
+        if (!accordionResizeActive)
+        {
+            accordionResizeActive = true;
+            accordionResizeStartScale = ResolveActivePlacementScale();
+            accordionResizeStartDistance = currentDistance;
+            PulseGrabHandleHaptics(GrabHandUnknown, 0.30f, 0.22f, 0.035f);
+            SetStatus("Radar accordion scale active.");
+        }
+
+        float ratio = currentDistance / Mathf.Max(AccordionResizeMinimumStartDistanceMeters, accordionResizeStartDistance);
+        SetActivePlacementScaleNoCallback(accordionResizeStartScale * ratio);
+        MarkGlobalPreferencesDirty();
+        UpdateResizeGuideLine(leftPosition, rightPosition, true);
+        return true;
+    }
+
+    private bool TryResolveAccordionResizeHands(Transform viewer, out Vector3 leftPosition, out Vector3 rightPosition)
+    {
+        leftPosition = Vector3.zero;
+        rightPosition = Vector3.zero;
+
+        Transform leftController = ResolveHandOrControllerTransform(GrabHandLeft);
+        Transform rightController = ResolveHandOrControllerTransform(GrabHandRight);
+        if (leftController == null || rightController == null)
+        {
+            return false;
+        }
+
+        float threshold = Mathf.Clamp(ReadFloat(wristTwistDegreesField, 65.0f), 15.0f, 120.0f);
+        float requiredTwist = accordionResizeActive ? Mathf.Max(0.0f, threshold - 12.0f) : threshold;
+        if (ResolveControllerOutwardTwistDegrees(leftController, GrabHandLeft, viewer) < requiredTwist
+            || ResolveControllerOutwardTwistDegrees(rightController, GrabHandRight, viewer) < requiredTwist)
+        {
+            return false;
+        }
+
+        leftPosition = leftController.position;
+        rightPosition = rightController.position;
+        return true;
+    }
+
+    private void EndDirectGripAccordionResize(bool applied)
+    {
+        if (!accordionResizeActive)
+        {
+            return;
+        }
+
+        if (applied)
+        {
+            MarkGlobalPreferencesDirty();
+            FlushGlobalPreferencesIfDue(true);
+            PulseGrabHandleHaptics(GrabHandUnknown, 0.24f, 0.18f, 0.03f);
+            SetStatus("Radar accordion scale applied.");
+        }
+
+        accordionResizeActive = false;
+        accordionResizeStartDistance = 0.0f;
+        accordionResizeStartScale = 0.0f;
         SetResizeGuideLineVisible(false);
     }
 
@@ -3419,10 +3463,10 @@ public class FrameAngelRadar : MVRScript
 
     private void StartMoveGrab(FreeControllerV3 primaryController, int hand)
     {
-        StartMoveGrabAtPosition(GetControllerWorldPosition(primaryController), hand, false);
+        StartMoveGrabAtPosition(GetControllerWorldPosition(primaryController), hand, false, ResolveRadarWorldCenter(ResolveViewerTransform()));
     }
 
-    private void StartMoveGrabAtPosition(Vector3 handlePosition, int hand, bool gripFallback)
+    private void StartMoveGrabAtPosition(Vector3 handlePosition, int hand, bool gripFallback, Vector3 radarWorldCenter)
     {
         moveGrabActive = true;
         resizeGrabActive = false;
@@ -3432,6 +3476,9 @@ public class FrameAngelRadar : MVRScript
         moveGrabHand = hand;
         resizeGrabHand = GrabHandUnknown;
         moveStartHandlePosition = handlePosition;
+        moveGrabStartRadarWorldCenter = radarWorldCenter;
+        moveGrabCurrentRadarWorldCenter = radarWorldCenter;
+        moveGrabWorldOverrideActive = true;
         moveStartHudOffset = GetHudOffset();
         moveStartWristOffset = GetWristOffset();
         moveStartStaticPosition = GetStaticWorldPosition();
@@ -3471,6 +3518,7 @@ public class FrameAngelRadar : MVRScript
     {
         if (moveGrabActive)
         {
+            ApplyMoveGrabWorldCenterToPreferences(ResolveViewerTransform());
             MarkGlobalPreferencesDirty();
             FlushGlobalPreferencesIfDue(true);
             PulseGrabHandleHaptics(moveGrabHand, 0.22f, 0.20f, 0.035f);
@@ -3481,25 +3529,46 @@ public class FrameAngelRadar : MVRScript
         moveGrabUsesGripFallback = false;
         resizeGrabUsesGripFallback = false;
         resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabWorldOverrideActive = false;
         moveGrabHand = GrabHandUnknown;
         resizeGrabHand = GrabHandUnknown;
         DestroyResizeGrabHandleAtom();
-        SetResizeGuideLineVisible(false);
+        EndDirectGripAccordionResize(false);
         SetStatus("Radar grab move applied.");
     }
 
     private void ApplyMoveGrabDelta(Transform viewer, Vector3 worldDelta)
     {
+        moveGrabCurrentRadarWorldCenter = moveGrabStartRadarWorldCenter + worldDelta;
+        moveGrabWorldOverrideActive = true;
         if (IsWristCompassModeActive())
         {
-            if (TryCompleteWristGrabHandOff(worldDelta))
+            if (TryCompleteWristGrabHandOff(moveGrabCurrentRadarWorldCenter, worldDelta))
             {
                 return;
             }
 
+            haveSmoothedHudPosition = false;
+            return;
+        }
+
+        haveSmoothedHudPosition = false;
+    }
+
+    private void ApplyMoveGrabWorldCenterToPreferences(Transform viewer)
+    {
+        if (!moveGrabWorldOverrideActive)
+        {
+            return;
+        }
+
+        if (IsWristCompassModeActive())
+        {
             Transform wristAnchor = ResolveWristCompassAnchorTransform();
-            Vector3 wristLocalDelta = wristAnchor != null ? wristAnchor.InverseTransformVector(worldDelta) : worldDelta;
-            SetWristOffsetNoCallback(moveStartWristOffset + wristLocalDelta);
+            if (wristAnchor != null)
+            {
+                SetWristOffsetNoCallback(wristAnchor.InverseTransformPoint(moveGrabCurrentRadarWorldCenter));
+            }
             haveSmoothedHudPosition = false;
             return;
         }
@@ -3507,7 +3576,7 @@ public class FrameAngelRadar : MVRScript
         string anchorMode = ResolveAnchorMode();
         if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
         {
-            SetStaticWorldPositionNoCallback(moveStartStaticPosition + worldDelta);
+            SetStaticWorldPositionNoCallback(moveGrabCurrentRadarWorldCenter);
             haveSmoothedHudPosition = false;
             return;
         }
@@ -3522,12 +3591,13 @@ public class FrameAngelRadar : MVRScript
             }
         }
 
-        Vector3 localDelta = reference != null ? reference.InverseTransformVector(worldDelta) : worldDelta;
-        SetHudOffsetNoCallback(moveStartHudOffset + localDelta);
+        SetHudOffsetNoCallback(reference != null
+            ? reference.InverseTransformPoint(moveGrabCurrentRadarWorldCenter)
+            : moveStartHudOffset);
         haveSmoothedHudPosition = false;
     }
 
-    private bool TryCompleteWristGrabHandOff(Vector3 worldDelta)
+    private bool TryCompleteWristGrabHandOff(Vector3 proposedRadarPosition, Vector3 worldDelta)
     {
         int activeHand = ResolveWristCompassHand();
         if (moveGrabHand == GrabHandUnknown || moveGrabHand == activeHand)
@@ -3542,7 +3612,6 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        Vector3 proposedRadarPosition = activeAnchor.TransformPoint(moveStartWristOffset) + worldDelta;
         float activeDistance = Vector3.Distance(proposedRadarPosition, activeAnchor.position);
         float targetDistance = Vector3.Distance(proposedRadarPosition, targetAnchor.position);
         if (worldDelta.magnitude < WristHandOffMinimumTravelMeters
@@ -3581,10 +3650,11 @@ public class FrameAngelRadar : MVRScript
         moveGrabUsesGripFallback = false;
         resizeGrabUsesGripFallback = false;
         resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabWorldOverrideActive = false;
         moveGrabHand = GrabHandUnknown;
         resizeGrabHand = GrabHandUnknown;
         DestroyResizeGrabHandleAtom();
-        SetResizeGuideLineVisible(false);
+        EndDirectGripAccordionResize(false);
         SetStatus(hand == GrabHandRight ? "Wrist compass moved to right hand." : "Wrist compass moved to left hand.");
     }
 
@@ -3848,13 +3918,13 @@ public class FrameAngelRadar : MVRScript
 
         if (leftPressed && Vector3.Distance(leftPosition, radarCenter) <= hitRadius)
         {
-            StartMoveGrabAtPosition(leftPosition, GrabHandLeft, true);
+            StartMoveGrabAtPosition(leftPosition, GrabHandLeft, true, radarCenter);
             return true;
         }
 
         if (rightPressed && Vector3.Distance(rightPosition, radarCenter) <= hitRadius)
         {
-            StartMoveGrabAtPosition(rightPosition, GrabHandRight, true);
+            StartMoveGrabAtPosition(rightPosition, GrabHandRight, true, radarCenter);
             return true;
         }
 
@@ -4004,6 +4074,11 @@ public class FrameAngelRadar : MVRScript
 
     private Vector3 ResolveRadarWorldCenter(Transform viewer)
     {
+        if (moveGrabWorldOverrideActive)
+        {
+            return moveGrabCurrentRadarWorldCenter;
+        }
+
         if (IsWristCompassModeActive())
         {
             Transform wristAnchor = ResolveWristCompassAnchorTransform();
@@ -4198,14 +4273,16 @@ public class FrameAngelRadar : MVRScript
 
     private void DestroySessionGrabHandles()
     {
-        if (moveGrabActive || resizeGrabActive)
+        if (moveGrabActive || resizeGrabActive || accordionResizeActive)
         {
             MarkGlobalPreferencesDirty();
         }
 
         moveGrabActive = false;
         resizeGrabActive = false;
+        accordionResizeActive = false;
         resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabWorldOverrideActive = false;
         moveGrabHand = GrabHandUnknown;
         resizeGrabHand = GrabHandUnknown;
         DestroySessionGrabHandleAtoms();
@@ -4391,8 +4468,8 @@ public class FrameAngelRadar : MVRScript
         }
 
         float range = ResolveEffectiveRadarRangeMeters();
-        float step = Mathf.Max(0.05f, gridStepMetersField.val);
-        Vector2 offset = gridFollowsUserField.val ? ResolveViewerGridOffsetMeters(viewer, step) : Vector2.zero;
+        float step = ResolveGridStepMeters();
+        Vector2 offset = ResolveViewerGridOffsetMeters(viewer, step);
         bool clipCircle = gridClipCircleField.val;
         bool sameOffset = haveLastGridOffset && (offset - lastGridOffsetMeters).sqrMagnitude < 0.0001f;
         if (
@@ -4452,7 +4529,14 @@ public class FrameAngelRadar : MVRScript
 
     private float ResolveFloorAreaScale()
     {
-        return Mathf.Clamp(floorAreaScaleField.val, 0.25f, 6.0f);
+        // Kept as a registered legacy pref, but the visible range control owns the meter contract.
+        return 1.0f;
+    }
+
+    private float ResolveGridStepMeters()
+    {
+        // Kept as a registered legacy pref, but the visible grid is a meter grid.
+        return 1.0f;
     }
 
     private float ResolveEffectiveRadarRangeMeters()
