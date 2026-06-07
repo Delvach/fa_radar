@@ -7,11 +7,11 @@ Updated: 2026-06-07
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.26`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.27`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.26.dll`
-- `fa_radar.pro.0.1.26.dll`
+- `fa_radar.free.0.1.27.dll`
+- `fa_radar.pro.0.1.27.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders,
-buttons, and text fields, but 0.1.26 keeps the normal UI limited to daily
+buttons, and text fields, but 0.1.27 keeps the normal UI limited to daily
 operation: HUD/wrist placement, mode, range, atom visibility, Pro filters, grab,
 haptics, prefs, and status. Prototype calibration controls remain registered
 but hidden. The first release should focus on core radar features: placement,
@@ -50,7 +50,7 @@ Free is the radar.
 - shared HUD/static/atom anchor modes
 - global placement/scale/look preferences under
   `Custom\PluginData\FrameAngel\Radar`
-- normal HUD/session prefs are separate from CUA preset prefs
+- normal HUD/session prefs are separate from Empty/atom-anchor prefs
 - user-controlled visual tuning for the radar itself
 - no visibility filtering
 - all available radar-supported atoms are shown together
@@ -76,15 +76,16 @@ Pro is the operational radar.
 - spotlight visualization as generated cones
 - spotlight rotation, range, and spot-angle representation
 - color customization is a Pro feature
-- creator-facing CUA resources should be thin anchor hosts around the shared
+- creator-facing Empty/atom resources should be thin anchor hosts around the shared
   runtime, not duplicate radar logic
-- Pro ships `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-  as a scene-anchor starter
-- CUA preset instances use `preferences_cua_common.json` and
+- Pro ships `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap` as a
+  scene-anchor starter
+- Empty/atom-anchor instances use `preferences_cua_common.json` and
   `preferences_cua_pro.json` so creator-anchor tuning does not pollute normal
-  HUD/session Radar preferences
-- The first grab-handle implementation is session/scene-plugin only; CUA
-  anchoring gets its own interaction pass later.
+  HUD/session Radar preferences. The legacy filenames are kept for older CUA
+  compatibility.
+- The first grab-handle implementation is session/scene-plugin only; Empty
+  anchoring uses VaM's normal atom movement/parenting instead.
 
 Pro should make scene diagnosis and targeting faster without turning every
 scene object into noise. Filters and semantic visuals are the value line.
@@ -110,7 +111,7 @@ Rules:
   runtime JSON dependency, or absolute development paths are introduced for
   edition gating
 - global preferences use VaM `FileManagerSecure` and flat scalar JSON only;
-  normal HUD/session and CUA preset profiles use separate files
+  normal HUD/session and Empty/atom-anchor profiles use separate files
 - edition gates should be static compile/package gates, not fragile runtime
   string checks
 
@@ -118,11 +119,11 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.26.var`
-- `fa_radar.pro.0.1.26.var`
+- `fa_radar.free.0.1.27.var`
+- `fa_radar.pro.0.1.27.var`
 
-The Pro candidate package includes the CUA preset under
-`Custom/Atom/CustomUnityAsset`; Free does not ship creator-facing CUA resources.
+The Pro candidate package includes the Empty atom preset under
+`Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.
 
 Human-facing release `.var` product naming remains undecided. Current
 candidates:

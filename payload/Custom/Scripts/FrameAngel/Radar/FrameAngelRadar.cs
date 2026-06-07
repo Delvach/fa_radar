@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.26";
+    private const string Version = "0.1.27";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -66,6 +66,8 @@ public class FrameAngelRadar : MVRScript
     private const float DefaultRadarVisualRadiusMeters = 0.08f;
     private const float MaxRadarVisualDiameterMeters = 1.0f;
     private const float MaxRadarPlacementScale = MaxRadarVisualDiameterMeters / (DefaultRadarVisualRadiusMeters * 2.0f);
+    private const float DefaultAtomAnchorOffsetZ = 0.15f;
+    private const float DefaultAtomAnchorScale = 0.75f;
     private const int GrabHandUnknown = -1;
     private const int GrabHandLeft = 0;
     private const int GrabHandRight = 1;
@@ -498,6 +500,12 @@ public class FrameAngelRadar : MVRScript
 
     private void BuildUi()
     {
+        if (ShouldUseCreatorAnchorUi())
+        {
+            BuildCreatorAnchorUi();
+            return;
+        }
+
         CreateToggle(radarEnabledField, false);
         CreateToggle(globalPrefsAutoSaveField, true);
         BuildPlacementUi();
@@ -518,6 +526,47 @@ public class FrameAngelRadar : MVRScript
             ResetGlobalPreferencesAction();
         });
         CreateTextField(statusField, true);
+    }
+
+    private bool ShouldUseCreatorAnchorUi()
+    {
+        return IsAttachedAtomAnchorHostActive()
+            || (cuaAnchorPresetField != null && cuaAnchorPresetField.val);
+    }
+
+    private void BuildCreatorAnchorUi()
+    {
+        CreateToggle(radarEnabledField, false);
+        BuildCreatorAnchorPlacementUi();
+        CreateSlider(radarRangeMetersField, false);
+        CreateToggle(availableAtomMarkersEnabledField, true);
+#if FA_RADAR_PRO
+        CreateToggle(showLightAtomsField, false);
+        CreateToggle(showCustomUnityAssetAtomsField, true);
+        CreateToggle(showPersonAtomsField, false);
+        CreateToggle(showOtherAtomsField, true);
+#endif
+        CreateToggle(gridEnabledField, false);
+        CreateButton("Save Anchor Prefs", false).button.onClick.AddListener(delegate
+        {
+            SaveGlobalPreferencesAction();
+        });
+        CreateButton("Reset Anchor Placement", false).button.onClick.AddListener(delegate
+        {
+            ResetCreatorAnchorPlacement();
+        });
+        CreateTextField(statusField, true);
+    }
+
+    private void BuildCreatorAnchorPlacementUi()
+    {
+        CreateSlider(hudOffsetXField, false);
+        CreateSlider(hudOffsetYField, false);
+        CreateSlider(hudOffsetZField, false);
+        CreateSlider(hudScaleField, false);
+        CreateSlider(anchorRotationXField, true);
+        CreateSlider(anchorRotationYField, true);
+        CreateSlider(anchorRotationZField, true);
     }
 
     private void BuildPlacementUi()
@@ -1022,7 +1071,14 @@ public class FrameAngelRadar : MVRScript
 
     private bool IsCuaPreferenceProfileActive()
     {
-        return cuaAnchorPresetField != null && cuaAnchorPresetField.val;
+        // Legacy name: this profile now covers creator anchor hosts, including Empty atoms.
+        return IsAttachedAtomAnchorHostActive()
+            || (cuaAnchorPresetField != null && cuaAnchorPresetField.val);
+    }
+
+    private bool IsAttachedAtomAnchorHostActive()
+    {
+        return containingAtom != null;
     }
 
     private string ResolveCommonPreferencesPath()
@@ -1256,6 +1312,25 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(staticWorldPitchField, 0.0f);
         SetFloatNoCallback(staticWorldYawField, 0.0f);
         SetFloatNoCallback(staticWorldRollField, 0.0f);
+
+        if (IsCuaPreferenceProfileActive())
+        {
+            SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
+            SetStringNoCallback(anchorAtomUidField, containingAtom != null ? (containingAtom.uid ?? "") : "");
+            SetRadarModeNoCallback(RadarModeHud);
+            ApplyCreatorAnchorPlacementDefaultsNoCallback();
+        }
+    }
+
+    private void ApplyCreatorAnchorPlacementDefaultsNoCallback()
+    {
+        SetFloatNoCallback(hudOffsetXField, 0.0f);
+        SetFloatNoCallback(hudOffsetYField, 0.0f);
+        SetFloatNoCallback(hudOffsetZField, DefaultAtomAnchorOffsetZ);
+        SetFloatNoCallback(hudScaleField, DefaultAtomAnchorScale);
+        SetFloatNoCallback(anchorRotationXField, 0.0f);
+        SetFloatNoCallback(anchorRotationYField, 0.0f);
+        SetFloatNoCallback(anchorRotationZField, 0.0f);
     }
 
     private string BuildCommonGlobalPreferencesJson()
@@ -1858,26 +1933,25 @@ public class FrameAngelRadar : MVRScript
 
     private void ApplyCuaAnchorPresetMode()
     {
-        if (cuaAnchorPresetApplied || cuaAnchorPresetField == null || !cuaAnchorPresetField.val || containingAtom == null)
+        if (cuaAnchorPresetApplied || containingAtom == null || !IsCuaPreferenceProfileActive())
         {
             return;
         }
 
+        SetBoolNoCallback(cuaAnchorPresetField, true);
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
+        SetBoolNoCallback(radarEnabledField, true);
         SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
         SetStringNoCallback(anchorAtomUidField, containingAtom.uid ?? "");
-        SetHudOffset(new Vector3(0.0f, 0.0f, 0.15f));
-        SetFloatNoCallback(hudScaleField, 0.75f);
-        SetFloatNoCallback(anchorRotationXField, 0.0f);
-        SetFloatNoCallback(anchorRotationYField, 0.0f);
-        SetFloatNoCallback(anchorRotationZField, 0.0f);
+        ApplyCreatorAnchorPlacementDefaultsNoCallback();
         LoadGlobalPreferences();
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
         SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
         SetStringNoCallback(anchorAtomUidField, containingAtom.uid ?? "");
+        SetRadarModeNoCallback(RadarModeHud);
         haveSmoothedHudPosition = false;
         cuaAnchorPresetApplied = true;
-        SetStatus("CUA anchor preset active.");
+        SetStatus("Creator anchor preset active.");
     }
 
     private void PollRecorderRadarVisibility()
@@ -5287,6 +5361,15 @@ public class FrameAngelRadar : MVRScript
         SetHudOffset(new Vector3(-0.59f, 0.22f, 0.78f));
         haveSmoothedHudPosition = false;
         SetStatus("HUD offset reset.");
+    }
+
+    private void ResetCreatorAnchorPlacement()
+    {
+        ApplyCreatorAnchorPlacementDefaultsNoCallback();
+        haveSmoothedHudPosition = false;
+        MarkGlobalPreferencesDirty();
+        FlushGlobalPreferencesIfDue(true);
+        SetStatus("Anchor placement reset.");
     }
 
     private void SetActiveIfChanged(GameObject target, bool active)

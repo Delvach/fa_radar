@@ -14,10 +14,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 0.1.26 audit anchors. The live values are read from config/fa_radar.version.json.
-# Free: FA_RADAR_FREE -> fa_radar.free.0.1.26.dll
-# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.26.dll
-# Pro CUA preset: Preset_FrameAngel_Radar_CUA.vap
+# 0.1.27 audit anchors. The live values are read from config/fa_radar.version.json.
+# Free: FA_RADAR_FREE -> fa_radar.free.0.1.27.dll
+# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.27.dll
+# Pro Empty preset: Preset_FrameAngel_Radar_Empty.vap
 
 function Ensure-FaRadarDirectory {
     param([string]$PathValue)
@@ -120,7 +120,8 @@ $source = Join-Path $resolvedRepoRoot "payload\Custom\Scripts\FrameAngel\Radar\F
 if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
     throw "Missing source plugin: $source"
 }
-$cuaPresetSource = Join-Path $resolvedRepoRoot "payload\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
+$anchorPresetRelativePath = "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
+$anchorPresetSource = Join-Path $resolvedRepoRoot ("payload\" + $anchorPresetRelativePath)
 
 if ([string]::IsNullOrWhiteSpace($VamManagedDir)) {
     $VamManagedDir = Join-Path $VamRoot "VaM_Data\Managed"
@@ -249,7 +250,7 @@ foreach ($editionId in $requestedEditions) {
     $packagePath = ""
     $packageSha256 = ""
     $stageRoot = ""
-    $cuaPresetPackagePath = ""
+    $anchorPresetPackagePath = ""
     if (-not $SkipPackage.IsPresent) {
         $packageWorkRoot = Join-Path (Join-Path $buildRoot "package_work") $editionId
         $stageRoot = Join-Path $packageWorkRoot "stage"
@@ -262,15 +263,15 @@ foreach ($editionId in $requestedEditions) {
         $contentList = New-Object System.Collections.ArrayList
         [void]$contentList.Add("Custom/Plugins/$pluginFileName")
         if ([string]::Equals($editionId, "pro", [System.StringComparison]::OrdinalIgnoreCase)) {
-            if (-not (Test-Path -LiteralPath $cuaPresetSource -PathType Leaf)) {
-                throw "Missing Pro CUA preset: $cuaPresetSource"
+            if (-not (Test-Path -LiteralPath $anchorPresetSource -PathType Leaf)) {
+                throw "Missing Pro Empty anchor preset: $anchorPresetSource"
             }
 
-            $cuaPresetStageDirectory = Join-Path $stageRoot "Custom\Atom\CustomUnityAsset"
-            Ensure-FaRadarDirectory -PathValue $cuaPresetStageDirectory
-            $cuaPresetPackagePath = Join-Path $cuaPresetStageDirectory "Preset_FrameAngel_Radar_CUA.vap"
-            Copy-Item -LiteralPath $cuaPresetSource -Destination $cuaPresetPackagePath -Force
-            [void]$contentList.Add("Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap")
+            $anchorPresetStageDirectory = Join-Path $stageRoot "Custom\Atom\Empty"
+            Ensure-FaRadarDirectory -PathValue $anchorPresetStageDirectory
+            $anchorPresetPackagePath = Join-Path $anchorPresetStageDirectory "Preset_FrameAngel_Radar_Empty.vap"
+            Copy-Item -LiteralPath $anchorPresetSource -Destination $anchorPresetPackagePath -Force
+            [void]$contentList.Add("Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap")
         }
 
         $meta = [ordered]@{
@@ -278,7 +279,7 @@ foreach ($editionId in $requestedEditions) {
             creatorName = $packageCreator
             packageName = $packageName
             description = "Frame Angel Radar $displayName $version plugin build."
-            instructions = "Install this package in VaM AddonPackages. The plugin DLL is staged under Custom/Plugins. Pro also includes a CustomUnityAsset preset for scene anchoring."
+            instructions = "Install this package in VaM AddonPackages. The plugin DLL is staged under Custom/Plugins. Pro also includes an Empty atom preset for scene anchoring."
             contentList = @($contentList)
             dependencies = @{}
         }
@@ -315,7 +316,7 @@ foreach ($editionId in $requestedEditions) {
         packageFileName = $packageFileName
         packagePath = $packagePath
         packageSha256 = $packageSha256
-        cuaPresetPackagePath = $cuaPresetPackagePath
+        anchorPresetPackagePath = $anchorPresetPackagePath
         stageRoot = $stageRoot
     })
 }

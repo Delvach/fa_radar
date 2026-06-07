@@ -30,26 +30,15 @@
          "scale" : "1"
       },
       {
-         "id" : "asset",
-         "importLightmaps" : "true",
-         "importLightProbes" : "true",
-         "registerCanvases" : "false",
-         "showCanvases" : "true",
-         "loadDll" : "false",
-         "assetName" : "",
-         "assetUrl" : "",
-         "assetDllUrl" : ""
-      },
-      {
          "id" : "PluginManager",
          "plugins" : {
-            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.26.dll"
+            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.27.dll"
          }
       },
       {
          "id" : "plugin#0_FrameAngelRadar",
          "enabled" : "true",
-         "pluginLabel" : "Frame Angel Radar CUA",
+         "pluginLabel" : "Frame Angel Radar Empty",
          "CUA Anchor Preset" : "true",
          "Global Prefs Auto Save" : "true",
          "Radar Enabled" : "true",

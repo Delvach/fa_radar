@@ -1,0 +1,72 @@
+﻿{
+    "schemaVersion":  "fa_radar_build_receipt_v1",
+    "createdAtUtc":  "2026-06-07T20:44:30.8333056Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "branch":  "codex/0.1.27-empty-anchor-ui",
+    "commit":  "af8b13d1ad4345c7d44e8c6b98ba0ebcd590f1a1",
+    "dirtyState":  [
+                       " M README.md",
+                       " M config/fa_radar.version.json",
+                       " M docs/FA_RADAR_ARCHITECTURE_V1.md",
+                       " M docs/FA_RADAR_PRODUCT_EDITIONS_V1.md",
+                       " M eng/Verify-FaRadarContract.ps1",
+                       " D payload/Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap",
+                       " M payload/Custom/Scripts/FrameAngel/Radar/FrameAngelRadar.cs",
+                       " M scripts/Build-FaRadar.ps1",
+                       " M scripts/Deploy-FaRadar.ps1",
+                       "?? payload/Custom/Atom/Empty/"
+                   ],
+    "version":  "0.1.27",
+    "editionRequest":  "All",
+    "configuration":  "Release",
+    "skipCompile":  false,
+    "skipObfuscation":  false,
+    "skipPackage":  false,
+    "source":  "C:\\projects\\fa_radar\\payload\\Custom\\Scripts\\FrameAngel\\Radar\\FrameAngelRadar.cs",
+    "csharpCompiler":  "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "editionBuilds":  [
+                          {
+                              "edition":  "free",
+                              "displayName":  "Free",
+                              "version":  "0.1.27",
+                              "compileSymbols":  [
+                                                     "FA_RADAR_FREE"
+                                                 ],
+                              "rawDllPath":  "C:\\projects\\fa_radar\\build\\bin\\Release\\free\\FrameAngelRadar.dll",
+                              "rawDllSha256":  "50FC3448015F1D7039914C954DFAA7DCF7A74EEB25059AB537E46727735A2AE9",
+                              "pluginFileName":  "fa_radar.free.0.1.27.dll",
+                              "pluginPath":  "C:\\projects\\fa_radar\\build\\bin\\Release\\free\\fa_radar.free.0.1.27.dll",
+                              "pluginSha256":  "17A7342DBCD5CA43CE4BAB25C6EA26510F765D8673620896884A8CF0146B4A66",
+                              "bytes":  84992,
+                              "obfuscated":  true,
+                              "obfuscationReportPath":  "C:\\projects\\fa_radar\\build\\bin\\Release\\free\\fa_radar.free.0.1.27.dll.obf-report.json",
+                              "packageFileName":  "fa_radar.free.0.1.27.var",
+                              "packagePath":  "C:\\projects\\fa_radar\\build\\packages\\fa_radar.free.0.1.27.var",
+                              "packageSha256":  "636ADD958942206F8F4DF0AF46D703571FEC1DA0F13A22719D79F043F209A156",
+                              "anchorPresetPackagePath":  "",
+                              "stageRoot":  "C:\\projects\\fa_radar\\build\\package_work\\free\\stage"
+                          },
+                          {
+                              "edition":  "pro",
+                              "displayName":  "Pro",
+                              "version":  "0.1.27",
+                              "compileSymbols":  [
+                                                     "FA_RADAR_PRO"
+                                                 ],
+                              "rawDllPath":  "C:\\projects\\fa_radar\\build\\bin\\Release\\pro\\FrameAngelRadar.dll",
+                              "rawDllSha256":  "6F5DEC16FBBBCF0821B07F40DF5F5B740B39428065D425D77589FD87C580928C",
+                              "pluginFileName":  "fa_radar.pro.0.1.27.dll",
+                              "pluginPath":  "C:\\projects\\fa_radar\\build\\bin\\Release\\pro\\fa_radar.pro.0.1.27.dll",
+                              "pluginSha256":  "ACE9BEA8561E597DF9417F2F050E70D6E8FCDDD3D1E69061E73CAEB83762CB4F",
+                              "bytes":  85504,
+                              "obfuscated":  true,
+                              "obfuscationReportPath":  "C:\\projects\\fa_radar\\build\\bin\\Release\\pro\\fa_radar.pro.0.1.27.dll.obf-report.json",
+                              "packageFileName":  "fa_radar.pro.0.1.27.var",
+                              "packagePath":  "C:\\projects\\fa_radar\\build\\packages\\fa_radar.pro.0.1.27.var",
+                              "packageSha256":  "7D82AD1E21143BB6BC8589048340EEA27C7EE49C02A5C9020763AEC92C7F9C87",
+                              "anchorPresetPackagePath":  "C:\\projects\\fa_radar\\build\\package_work\\pro\\stage\\Custom\\Atom\\Empty\\Preset_FrameAngel_Radar_Empty.vap",
+                              "stageRoot":  "C:\\projects\\fa_radar\\build\\package_work\\pro\\stage"
+                          }
+                      ]
+}

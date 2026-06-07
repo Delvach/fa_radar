@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.26`.
+Current branch version: `0.1.27`.
 
-Current product contract version: `0.1.26`.
+Current product contract version: `0.1.27`.
 
 The current slice is compiled C# only:
 
@@ -29,7 +29,7 @@ The current slice is compiled C# only:
 - camera-local anchoring to reduce desktop navigation jitter
 - stable look-camera caching to prevent HUD anchor jumps during atom add/remove
   churn
-- shared anchor modes for HUD/view, static world placement, containing-atom/CUA
+- shared anchor modes for HUD/view, static world placement, containing-atom/Empty
   placement, and explicit atom UID placement without duplicating radar logic
 - promoted HUD X/Y/Z and scale controls near the top of the native plugin UI,
   with immediate global preference saves while autosave is enabled
@@ -40,8 +40,8 @@ The current slice is compiled C# only:
   modes start hidden until the outward wrist-twist reveal is active
 - wrist modes use their own wrist-relative offset/scale prefs and can hand off
   to the opposing controller with a grip drag across the body
-- Pro CUA preset at
-  `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- Pro Empty atom preset at
+  `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - FAAR visibility handshake reads
   `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
   Radar visuals when `radarHudVisible` is false
@@ -64,7 +64,7 @@ The current slice is compiled C# only:
 - two-hand outward-twist accordion scaling for HUD and wrist modes
 - global non-scene-stored preferences under
   `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
-- CUA preset instances use separate global preference files:
+- Empty/atom-anchor preset instances use separate global preference files:
   `preferences_cua_common.json` and `preferences_cua_pro.json`
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free is the
@@ -104,12 +104,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.26.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.26.dll`
-- `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.26.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.26.dll`
-- `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.27.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.27.dll`
+- `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.27.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.27.dll`
+- `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral
 dev candidate filenames under `build/packages`.

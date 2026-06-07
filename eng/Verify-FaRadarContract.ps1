@@ -17,7 +17,7 @@ $deployPath = Join-Path $RepoRoot "scripts\Deploy-FaRadar.ps1"
 $docPath = Join-Path $RepoRoot "docs\FA_RADAR_ARCHITECTURE_V1.md"
 $versionPath = Join-Path $RepoRoot "config\fa_radar.version.json"
 $obfuscationConfigPath = Join-Path $RepoRoot "config\obfuscation.defaults.json"
-$cuaPresetPath = Join-Path $RepoRoot "payload\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
+$anchorPresetPath = Join-Path $RepoRoot "payload\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
 
 $failures = New-Object System.Collections.Generic.List[string]
 
@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.26"',
+        'private const string Version = "0.1.27"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -68,6 +68,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "DefaultRadarVisualRadiusMeters",
         "MaxRadarVisualDiameterMeters = 1.0f",
         "MaxRadarPlacementScale",
+        "DefaultAtomAnchorOffsetZ",
+        "DefaultAtomAnchorScale",
         "ResolveMaxPlacementScale",
         "ResolveHudScale",
         "ResolveWristScale",
@@ -114,6 +116,12 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Save Global Prefs",
         "Load Global Prefs",
         "Reset Global Prefs",
+        "ShouldUseCreatorAnchorUi",
+        "BuildCreatorAnchorUi",
+        "BuildCreatorAnchorPlacementUi",
+        "ResetCreatorAnchorPlacement",
+        "IsAttachedAtomAnchorHostActive",
+        "Creator anchor preset active.",
         "BuildPlacementUi();",
         "private void BuildPlacementUi()",
         "BuildWristCompassUi();",
@@ -385,7 +393,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CreateSlider(radarVisualRadiusField",
         "CreateSlider(desktopTiltDegreesField",
         "CreateSlider(responseSmoothingField",
-        "CreateSlider(anchorRotationXField",
         "CreateSlider(staticWorldXField",
         "CreateSlider(wristTwistDegreesField",
         "CreateSlider(ringRotationSpeedField",
@@ -415,6 +422,10 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         if ($plugin.Contains($snippet)) {
             Add-Failure "Normal plugin UI must keep compatibility/prototype control hidden: $snippet"
         }
+    }
+
+    if ($plugin.Contains("CreateToggle(grabHapticsEnabledField, true)") -and $plugin.IndexOf("BuildCreatorAnchorUi") -gt $plugin.IndexOf("CreateToggle(grabHapticsEnabledField, true)")) {
+        Add-Failure "Creator-anchor UI must be separated before normal grab/haptics controls."
     }
 
     $forbiddenActiveGrabSnippets = @(
@@ -465,9 +476,10 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.26.dll",
-        "fa_radar.pro.0.1.26.dll",
-        "Preset_FrameAngel_Radar_CUA.vap",
+        "fa_radar.free.0.1.27.dll",
+        "fa_radar.pro.0.1.27.dll",
+        "Preset_FrameAngel_Radar_Empty.vap",
+        "Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
         "meta.json",
@@ -511,9 +523,10 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.26.dll",
-        "fa_radar.pro.0.1.26.dll",
-        "Preset_FrameAngel_Radar_CUA.vap",
+        "fa_radar.free.0.1.27.dll",
+        "fa_radar.pro.0.1.27.dll",
+        "Preset_FrameAngel_Radar_Empty.vap",
+        "Custom\Atom\Empty",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -542,16 +555,18 @@ if (-not (Test-Path -LiteralPath $docPath)) {
     Add-Failure "Missing architecture doc: $docPath"
 }
 
-if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
-    Add-Failure "Missing CUA preset: $cuaPresetPath"
+if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
+    Add-Failure "Missing Empty anchor preset: $anchorPresetPath"
 } else {
-    $cuaPreset = Get-Content -Raw -LiteralPath $cuaPresetPath
-    $requiredCuaPresetSnippets = @(
+    $anchorPreset = Get-Content -Raw -LiteralPath $anchorPresetPath
+    $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.26.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.27.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
+        '"Radar Enabled" : "true"',
+        '"CUA Anchor Preset" : "true"',
         '"HUD Offset X"',
         '"HUD Offset Y"',
         '"HUD Offset Z"',
@@ -559,12 +574,12 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
         '"Anchor Rot X"',
         '"Anchor Rot Y"',
         '"Anchor Rot Z"',
-        '"pluginLabel" : "Frame Angel Radar CUA"'
+        '"pluginLabel" : "Frame Angel Radar Empty"'
     )
 
-    foreach ($snippet in $requiredCuaPresetSnippets) {
-        if (-not $cuaPreset.Contains($snippet)) {
-            Add-Failure "CUA preset missing required snippet: $snippet"
+    foreach ($snippet in $requiredAnchorPresetSnippets) {
+        if (-not $anchorPreset.Contains($snippet)) {
+            Add-Failure "Empty anchor preset missing required snippet: $snippet"
         }
     }
 }
@@ -595,11 +610,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.26") {
-        Add-Failure "Version config must declare version 0.1.26."
+    if ($version.version -ne "0.1.27") {
+        Add-Failure "Version config must declare version 0.1.27."
     }
-    if ($version.branch -ne "codex/0.1.26-one-meter-visual-scale") {
-        Add-Failure "Version config branch must match codex/0.1.26-one-meter-visual-scale."
+    if ($version.branch -ne "codex/0.1.27-empty-anchor-ui") {
+        Add-Failure "Version config branch must match codex/0.1.27-empty-anchor-ui."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -700,10 +715,10 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.26.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.26.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.27.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.27.dll")
         )
-        $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
+        $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
 
         foreach ($deployedDll in $expectedDlls) {
@@ -721,8 +736,8 @@ if ($ValidateLiveDeploy.IsPresent) {
             Add-Failure "Legacy loose radar .cs remains in VaM script load path: $legacyLooseScript"
         }
 
-        if (-not (Test-Path -LiteralPath $expectedCuaPreset -PathType Leaf)) {
-            Add-Failure "Live CUA preset was not deployed: $expectedCuaPreset"
+        if (-not (Test-Path -LiteralPath $expectedAnchorPreset -PathType Leaf)) {
+            Add-Failure "Live Empty anchor preset was not deployed: $expectedAnchorPreset"
         }
     }
 }
@@ -730,7 +745,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.26."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.27."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
