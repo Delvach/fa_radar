@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.25";
+    private const string Version = "0.1.26";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -63,6 +63,9 @@ public class FrameAngelRadar : MVRScript
     private const float GrabHapticCooldownSeconds = 0.08f;
     private const float GripGrabPressThreshold = 0.62f;
     private const float GripGrabReleaseThreshold = 0.34f;
+    private const float DefaultRadarVisualRadiusMeters = 0.08f;
+    private const float MaxRadarVisualDiameterMeters = 1.0f;
+    private const float MaxRadarPlacementScale = MaxRadarVisualDiameterMeters / (DefaultRadarVisualRadiusMeters * 2.0f);
     private const int GrabHandUnknown = -1;
     private const int GrabHandLeft = 0;
     private const int GrabHandRight = 1;
@@ -365,15 +368,15 @@ public class FrameAngelRadar : MVRScript
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
         hudOffsetZField = new JSONStorableFloat("HUD Offset Z", 0.78f, 0.15f, 1.5f, true, true);
-        hudScaleField = new JSONStorableFloat("HUD Scale", 0.49f, 0.25f, 3.0f, true, true);
+        hudScaleField = new JSONStorableFloat("HUD Scale", 0.49f, 0.25f, MaxRadarPlacementScale, true, true);
         wristOffsetXField = new JSONStorableFloat("Wrist Offset X", 0.0f, -0.5f, 0.5f, true, true);
         wristOffsetYField = new JSONStorableFloat("Wrist Offset Y", 0.08f, -0.5f, 0.5f, true, true);
         wristOffsetZField = new JSONStorableFloat("Wrist Offset Z", 0.12f, -0.5f, 0.5f, true, true);
-        wristScaleField = new JSONStorableFloat("Wrist Scale", 0.35f, 0.05f, 1.5f, true, true);
+        wristScaleField = new JSONStorableFloat("Wrist Scale", 0.35f, 0.05f, MaxRadarPlacementScale, true, true);
         desktopTiltDegreesField = new JSONStorableFloat("Desktop Tilt Degrees", 90.0f, 0.0f, 90.0f, true, true);
         radarRangeMetersField = new JSONStorableFloat("Radar Range Meters", 5.0f, 0.5f, 30.0f, true, true);
         floorAreaScaleField = new JSONStorableFloat("Floor Area Scale", 1.0f, 0.25f, 6.0f, true, true);
-        radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", 0.08f, 0.025f, 0.25f, true, true);
+        radarVisualRadiusField = new JSONStorableFloat("Radar Visual Radius", DefaultRadarVisualRadiusMeters, 0.025f, 0.25f, true, true);
         gridStepMetersField = new JSONStorableFloat("Grid Step Meters", 1.0f, 0.25f, 5.0f, true, true);
         shellAlphaField = new JSONStorableFloat("Sphere Alpha", 0.09f, 0.0f, 0.45f, true, true);
         ringAlphaField = new JSONStorableFloat("Ring Alpha", 0.34f, 0.02f, 0.9f, true, true);
@@ -1224,7 +1227,7 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(desktopTiltDegreesField, 90.0f);
         SetFloatNoCallback(radarRangeMetersField, 5.0f);
         SetFloatNoCallback(floorAreaScaleField, 1.0f);
-        SetFloatNoCallback(radarVisualRadiusField, 0.08f);
+        SetFloatNoCallback(radarVisualRadiusField, DefaultRadarVisualRadiusMeters);
         SetFloatNoCallback(gridStepMetersField, 1.0f);
         SetFloatNoCallback(shellAlphaField, 0.09f);
         SetFloatNoCallback(ringAlphaField, 0.34f);
@@ -1297,7 +1300,7 @@ public class FrameAngelRadar : MVRScript
         AppendJsonFloatProperty(sb, ref wroteProperty, "desktopTiltDegrees", ReadFloat(desktopTiltDegreesField, 90.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "radarRangeMeters", ReadFloat(radarRangeMetersField, 5.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "floorAreaScale", ReadFloat(floorAreaScaleField, 1.0f));
-        AppendJsonFloatProperty(sb, ref wroteProperty, "radarVisualRadius", ReadFloat(radarVisualRadiusField, 0.08f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "radarVisualRadius", ReadFloat(radarVisualRadiusField, DefaultRadarVisualRadiusMeters));
         AppendJsonFloatProperty(sb, ref wroteProperty, "gridStepMeters", ReadFloat(gridStepMetersField, 1.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "shellAlpha", ReadFloat(shellAlphaField, 0.09f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "ringAlpha", ReadFloat(ringAlphaField, 0.34f));
@@ -2199,7 +2202,7 @@ public class FrameAngelRadar : MVRScript
 
             hudRoot.transform.localPosition = GetHudOffset();
             hudRoot.transform.localRotation = Quaternion.identity;
-            hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+            hudRoot.transform.localScale = Vector3.one * ResolveHudScale();
             return;
         }
 
@@ -2218,7 +2221,7 @@ public class FrameAngelRadar : MVRScript
 
         hudRoot.transform.position = smoothedHudPosition;
         hudRoot.transform.rotation = viewer.rotation;
-        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+        hudRoot.transform.localScale = Vector3.one * ResolveHudScale();
     }
 
     private void ApplyWorldStaticAnchor()
@@ -2237,7 +2240,7 @@ public class FrameAngelRadar : MVRScript
 
         hudRoot.transform.position = GetStaticWorldPosition();
         hudRoot.transform.rotation = GetStaticWorldRotation();
-        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+        hudRoot.transform.localScale = Vector3.one * ResolveHudScale();
     }
 
     private void ApplyTransformAnchor(Transform anchor)
@@ -2256,7 +2259,7 @@ public class FrameAngelRadar : MVRScript
 
         hudRoot.transform.localPosition = GetHudOffset();
         hudRoot.transform.localRotation = GetAnchorLocalRotation();
-        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
+        hudRoot.transform.localScale = Vector3.one * ResolveHudScale();
     }
 
     private void ApplyWristAnchor(Transform wristAnchor, Transform viewer)
@@ -2275,7 +2278,7 @@ public class FrameAngelRadar : MVRScript
 
         hudRoot.transform.position = wristAnchor.TransformPoint(GetWristOffset());
         hudRoot.transform.rotation = viewer != null ? viewer.rotation : Quaternion.identity;
-        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, ReadFloat(wristScaleField, 0.35f));
+        hudRoot.transform.localScale = Vector3.one * ResolveWristScale();
     }
 
     private void ApplyMoveGrabWorldAnchor(Transform viewer)
@@ -4527,6 +4530,12 @@ public class FrameAngelRadar : MVRScript
         return Mathf.Max(0.01f, radarVisualRadiusField.val);
     }
 
+    private float ResolveMaxPlacementScale()
+    {
+        float visualDiameter = Mathf.Max(0.001f, ResolveVisualRadius() * 2.0f);
+        return Mathf.Max(0.01f, MaxRadarVisualDiameterMeters / visualDiameter);
+    }
+
     private float ResolveFloorAreaScale()
     {
         // Kept as a registered legacy pref, but the visible range control owns the meter contract.
@@ -5064,7 +5073,7 @@ public class FrameAngelRadar : MVRScript
 
     private void SetHudScaleNoCallback(float scale)
     {
-        SetFloatNoCallback(hudScaleField, ClampStorableFloat(hudScaleField, scale, 0.25f, 3.0f));
+        SetFloatNoCallback(hudScaleField, Mathf.Clamp(scale, 0.25f, ResolveMaxPlacementScale()));
     }
 
     private Vector3 GetWristOffset()
@@ -5085,19 +5094,29 @@ public class FrameAngelRadar : MVRScript
     private float ResolveActivePlacementScale()
     {
         return IsWristCompassModeActive()
-            ? Mathf.Max(0.01f, ReadFloat(wristScaleField, 0.35f))
-            : Mathf.Max(0.01f, ReadFloat(hudScaleField, 0.49f));
+            ? ResolveWristScale()
+            : ResolveHudScale();
     }
 
     private void SetActivePlacementScaleNoCallback(float scale)
     {
         if (IsWristCompassModeActive())
         {
-            SetFloatNoCallback(wristScaleField, ClampStorableFloat(wristScaleField, scale, 0.05f, 1.5f));
+            SetFloatNoCallback(wristScaleField, Mathf.Clamp(scale, 0.05f, ResolveMaxPlacementScale()));
             return;
         }
 
         SetHudScaleNoCallback(scale);
+    }
+
+    private float ResolveHudScale()
+    {
+        return Mathf.Clamp(ReadFloat(hudScaleField, 0.49f), 0.25f, ResolveMaxPlacementScale());
+    }
+
+    private float ResolveWristScale()
+    {
+        return Mathf.Clamp(ReadFloat(wristScaleField, 0.35f), 0.05f, ResolveMaxPlacementScale());
     }
 
     private void SetStaticWorldPositionNoCallback(Vector3 position)

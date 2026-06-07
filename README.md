@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD-relative radar for the currently selected atom.
 
-Current branch version: `0.1.25`.
+Current branch version: `0.1.26`.
 
-Current product contract version: `0.1.25`.
+Current product contract version: `0.1.26`.
 
 The current slice is compiled C# only:
 
@@ -22,6 +22,8 @@ The current slice is compiled C# only:
 - faded generated meter grid
 - visible `Radar Range Meters` control that expands or contracts represented
   meters without changing the compass visual size
+- HUD and wrist scale controls change overall rendered radar size only, with a
+  1m displayed diameter cap at the default visual radius
 - user center marker
 - unified desktop/VR sphere-grid treatment
 - camera-local anchoring to reduce desktop navigation jitter
@@ -102,11 +104,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.25.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.25.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.26.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.26.dll`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.25.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.25.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.26.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.26.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral
