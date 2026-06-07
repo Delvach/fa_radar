@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.23";
+    private const string Version = "0.1.24";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -44,11 +44,20 @@ public class FrameAngelRadar : MVRScript
     private const string AnchorModeWorldStatic = "World Static";
     private const string AnchorModeContainingAtom = "Containing Atom";
     private const string AnchorModeAtomUid = "Anchor Atom UID";
+    private const string RadarModeHud = "HUD";
+    private const string RadarModeWristLeft = "wrist-left";
+    private const string RadarModeWristRight = "wrist-right";
+    private const string RadarModeWristLeftAlwaysOn = "wrist-left-always-on";
+    private const string RadarModeWristRightAlwaysOn = "wrist-right-always-on";
     private const string GrabHandlePrimarySuffix = "primary";
     private const string GrabHandleResizeSuffix = "resize";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
     private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
     private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
+    private const float RadarVisibilityFadeSeconds = 0.18f;
+    private const float WristRevealGraceSeconds = 0.55f;
+    private const float WristHandOffDistanceMeters = 0.61f;
+    private const float WristHandOffMinimumTravelMeters = 0.30f;
     private const float GrabResizeMinimumStartDistanceMeters = 0.05f;
     private const float GrabHapticCooldownSeconds = 0.08f;
     private const float GripGrabPressThreshold = 0.62f;
@@ -104,6 +113,10 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat hudOffsetYField;
     private JSONStorableFloat hudOffsetZField;
     private JSONStorableFloat hudScaleField;
+    private JSONStorableFloat wristOffsetXField;
+    private JSONStorableFloat wristOffsetYField;
+    private JSONStorableFloat wristOffsetZField;
+    private JSONStorableFloat wristScaleField;
     private JSONStorableFloat desktopTiltDegreesField;
     private JSONStorableFloat radarRangeMetersField;
     private JSONStorableFloat floorAreaScaleField;
@@ -125,6 +138,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat availableAtomAlphaField;
     private JSONStorableFloat markerClickRadiusPixelsField;
     private JSONStorableFloat grabHitRadiusMetersField;
+    private JSONStorableFloat wristTwistDegreesField;
     private JSONStorableFloat pollIntervalField;
     private JSONStorableFloat responseSmoothingField;
     private JSONStorableFloat anchorRotationXField;
@@ -140,6 +154,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableString statusField;
     private JSONStorableString anchorAtomUidField;
     private JSONStorableStringChooser anchorModeField;
+    private JSONStorableStringChooser radarModeField;
 
     private GameObject hudRoot;
     private GameObject radarRoot;
@@ -208,6 +223,8 @@ public class FrameAngelRadar : MVRScript
     private bool recorderRadarVisible = true;
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
+    private bool wristCompassRevealed;
+    private bool radarVisibilityAlphaInitialized;
     private bool primaryGrabHandleCreatePending;
     private bool primaryGrabHandleFollowArmed;
     private bool resizeGrabHandleCreatePending;
@@ -221,14 +238,18 @@ public class FrameAngelRadar : MVRScript
     private Vector3 smoothedHudPosition;
     private Vector3 moveStartHandlePosition;
     private Vector3 moveStartHudOffset;
+    private Vector3 moveStartWristOffset;
     private Vector3 moveStartStaticPosition;
     private Vector3 resizeStartPrimaryPosition;
     private Vector3 resizeStartHandlePosition;
     private float nextGlobalPreferencesFlushTime;
     private float nextGlobalPreferencesPollTime;
     private float nextRecorderVisibilityPollTime;
+    private float radarVisibilityAlpha = 1.0f;
+    private float radarVisibilityTargetAlpha = 1.0f;
     private float resizeStartScale;
     private float resizeStartDistance;
+    private float wristRevealGraceUntil;
     private float leftGripValue;
     private float rightGripValue;
     private float previousLeftGripValue;
@@ -313,11 +334,35 @@ public class FrameAngelRadar : MVRScript
             AnchorModeHud,
             "Anchor Mode");
         anchorModeField.displayChoices = new List<string> { "HUD / View", "World Static", "Containing Atom", "Anchor Atom UID" };
+        radarModeField = new JSONStorableStringChooser(
+            "Radar Mode",
+            new List<string>
+            {
+                RadarModeHud,
+                RadarModeWristLeft,
+                RadarModeWristRight,
+                RadarModeWristLeftAlwaysOn,
+                RadarModeWristRightAlwaysOn
+            },
+            RadarModeHud,
+            "Radar Mode");
+        radarModeField.displayChoices = new List<string>
+        {
+            RadarModeHud,
+            RadarModeWristLeft,
+            RadarModeWristRight,
+            RadarModeWristLeftAlwaysOn,
+            RadarModeWristRightAlwaysOn
+        };
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
         hudOffsetYField = new JSONStorableFloat("HUD Offset Y", 0.22f, -1.0f, 1.0f, true, true);
         hudOffsetZField = new JSONStorableFloat("HUD Offset Z", 0.78f, 0.15f, 1.5f, true, true);
         hudScaleField = new JSONStorableFloat("HUD Scale", 0.49f, 0.25f, 3.0f, true, true);
+        wristOffsetXField = new JSONStorableFloat("Wrist Offset X", 0.0f, -0.5f, 0.5f, true, true);
+        wristOffsetYField = new JSONStorableFloat("Wrist Offset Y", 0.08f, -0.5f, 0.5f, true, true);
+        wristOffsetZField = new JSONStorableFloat("Wrist Offset Z", 0.12f, -0.5f, 0.5f, true, true);
+        wristScaleField = new JSONStorableFloat("Wrist Scale", 0.35f, 0.05f, 1.5f, true, true);
         desktopTiltDegreesField = new JSONStorableFloat("Desktop Tilt Degrees", 90.0f, 0.0f, 90.0f, true, true);
         radarRangeMetersField = new JSONStorableFloat("Radar Range Meters", 5.0f, 0.5f, 30.0f, true, true);
         floorAreaScaleField = new JSONStorableFloat("Floor Area Scale", 1.0f, 0.25f, 6.0f, true, true);
@@ -339,6 +384,7 @@ public class FrameAngelRadar : MVRScript
         availableAtomAlphaField = new JSONStorableFloat("Available Atom Alpha", 0.46f, 0.0f, 1.0f, true, true);
         markerClickRadiusPixelsField = new JSONStorableFloat("Marker Click Radius Pixels", 20.0f, 4.0f, 80.0f, true, true);
         grabHitRadiusMetersField = new JSONStorableFloat("Grab Hit Radius Meters", 0.16f, 0.04f, 0.45f, true, true);
+        wristTwistDegreesField = new JSONStorableFloat("Wrist Twist Degrees", 65.0f, 15.0f, 120.0f, true, true);
         pollIntervalField = new JSONStorableFloat("Selection Poll Seconds", 0.15f, 0.03f, 1.0f, true, true);
         responseSmoothingField = new JSONStorableFloat("Response Smoothing", 0.0f, 0.0f, 1.0f, true, true);
         anchorRotationXField = new JSONStorableFloat("Anchor Rot X", 0.0f, -180.0f, 180.0f, true, true);
@@ -381,12 +427,15 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(grabHapticsEnabledField);
         RegisterBool(globalPrefsAutoSaveField);
         RegisterBool(cuaAnchorPresetField);
-        RegisterStringChooser(anchorModeField);
 
         RegisterFloat(hudOffsetXField);
         RegisterFloat(hudOffsetYField);
         RegisterFloat(hudOffsetZField);
         RegisterFloat(hudScaleField);
+        RegisterFloat(wristOffsetXField);
+        RegisterFloat(wristOffsetYField);
+        RegisterFloat(wristOffsetZField);
+        RegisterFloat(wristScaleField);
         RegisterFloat(desktopTiltDegreesField);
         RegisterFloat(radarRangeMetersField);
         RegisterFloat(floorAreaScaleField);
@@ -408,6 +457,7 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(availableAtomAlphaField);
         RegisterFloat(markerClickRadiusPixelsField);
         RegisterFloat(grabHitRadiusMetersField);
+        RegisterFloat(wristTwistDegreesField);
         RegisterFloat(pollIntervalField);
         RegisterFloat(responseSmoothingField);
         RegisterFloat(anchorRotationXField);
@@ -422,6 +472,8 @@ public class FrameAngelRadar : MVRScript
 
         RegisterString(statusField);
         RegisterString(anchorAtomUidField);
+        RegisterStringChooser(anchorModeField);
+        RegisterStringChooser(radarModeField);
 
         RegisterAction(new JSONStorableAction("Capture HUD Offset From Atom", CaptureHudOffsetFromAttachedAtom));
         RegisterAction(new JSONStorableAction("Reset HUD Offset", ResetHudOffset));
@@ -439,6 +491,7 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(radarEnabledField, false);
         CreateToggle(globalPrefsAutoSaveField, true);
         BuildPlacementUi();
+        BuildWristCompassUi();
         CreateTextField(statusField, true);
         CreateButton("Load Global Prefs", false).button.onClick.AddListener(delegate
         {
@@ -531,7 +584,7 @@ public class FrameAngelRadar : MVRScript
     private void BuildPlacementUi()
     {
         CreateSlider(hudOffsetXField, false);
-        CreateSlider(hudOffsetYField, true);
+        CreateSlider(hudOffsetYField, false);
         CreateSlider(hudOffsetZField, false);
         CreateSlider(hudScaleField, true);
         CreateButton("Save Global Prefs", false).button.onClick.AddListener(delegate
@@ -542,6 +595,16 @@ public class FrameAngelRadar : MVRScript
         {
             ResetHudOffset();
         });
+    }
+
+    private void BuildWristCompassUi()
+    {
+        CreatePopup(radarModeField, false);
+        CreateSlider(wristScaleField, true);
+        CreateSlider(wristOffsetXField, false);
+        CreateSlider(wristOffsetYField, false);
+        CreateSlider(wristOffsetZField, false);
+        CreateSlider(wristTwistDegreesField, true);
     }
 
     private void ConfigureGlobalPreferenceCallbacks()
@@ -574,6 +637,7 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(availableAtomMarkersEnabledField);
         ConfigureGlobalPreferenceCallback(clickSelectMarkersField);
         ConfigureGlobalPreferenceCallback(grabHandlesEnabledField);
+        ConfigureGlobalPreferenceCallback(radarModeField);
         ConfigureGlobalPreferenceCallback(grabHandleDebugVisibleField);
         ConfigureGlobalPreferenceCallback(grabHapticsEnabledField);
 
@@ -581,6 +645,10 @@ public class FrameAngelRadar : MVRScript
         ConfigureImmediatePlacementPreferenceCallback(hudOffsetYField);
         ConfigureImmediatePlacementPreferenceCallback(hudOffsetZField);
         ConfigureImmediatePlacementPreferenceCallback(hudScaleField);
+        ConfigureImmediatePlacementPreferenceCallback(wristOffsetXField);
+        ConfigureImmediatePlacementPreferenceCallback(wristOffsetYField);
+        ConfigureImmediatePlacementPreferenceCallback(wristOffsetZField);
+        ConfigureImmediatePlacementPreferenceCallback(wristScaleField);
         ConfigureGlobalPreferenceCallback(desktopTiltDegreesField);
         ConfigureGlobalPreferenceCallback(radarRangeMetersField);
         ConfigureGlobalPreferenceCallback(floorAreaScaleField);
@@ -601,6 +669,7 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(availableAtomAlphaField);
         ConfigureGlobalPreferenceCallback(markerClickRadiusPixelsField);
         ConfigureGlobalPreferenceCallback(grabHitRadiusMetersField);
+        ConfigureGlobalPreferenceCallback(wristTwistDegreesField);
         ConfigureGlobalPreferenceCallback(pollIntervalField);
         ConfigureGlobalPreferenceCallback(responseSmoothingField);
         ConfigureGlobalPreferenceCallback(anchorRotationXField);
@@ -1091,11 +1160,16 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "grabHaptics", grabHapticsEnabledField);
             ApplyStringPreference(preferencesJson, "anchorMode", anchorModeField);
             ApplyStringPreference(preferencesJson, "anchorAtomUid", anchorAtomUidField);
+            ApplyRadarModePreference(preferencesJson);
 
             ApplyFloatPreference(preferencesJson, "hudOffsetX", hudOffsetXField);
             ApplyFloatPreference(preferencesJson, "hudOffsetY", hudOffsetYField);
             ApplyFloatPreference(preferencesJson, "hudOffsetZ", hudOffsetZField);
             ApplyFloatPreference(preferencesJson, "hudScale", hudScaleField);
+            ApplyFloatPreference(preferencesJson, "wristOffsetX", wristOffsetXField);
+            ApplyFloatPreference(preferencesJson, "wristOffsetY", wristOffsetYField);
+            ApplyFloatPreference(preferencesJson, "wristOffsetZ", wristOffsetZField);
+            ApplyFloatPreference(preferencesJson, "wristScale", wristScaleField);
             ApplyFloatPreference(preferencesJson, "desktopTiltDegrees", desktopTiltDegreesField);
             ApplyFloatPreference(preferencesJson, "radarRangeMeters", radarRangeMetersField);
             ApplyFloatPreference(preferencesJson, "floorAreaScale", floorAreaScaleField);
@@ -1116,6 +1190,7 @@ public class FrameAngelRadar : MVRScript
             ApplyFloatPreference(preferencesJson, "availableAtomAlpha", availableAtomAlphaField);
             ApplyFloatPreference(preferencesJson, "markerClickRadiusPixels", markerClickRadiusPixelsField);
             ApplyFloatPreference(preferencesJson, "grabHitRadiusMeters", grabHitRadiusMetersField);
+            ApplyFloatPreference(preferencesJson, "wristTwistDegrees", wristTwistDegreesField);
             ApplyFloatPreference(preferencesJson, "selectionPollSeconds", pollIntervalField);
             ApplyFloatPreference(preferencesJson, "responseSmoothing", responseSmoothingField);
             ApplyFloatPreference(preferencesJson, "anchorRotationX", anchorRotationXField);
@@ -1201,11 +1276,16 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(showOtherAtomsField, false);
         SetStringNoCallback(anchorModeField, AnchorModeHud);
         SetStringNoCallback(anchorAtomUidField, "");
+        SetRadarModeNoCallback(RadarModeHud);
 
         SetFloatNoCallback(hudOffsetXField, -0.59f);
         SetFloatNoCallback(hudOffsetYField, 0.22f);
         SetFloatNoCallback(hudOffsetZField, 0.78f);
         SetFloatNoCallback(hudScaleField, 0.49f);
+        SetFloatNoCallback(wristOffsetXField, 0.0f);
+        SetFloatNoCallback(wristOffsetYField, 0.08f);
+        SetFloatNoCallback(wristOffsetZField, 0.12f);
+        SetFloatNoCallback(wristScaleField, 0.35f);
         SetFloatNoCallback(desktopTiltDegreesField, 90.0f);
         SetFloatNoCallback(radarRangeMetersField, 5.0f);
         SetFloatNoCallback(floorAreaScaleField, 1.0f);
@@ -1226,6 +1306,7 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(availableAtomAlphaField, 0.46f);
         SetFloatNoCallback(markerClickRadiusPixelsField, 20.0f);
         SetFloatNoCallback(grabHitRadiusMetersField, 0.16f);
+        SetFloatNoCallback(wristTwistDegreesField, 65.0f);
         SetFloatNoCallback(pollIntervalField, 0.15f);
         SetFloatNoCallback(responseSmoothingField, 0.0f);
         SetFloatNoCallback(anchorRotationXField, 0.0f);
@@ -1268,11 +1349,16 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHaptics", ReadBool(grabHapticsEnabledField, true));
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorMode", ResolveAnchorMode());
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorAtomUid", ReadString(anchorAtomUidField, ""));
+        AppendJsonStringProperty(sb, ref wroteProperty, "radarMode", ResolveRadarMode());
 
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetX", ReadFloat(hudOffsetXField, -0.59f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetY", ReadFloat(hudOffsetYField, 0.22f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetZ", ReadFloat(hudOffsetZField, 0.78f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudScale", ReadFloat(hudScaleField, 0.49f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "wristOffsetX", ReadFloat(wristOffsetXField, 0.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "wristOffsetY", ReadFloat(wristOffsetYField, 0.08f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "wristOffsetZ", ReadFloat(wristOffsetZField, 0.12f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "wristScale", ReadFloat(wristScaleField, 0.35f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "desktopTiltDegrees", ReadFloat(desktopTiltDegreesField, 90.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "radarRangeMeters", ReadFloat(radarRangeMetersField, 5.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "floorAreaScale", ReadFloat(floorAreaScaleField, 1.0f));
@@ -1293,6 +1379,7 @@ public class FrameAngelRadar : MVRScript
         AppendJsonFloatProperty(sb, ref wroteProperty, "availableAtomAlpha", ReadFloat(availableAtomAlphaField, 0.46f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "markerClickRadiusPixels", ReadFloat(markerClickRadiusPixelsField, 20.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "grabHitRadiusMeters", ReadFloat(grabHitRadiusMetersField, 0.16f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "wristTwistDegrees", ReadFloat(wristTwistDegreesField, 65.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "selectionPollSeconds", ReadFloat(pollIntervalField, 0.15f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "responseSmoothing", ReadFloat(responseSmoothingField, 0.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "anchorRotationX", ReadFloat(anchorRotationXField, 0.0f));
@@ -1359,6 +1446,39 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private void ApplyRadarModePreference(string preferencesJson)
+    {
+        string value;
+        if (radarModeField != null && TryReadStringPreference(preferencesJson, "radarMode", out value))
+        {
+            SetRadarModeNoCallback(value);
+            return;
+        }
+
+        bool legacyWristMode;
+        if (!TryReadBoolPreference(preferencesJson, "wristCompassMode", out legacyWristMode) || !legacyWristMode)
+        {
+            return;
+        }
+
+        bool legacyTwistReveal = true;
+        bool parsedLegacyTwistReveal;
+        if (TryReadBoolPreference(preferencesJson, "wristTwistReveal", out parsedLegacyTwistReveal))
+        {
+            legacyTwistReveal = parsedLegacyTwistReveal;
+        }
+        string legacyHand = "";
+        TryReadStringPreference(preferencesJson, "wristHand", out legacyHand);
+        bool legacyRightHand = string.Equals(legacyHand, "Right", StringComparison.OrdinalIgnoreCase);
+        if (legacyRightHand)
+        {
+            SetRadarModeNoCallback(legacyTwistReveal ? RadarModeWristRight : RadarModeWristRightAlwaysOn);
+            return;
+        }
+
+        SetRadarModeNoCallback(legacyTwistReveal ? RadarModeWristLeft : RadarModeWristLeftAlwaysOn);
+    }
+
     private static void SetBoolNoCallback(JSONStorableBool field, bool value)
     {
         if (field != null)
@@ -1388,6 +1508,14 @@ public class FrameAngelRadar : MVRScript
         if (field != null)
         {
             field.valNoCallback = NormalizeAnchorMode(value);
+        }
+    }
+
+    private void SetRadarModeNoCallback(string value)
+    {
+        if (radarModeField != null)
+        {
+            radarModeField.valNoCallback = NormalizeRadarMode(value);
         }
     }
 
@@ -1761,7 +1889,8 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        SetActiveIfChanged(hudRoot, true);
+        UpdateWristCompassReveal(viewer);
+        SetRadarVisualsVisible(ResolveRadarRuntimeVisible(viewer));
         PollSelectionIfDue();
         PollAvailableAtomsIfDue(viewer);
         TrackAttachedAtomPlacement(viewer);
@@ -1871,7 +2000,36 @@ public class FrameAngelRadar : MVRScript
 
     private void SetRadarVisualsVisible(bool visible)
     {
-        SetActiveIfChanged(hudRoot, visible);
+        if (hudRoot == null)
+        {
+            return;
+        }
+
+        radarVisibilityTargetAlpha = visible ? 1.0f : 0.0f;
+        if (!radarVisibilityAlphaInitialized)
+        {
+            radarVisibilityAlphaInitialized = true;
+            radarVisibilityAlpha = radarVisibilityTargetAlpha;
+            SetMaterialAlphaMultiplier(radarVisibilityAlpha);
+            SetActiveIfChanged(hudRoot, visible);
+            return;
+        }
+
+        if (visible)
+        {
+            SetActiveIfChanged(hudRoot, true);
+        }
+
+        float step = RadarVisibilityFadeSeconds > 0.0f
+            ? Mathf.Max(Time.unscaledDeltaTime, 0.001f) / RadarVisibilityFadeSeconds
+            : 1.0f;
+        radarVisibilityAlpha = Mathf.MoveTowards(radarVisibilityAlpha, radarVisibilityTargetAlpha, step);
+        SetMaterialAlphaMultiplier(radarVisibilityAlpha);
+
+        if (!visible && radarVisibilityAlpha <= 0.001f)
+        {
+            SetActiveIfChanged(hudRoot, false);
+        }
     }
 
     private void PollSelectionIfDue()
@@ -2053,6 +2211,16 @@ public class FrameAngelRadar : MVRScript
         }
 
         string anchorMode = ResolveAnchorMode();
+        if (IsWristCompassModeActive())
+        {
+            Transform wristAnchor = ResolveWristCompassAnchorTransform();
+            if (wristAnchor != null)
+            {
+                ApplyWristAnchor(wristAnchor, viewer);
+                return;
+            }
+        }
+
         if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
         {
             ApplyWorldStaticAnchor();
@@ -2150,6 +2318,25 @@ public class FrameAngelRadar : MVRScript
         hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, hudScaleField.val);
     }
 
+    private void ApplyWristAnchor(Transform wristAnchor, Transform viewer)
+    {
+        if (hudRoot == null || wristAnchor == null)
+        {
+            return;
+        }
+
+        if (hudRoot.transform.parent != null)
+        {
+            hudRoot.transform.SetParent(null, true);
+            currentHudAnchor = null;
+            haveSmoothedHudPosition = false;
+        }
+
+        hudRoot.transform.position = wristAnchor.TransformPoint(GetWristOffset());
+        hudRoot.transform.rotation = viewer != null ? viewer.rotation : Quaternion.identity;
+        hudRoot.transform.localScale = Vector3.one * Mathf.Max(0.01f, ReadFloat(wristScaleField, 0.35f));
+    }
+
     private Transform ResolveRadarAnchorTransform(string anchorMode)
     {
         if (string.Equals(anchorMode, AnchorModeContainingAtom, StringComparison.Ordinal))
@@ -2195,6 +2382,216 @@ public class FrameAngelRadar : MVRScript
         }
 
         return null;
+    }
+
+    private bool IsWristCompassModeActive()
+    {
+        return IsRadarModeWrist(ResolveRadarMode())
+            && !IsCuaPreferenceProfileActive();
+    }
+
+    private bool ResolveRadarRuntimeVisible(Transform viewer)
+    {
+        if (!recorderRadarVisible || radarEnabledField == null || !radarEnabledField.val)
+        {
+            return false;
+        }
+
+        if (!IsWristCompassModeActive())
+        {
+            return true;
+        }
+
+        if (IsWristCompassAlwaysOn())
+        {
+            return ResolveWristCompassAnchorTransform() != null;
+        }
+
+        return wristCompassRevealed;
+    }
+
+    private void UpdateWristCompassReveal(Transform viewer)
+    {
+        if (!IsWristCompassModeActive())
+        {
+            wristCompassRevealed = false;
+            wristRevealGraceUntil = 0.0f;
+            return;
+        }
+
+        if (moveGrabActive)
+        {
+            wristCompassRevealed = true;
+            wristRevealGraceUntil = Time.unscaledTime + WristRevealGraceSeconds;
+            return;
+        }
+
+        if (IsWristCompassAlwaysOn())
+        {
+            wristCompassRevealed = ResolveWristCompassAnchorTransform() != null;
+            return;
+        }
+
+        Transform wristAnchor = ResolveWristCompassAnchorTransform();
+        if (wristAnchor == null)
+        {
+            wristCompassRevealed = false;
+            return;
+        }
+
+        if (Time.unscaledTime < wristRevealGraceUntil)
+        {
+            wristCompassRevealed = true;
+            return;
+        }
+
+        int hand = ResolveWristCompassHand();
+        float twistDegrees = ResolveControllerOutwardTwistDegrees(wristAnchor, hand, viewer);
+        float threshold = Mathf.Clamp(ReadFloat(wristTwistDegreesField, 65.0f), 15.0f, 120.0f);
+        float releaseThreshold = Mathf.Max(0.0f, threshold - 12.0f);
+        if (!wristCompassRevealed && twistDegrees >= threshold)
+        {
+            wristCompassRevealed = true;
+            PulseGrabHandleHaptics(ResolveWristCompassHand(), 0.22f, 0.22f, 0.035f);
+            SetStatus("Wrist compass revealed.");
+        }
+        else if (wristCompassRevealed && twistDegrees < releaseThreshold)
+        {
+            wristCompassRevealed = false;
+        }
+    }
+
+    private Transform ResolveWristCompassAnchorTransform()
+    {
+        return ResolveHandOrControllerTransform(ResolveWristCompassHand());
+    }
+
+    private Transform ResolveHandOrControllerTransform(int hand)
+    {
+        Transform handTransform;
+        if (TryResolveHandTransform(hand, out handTransform))
+        {
+            return handTransform;
+        }
+
+        return ResolveMotionControllerTransform(hand);
+    }
+
+    private bool TryResolveHandTransform(int hand, out Transform handTransform)
+    {
+        handTransform = null;
+        if (SuperController.singleton == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (hand == GrabHandLeft)
+            {
+                if (SuperController.singleton.leftHand != null)
+                {
+                    handTransform = SuperController.singleton.leftHand;
+                    return true;
+                }
+
+                if (SuperController.singleton.leftHandAlternate != null)
+                {
+                    handTransform = SuperController.singleton.leftHandAlternate;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (SuperController.singleton.rightHand != null)
+            {
+                handTransform = SuperController.singleton.rightHand;
+                return true;
+            }
+
+            if (SuperController.singleton.rightHandAlternate != null)
+            {
+                handTransform = SuperController.singleton.rightHandAlternate;
+                return true;
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    private int ResolveWristCompassHand()
+    {
+        string radarMode = ResolveRadarMode();
+        return string.Equals(radarMode, RadarModeWristRight, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModeWristRightAlwaysOn, StringComparison.Ordinal)
+            ? GrabHandRight
+            : GrabHandLeft;
+    }
+
+    private bool IsWristCompassAlwaysOn()
+    {
+        string radarMode = ResolveRadarMode();
+        return string.Equals(radarMode, RadarModeWristLeftAlwaysOn, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModeWristRightAlwaysOn, StringComparison.Ordinal);
+    }
+
+    private string ResolveRadarMode()
+    {
+        return NormalizeRadarMode(radarModeField != null ? radarModeField.val : "");
+    }
+
+    private static bool IsRadarModeWrist(string radarMode)
+    {
+        return string.Equals(radarMode, RadarModeWristLeft, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModeWristRight, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModeWristLeftAlwaysOn, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModeWristRightAlwaysOn, StringComparison.Ordinal);
+    }
+
+    private static string NormalizeRadarMode(string value)
+    {
+        if (string.Equals(value, RadarModeWristLeft, StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModeWristLeft;
+        }
+
+        if (string.Equals(value, RadarModeWristRight, StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModeWristRight;
+        }
+
+        if (string.Equals(value, RadarModeWristLeftAlwaysOn, StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModeWristLeftAlwaysOn;
+        }
+
+        if (string.Equals(value, RadarModeWristRightAlwaysOn, StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModeWristRightAlwaysOn;
+        }
+
+        return RadarModeHud;
+    }
+
+    private float ResolveControllerOutwardTwistDegrees(Transform controller, int hand, Transform viewer)
+    {
+        if (controller == null)
+        {
+            return 0.0f;
+        }
+
+        Vector3 outward = viewer != null
+            ? (hand == GrabHandLeft ? -viewer.right : viewer.right)
+            : (hand == GrabHandLeft ? Vector3.left : Vector3.right);
+        outward.Normalize();
+        Vector3 controllerUp = controller.up.normalized;
+        float outwardAmount = Mathf.Max(0.0f, Vector3.Dot(controllerUp, outward));
+        float upAmount = Mathf.Max(0.0f, Vector3.Dot(controllerUp, Vector3.up));
+        return Mathf.Atan2(outwardAmount, upAmount) * Mathf.Rad2Deg;
     }
 
     private string ResolveAnchorMode()
@@ -2747,6 +3144,12 @@ public class FrameAngelRadar : MVRScript
 
         if (!moveGrabActive)
         {
+            if (radarVisibilityAlpha <= 0.08f)
+            {
+                SetResizeGuideLineVisible(false);
+                return;
+            }
+
             TryStartFauxPrimaryGrab(radarCenter);
             SetResizeGuideLineVisible(false);
             return;
@@ -3030,6 +3433,7 @@ public class FrameAngelRadar : MVRScript
         resizeGrabHand = GrabHandUnknown;
         moveStartHandlePosition = handlePosition;
         moveStartHudOffset = GetHudOffset();
+        moveStartWristOffset = GetWristOffset();
         moveStartStaticPosition = GetStaticWorldPosition();
         haveSmoothedHudPosition = false;
         PulseGrabHandleHaptics(hand, 0.35f, 0.28f, 0.045f);
@@ -3068,6 +3472,7 @@ public class FrameAngelRadar : MVRScript
         if (moveGrabActive)
         {
             MarkGlobalPreferencesDirty();
+            FlushGlobalPreferencesIfDue(true);
             PulseGrabHandleHaptics(moveGrabHand, 0.22f, 0.20f, 0.035f);
         }
 
@@ -3085,6 +3490,20 @@ public class FrameAngelRadar : MVRScript
 
     private void ApplyMoveGrabDelta(Transform viewer, Vector3 worldDelta)
     {
+        if (IsWristCompassModeActive())
+        {
+            if (TryCompleteWristGrabHandOff(worldDelta))
+            {
+                return;
+            }
+
+            Transform wristAnchor = ResolveWristCompassAnchorTransform();
+            Vector3 wristLocalDelta = wristAnchor != null ? wristAnchor.InverseTransformVector(worldDelta) : worldDelta;
+            SetWristOffsetNoCallback(moveStartWristOffset + wristLocalDelta);
+            haveSmoothedHudPosition = false;
+            return;
+        }
+
         string anchorMode = ResolveAnchorMode();
         if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
         {
@@ -3106,6 +3525,67 @@ public class FrameAngelRadar : MVRScript
         Vector3 localDelta = reference != null ? reference.InverseTransformVector(worldDelta) : worldDelta;
         SetHudOffsetNoCallback(moveStartHudOffset + localDelta);
         haveSmoothedHudPosition = false;
+    }
+
+    private bool TryCompleteWristGrabHandOff(Vector3 worldDelta)
+    {
+        int activeHand = ResolveWristCompassHand();
+        if (moveGrabHand == GrabHandUnknown || moveGrabHand == activeHand)
+        {
+            return false;
+        }
+
+        Transform activeAnchor = ResolveHandOrControllerTransform(activeHand);
+        Transform targetAnchor = ResolveHandOrControllerTransform(moveGrabHand);
+        if (activeAnchor == null || targetAnchor == null)
+        {
+            return false;
+        }
+
+        Vector3 proposedRadarPosition = activeAnchor.TransformPoint(moveStartWristOffset) + worldDelta;
+        float activeDistance = Vector3.Distance(proposedRadarPosition, activeAnchor.position);
+        float targetDistance = Vector3.Distance(proposedRadarPosition, targetAnchor.position);
+        if (worldDelta.magnitude < WristHandOffMinimumTravelMeters
+            || targetDistance > WristHandOffDistanceMeters
+            || targetDistance + 0.08f >= activeDistance)
+        {
+            return false;
+        }
+
+        bool alwaysOn = IsWristCompassAlwaysOn();
+        SetRadarModeNoCallback(ResolveRadarModeForHand(moveGrabHand, alwaysOn));
+        SetWristOffsetNoCallback(moveStartWristOffset);
+        wristCompassRevealed = true;
+        wristRevealGraceUntil = Time.unscaledTime + WristRevealGraceSeconds;
+        FinishMoveGrabAfterWristHandOff(moveGrabHand);
+        return true;
+    }
+
+    private string ResolveRadarModeForHand(int hand, bool alwaysOn)
+    {
+        if (hand == GrabHandRight)
+        {
+            return alwaysOn ? RadarModeWristRightAlwaysOn : RadarModeWristRight;
+        }
+
+        return alwaysOn ? RadarModeWristLeftAlwaysOn : RadarModeWristLeft;
+    }
+
+    private void FinishMoveGrabAfterWristHandOff(int hand)
+    {
+        MarkGlobalPreferencesDirty();
+        FlushGlobalPreferencesIfDue(true);
+        PulseGrabHandleHaptics(hand, 0.42f, 0.32f, 0.05f);
+        moveGrabActive = false;
+        resizeGrabActive = false;
+        moveGrabUsesGripFallback = false;
+        resizeGrabUsesGripFallback = false;
+        resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabHand = GrabHandUnknown;
+        resizeGrabHand = GrabHandUnknown;
+        DestroyResizeGrabHandleAtom();
+        SetResizeGuideLineVisible(false);
+        SetStatus(hand == GrabHandRight ? "Wrist compass moved to right hand." : "Wrist compass moved to left hand.");
     }
 
     private bool TryApplyPrimaryHandleDisplacement(Transform viewer, Vector3 radarCenter, FreeControllerV3 primaryController)
@@ -3131,6 +3611,15 @@ public class FrameAngelRadar : MVRScript
 
     private void ApplyHandleWorldDisplacement(Transform viewer, Vector3 worldDelta)
     {
+        if (IsWristCompassModeActive())
+        {
+            Transform wristAnchor = ResolveWristCompassAnchorTransform();
+            Vector3 wristLocalDelta = wristAnchor != null ? wristAnchor.InverseTransformVector(worldDelta) : worldDelta;
+            SetWristOffsetNoCallback(GetWristOffset() + wristLocalDelta);
+            haveSmoothedHudPosition = false;
+            return;
+        }
+
         string anchorMode = ResolveAnchorMode();
         if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
         {
@@ -3246,7 +3735,7 @@ public class FrameAngelRadar : MVRScript
         resizeGrabActive = true;
         resizeGrabUsesGripFallback = gripFallback;
         resizeGrabHand = hand;
-        resizeStartScale = Mathf.Max(0.01f, ReadFloat(hudScaleField, 0.49f));
+        resizeStartScale = ResolveActivePlacementScale();
         resizeStartPrimaryPosition = primaryPosition;
         resizeStartHandlePosition = resizePosition;
         resizeStartDistance = Mathf.Max(
@@ -3267,7 +3756,7 @@ public class FrameAngelRadar : MVRScript
             GrabResizeMinimumStartDistanceMeters,
             Vector3.Distance(GetControllerWorldPosition(primaryController), GetControllerWorldPosition(resizeController)));
         float ratio = currentDistance / Mathf.Max(GrabResizeMinimumStartDistanceMeters, resizeStartDistance);
-        SetHudScaleNoCallback(resizeStartScale * ratio);
+        SetActivePlacementScaleNoCallback(resizeStartScale * ratio);
     }
 
     private void UpdateFauxResizeGrab()
@@ -3289,7 +3778,7 @@ public class FrameAngelRadar : MVRScript
             GrabResizeMinimumStartDistanceMeters,
             Vector3.Distance(primaryPosition, resizePosition));
         float ratio = currentDistance / Mathf.Max(GrabResizeMinimumStartDistanceMeters, resizeStartDistance);
-        SetHudScaleNoCallback(resizeStartScale * ratio);
+        SetActivePlacementScaleNoCallback(resizeStartScale * ratio);
         UpdateResizeGuideLine(primaryPosition, resizePosition, true);
     }
 
@@ -3298,6 +3787,7 @@ public class FrameAngelRadar : MVRScript
         if (resizeGrabActive)
         {
             MarkGlobalPreferencesDirty();
+            FlushGlobalPreferencesIfDue(true);
             PulseGrabHandleHaptics(resizeGrabHand, 0.26f, 0.22f, 0.035f);
         }
 
@@ -3514,6 +4004,15 @@ public class FrameAngelRadar : MVRScript
 
     private Vector3 ResolveRadarWorldCenter(Transform viewer)
     {
+        if (IsWristCompassModeActive())
+        {
+            Transform wristAnchor = ResolveWristCompassAnchorTransform();
+            if (wristAnchor != null)
+            {
+                return wristAnchor.TransformPoint(GetWristOffset());
+            }
+        }
+
         string anchorMode = ResolveAnchorMode();
         if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
         {
@@ -4482,6 +4981,39 @@ public class FrameAngelRadar : MVRScript
     private void SetHudScaleNoCallback(float scale)
     {
         SetFloatNoCallback(hudScaleField, ClampStorableFloat(hudScaleField, scale, 0.25f, 3.0f));
+    }
+
+    private Vector3 GetWristOffset()
+    {
+        return new Vector3(
+            ReadFloat(wristOffsetXField, 0.0f),
+            ReadFloat(wristOffsetYField, 0.08f),
+            ReadFloat(wristOffsetZField, 0.12f));
+    }
+
+    private void SetWristOffsetNoCallback(Vector3 offset)
+    {
+        SetFloatNoCallback(wristOffsetXField, ClampStorableFloat(wristOffsetXField, offset.x, -0.5f, 0.5f));
+        SetFloatNoCallback(wristOffsetYField, ClampStorableFloat(wristOffsetYField, offset.y, -0.5f, 0.5f));
+        SetFloatNoCallback(wristOffsetZField, ClampStorableFloat(wristOffsetZField, offset.z, -0.5f, 0.5f));
+    }
+
+    private float ResolveActivePlacementScale()
+    {
+        return IsWristCompassModeActive()
+            ? Mathf.Max(0.01f, ReadFloat(wristScaleField, 0.35f))
+            : Mathf.Max(0.01f, ReadFloat(hudScaleField, 0.49f));
+    }
+
+    private void SetActivePlacementScaleNoCallback(float scale)
+    {
+        if (IsWristCompassModeActive())
+        {
+            SetFloatNoCallback(wristScaleField, ClampStorableFloat(wristScaleField, scale, 0.05f, 1.5f));
+            return;
+        }
+
+        SetHudScaleNoCallback(scale);
     }
 
     private void SetStaticWorldPositionNoCallback(Vector3 position)

@@ -1,11 +1,11 @@
 {
   "schemaVersion": "fa_radar_version_v2",
   "product": "fa_radar",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "channel": "dev",
-  "branch": "codex/0.1.23-direct-grip-move",
-  "status": "direct-grip-move",
-  "versionNote": "0.1.23 makes grab movement default-on and direct: grip near the radar, track controller-relative movement, and release to apply placement. Visible grab handles and resize affordances are removed from the active session path.",
+  "branch": "codex/0.1.24-wrist-compass-prototype",
+  "status": "wrist-compass-prototype",
+  "versionNote": "0.1.24 adds Radar Mode values for HUD plus wrist-left/right projection, including twist-revealed and always-on wrist variants, wrist-relative placement prefs, cross-hand grip hand-off, and quick show/hide fade while preserving existing HUD/static/CUA behavior.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
@@ -14,7 +14,7 @@
     "lineageNote": "FA Keyboard informed camera-relative placement and generated overlay visuals. FAP informs build, obfuscation, and package receipt shape. No source from either repo is copied into the runtime plugin."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.pro.0.1.23.dll",
+    "pluginFileName": "fa_radar.pro.0.1.24.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -28,8 +28,8 @@
       "compileSymbols": [
         "FA_RADAR_FREE"
       ],
-      "pluginFileName": "fa_radar.free.0.1.23.dll",
-      "packageFileName": "fa_radar.free.0.1.23.var",
+      "pluginFileName": "fa_radar.free.0.1.24.dll",
+      "packageFileName": "fa_radar.free.0.1.24.var",
       "packageName": "FrameAngel.RadarFree",
       "packageCreator": "FrameAngel",
       "summary": "Movable, scalable, visually tunable radar that shows every eligible radar atom together.",
@@ -43,8 +43,8 @@
       "compileSymbols": [
         "FA_RADAR_PRO"
       ],
-      "pluginFileName": "fa_radar.pro.0.1.23.dll",
-      "packageFileName": "fa_radar.pro.0.1.23.var",
+      "pluginFileName": "fa_radar.pro.0.1.24.dll",
+      "packageFileName": "fa_radar.pro.0.1.24.var",
       "packageName": "FrameAngel.RadarPro",
       "packageCreator": "FrameAngel",
       "summary": "Operational radar controls with native VaM plugin UI filters, category colors, and the foundation for light visuals.",
@@ -69,7 +69,7 @@
       "creatorResources": {
         "customUnityAssetPreset": "Custom\\Atom\\CustomUnityAsset\\Preset_FrameAngel_Radar_CUA.vap",
         "anchorMode": "Containing Atom",
-        "pluginFileName": "fa_radar.pro.0.1.23.dll"
+        "pluginFileName": "fa_radar.pro.0.1.24.dll"
       }
     }
   },
@@ -87,5 +87,5 @@
     "profile": "vam_compat",
     "pluginKey": "fa_radar"
   },
-  "updatedAt": "2026-06-05T18:07:00-06:00"
+  "updatedAt": "2026-06-06T23:37:00-06:00"
 }
