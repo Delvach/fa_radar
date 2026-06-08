@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.30` on branch
-  `codex/0.1.30-session-ui-anchor-fix`.
+- Version: `0.1.31` on branch
+  `codex/0.1.31-static-reference-pro-volumes`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.30.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.30.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.31.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.31.dll`.
 - Pro also ships a thin Empty atom preset:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,15 +27,18 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.30` branch preserves the generated visual treatment, keeps the normal
+The `0.1.31` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, adds a
 separate scene/session `Desktop Placement` and `VR Placement` split, keeps
 Empty/atom-hosted instances anchored to their host, and raises HUD/wrist
 placement scale so the
 rendered radar can reach a 1m diameter without changing represented meters. It
 also keeps optional wrist compass projection modes that can reveal on an
-outward twist or stay always-on per hand. It uses generated emissive polygons so
-targeting can be tested before any art polish:
+outward twist or stay always-on per hand. The 0.1.31 behavior change is that
+static scene and Empty/atom-anchor radar displays use the radar's own world pose
+as the map origin, so scene items stay stable in the radar while the user moves
+as a green marker. It uses generated emissive polygons so targeting can be
+tested before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
   target markers
@@ -52,9 +55,10 @@ targeting can be tested before any art polish:
 - `HUD Scale` and `Wrist Scale` change overall rendered size only; at the
   default visual radius their max maps to a 1m radar diameter
 - grid lines clipped to the radar circle
-- one-meter grid panning from viewer world X/Z movement without relying on a
-  visible toggle or stale scene/global pref
-- green center marker for the user
+- one-meter grid panning from the active radar reference position without
+  relying on a visible toggle or stale scene/global pref
+- green user marker; in HUD/wrist modes it stays centered, while in static
+  scene/Empty modes it moves through the radar display
 - orange selected-atom sphere without an extra outer outline, so marker size
   remains a proximity/depth cue
 - optional selected world-ground grid drop marker, disabled by default so the
@@ -69,6 +73,14 @@ targeting can be tested before any art polish:
   together with a neutral marker color; Pro exposes Light, Person, CUA, Empty,
   SubScene, ImagePanel, Animation, Force, Shapes, Sounds, Triggers, and other
   atom filters with category colors
+- Pro-only rotation-axis glyphs draw short red, green, and blue bars through
+  selected/available markers using each item's real scene rotation relative to
+  the radar's world-axis display
+- Pro-only light visuals draw translucent range spheres for lights and
+  translucent spot cones for spotlights, scaled from the same meter-to-radar
+  mapping as the grid and height stems
+- Pro-only user, desktop, and scene-camera POV/frustum helpers are generated as
+  translucent radar-local projections for filming setup
 - click-to-select for visible available CUA/light/person/other atom markers
 - session-plugin-only direct grip movement with OVR haptics: grip near the
   radar, move the controller, and release to apply placement; the active
@@ -81,24 +93,26 @@ targeting can be tested before any art polish:
 
 The selected atom is resolved with
 `SuperController.singleton.GetSelectedAtom()` on a configurable poll interval.
-The target position is converted through the current look camera with
-`viewer.InverseTransformPoint(target.position)`, then divided by `Radar Range
-Meters` and clamped to the unit sphere. This makes the marker represent the
-selected item relative to the user's current HUD POV.
+The target position is converted through the active radar reference frame, then
+divided by `Radar Range Meters` and clamped to the unit sphere. HUD and wrist
+modes use the viewer as the reference origin. Static world and Empty/atom-anchor
+modes use the radar's own world pose as the reference origin, so moving the user
+does not slide scene items around the static radar.
 
-By default the selected marker uses all three viewer-local axes. `Flatten Target
-Y` remains available as a test toggle when a stricter X/Z desktop read is more
-useful than height/depth representation.
+By default the selected marker uses all three world-axis display dimensions.
+`Flatten Target Y` remains available as a test toggle when a stricter X/Z
+desktop read is more useful than height/depth representation.
 
 `World Axis Align` controls the grid/ring visual root. With the default `Ground
 Axis Lock` enabled, the axis root is counter-rotated from the HUD/dish so its
 world rotation matches real world XYZ. This keeps the meter grid on the actual
 ground X/Z plane for desktop and VR and prevents camera roll from rolling the
 radar Z axis. With `Ground Axis Lock` disabled, the older yaw-only axis behavior
-is available for VR comparison. Markers remain POV-relative; grid-drop markers
-are projected onto the ground-axis root from target world X/Z delta.
+is available for VR comparison. Markers remain reference-frame-relative;
+grid-drop markers are projected onto the ground-axis root from target world X/Z
+delta against the active radar reference position.
 
-Previous-selection rendering is parked in `0.1.30`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.31`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
@@ -107,7 +121,7 @@ controls only the current atom's optional ground projection dot.
 The creator-anchor preference profile and atom-host path skip this system so
 Empty/CUA creator-anchor behavior remains separate.
 
-The active 0.1.30 session path is direct grip only: when a controller grip press
+The active 0.1.31 session path is direct grip only: when a controller grip press
 starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
 that controller position plus the radar world center. During the grab, the
 controller owns the radar's world-space center; HUD, static, atom-anchor, and
@@ -201,13 +215,15 @@ VaM metadata inspection: `Atom.mainController` is `FreeControllerV3`, and
 `SuperController.SelectController(FreeControllerV3, alignView,
 alignRotationOnly, alignUpDown, openUI)` exists in the target VaM assembly.
 
-The grid uses the viewer's world X/Z position to offset the one-meter mesh
-before it is clipped into the radar circle. A 1m movement along world Z changes
-the grid's Z offset, so the center marker remains the user while the world grid
-slides underneath it. `Grid Follows User`, `Grid Step Meters`, and
-`Floor Area Scale` remain registered legacy prefs, but 0.1.30 makes panning
-always-on, keeps the visible grid at one meter, and makes `Radar Range Meters`
-the authority for how much world the sphere represents.
+The grid uses the active radar reference position to offset the one-meter mesh
+before it is clipped into the radar circle. In HUD/wrist modes the reference is
+the viewer, so movement slides the grid under the centered user marker. In
+static world and Empty/atom-anchor modes the reference is the radar itself, so
+the grid and scene atoms stay stable while the user marker moves. `Grid Follows
+User`, `Grid Step Meters`, and `Floor Area Scale` remain registered legacy
+prefs, but 0.1.31 makes panning always-on, keeps the visible grid at one meter,
+and makes `Radar Range Meters` the authority for how much world the sphere
+represents.
 
 ## HUD Placement
 
@@ -313,27 +329,29 @@ offset sliders and reset button.
   position/rotation are local to the camera instead of smoothed through world
   space.
 - Grid mesh rebuilds only when effective radar range (`Radar Range Meters`),
-  clip mode, or the quantized viewer grid offset changes.
+  clip mode, or the quantized radar-reference grid offset changes.
 - Click selection is idle unless the desktop left mouse button goes down.
   Marker hit-testing only checks the visible pooled marker list.
 - Materials use the FA Keyboard-inspired overlay pattern:
   `Hidden/Internal-Colored`, alpha blend, `ZWrite=0`, and
   `CompareFunction.Always`.
-- The generated object and material names include `favr.hud.radar` as a small
-  filming identifier. This is intentionally name-based only: no Unity tag,
-  file IO, recorder import, or scene persistence is added for filming.
+- The generated object and material names include `favr.hud.radar` as the
+  current filming identifier. New generated radar/studio visuals should derive
+  stable reusable names from this identifier.
 - FAAR recorder visibility is read from
   `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json`. If
   `radarHudFilmSubjectIdentifier` matches `favr.hud.radar` and
   `radarHudVisible` is false, Radar hides its generated visual root/materials.
   This does not modify placement, anchor mode, offsets, scale, or scene data.
+  FAAR consumes identifiers and visibility state only; Radar retains placement
+  authority.
 
 ## Build And Deploy Contract
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.30.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.30.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.31.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.31.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -349,11 +367,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.30.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.30.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.31.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.31.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.30.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.30.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.31.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.31.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Future `.var` product naming is undecided. Current candidates are
@@ -368,8 +386,8 @@ editions, not separate runtime forks.
 - Free is the movable, scalable, visually tunable radar, but it shows all
   supported radar atoms together.
 - Pro adds visibility switches in the native VaM plugin UI, customizable
-  category colors, and richer light visuals such as range spheres and spotlight
-  cones that show rotation, range, and spot angle.
+  category colors, per-item rotation axes, richer light visuals such as range
+  spheres and spotlight cones, and filming POV/frustum helpers.
 
 The first release is plugin-UI-only. Do not build or assume a browser,
 companion, custom external, or separate in-world control surface for v1. The
@@ -382,7 +400,7 @@ The current product split authority is
 
 ## Planned Interaction Extensions
 
-Overlap clustering and God Mode are planned but not implemented in 0.1.30.
+Overlap clustering and God Mode are planned but not implemented in 0.1.31.
 The implementation should preserve the current marker identity path: visible
 atoms are still collected into `trackedAvailableAtoms`, projected into radar
 local space, and represented by pooled marker objects.

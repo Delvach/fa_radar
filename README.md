@@ -1,11 +1,11 @@
 # fa_radar
 
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
-HUD-relative radar for the currently selected atom.
+HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.30`.
+Current branch version: `0.1.31`.
 
-Current product contract version: `0.1.30`.
+Current product contract version: `0.1.31`.
 
 The current slice is compiled C# only:
 
@@ -18,6 +18,9 @@ The current slice is compiled C# only:
 - generated HUD objects and materials carry the `favr.hud.radar` filming
   identifier so FAAR/recorder tooling can locate the radar without scene
   storage or a product dependency
+- static scene and Empty/atom-anchor radar displays use the radar's own world
+  pose as the map origin; the user moves as a green marker while scene atoms
+  stay stable in the display
 - three generated rotating rings, colored to match VaM/world axes
 - faded generated meter grid
 - visible `Radar Range Meters` control that expands or contracts represented
@@ -62,6 +65,9 @@ The current slice is compiled C# only:
 - edition-gated available atom markers: Free shows every eligible atom together,
   Pro exposes Light, Person, CUA, Empty, SubScene, ImagePanel, Animation, Force,
   Shapes, Sounds, Triggers, and other category filters
+- Pro-only rotation axes, light range spheres, spotlight cones, and optional
+  user/desktop/scene-camera POV frustums as the first movie-studio scene-map
+  layer
 - click-to-select for visible available CUA/light/person/other atom markers
 - session-plugin-only direct grip movement with OVR haptics; grip near the
   radar, move the controller, and release to apply HUD/static/wrist-relative
@@ -76,7 +82,9 @@ The current slice is compiled C# only:
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free is the
   unrestricted radar that shows everything, while Pro adds filters, category
-  colors, and the staged path for light volume visuals
+  colors, light volumes, rotation axes, and filming POV helpers
+- FAAR/video-recorder integration consumes stable identifiers and visibility
+  state only; Radar keeps placement authority
 - first release UI is native VaM plugin UI only; no external/browser/companion
   UI surface
 - FAP-style Obfuscar wrapper and `.var` package candidate staging
@@ -111,11 +119,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.30.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.30.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.31.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.31.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.30.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.30.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.31.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.31.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral
