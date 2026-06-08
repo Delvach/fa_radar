@@ -1,17 +1,17 @@
 # FA Radar Product Editions V1
 
-Updated: 2026-06-07
+Updated: 2026-06-08
 
 ## Decision
 
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.28`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.29`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.28.dll`
-- `fa_radar.pro.0.1.28.dll`
+- `fa_radar.free.0.1.29.dll`
+- `fa_radar.pro.0.1.29.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -26,9 +26,10 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.28 keeps the normal UI limited to daily
-operation: desktop placement, HUD/wrist placement, mode, range, atom visibility,
-Pro filters, grab, haptics, reset, and status. Preference writes happen
+buttons, and text fields, but 0.1.29 keeps the normal UI limited to daily
+operation: host/display status, desktop/VR placement, HUD/wrist placement, mode,
+range, atom visibility, Pro filters, grab, haptics, reset, and status.
+Preference writes happen
 automatically after value changes; manual save buttons are not exposed.
 Prototype calibration controls remain registered but hidden. The first release
 should focus on core radar features: placement, scale up to a 1m rendered radar
@@ -121,8 +122,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.28.var`
-- `fa_radar.pro.0.1.28.var`
+- `fa_radar.free.0.1.29.var`
+- `fa_radar.pro.0.1.29.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.

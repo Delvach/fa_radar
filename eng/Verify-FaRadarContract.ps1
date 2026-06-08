@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.28"',
+        'private const string Version = "0.1.29"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -118,10 +118,24 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Load Global Prefs",
         "Reset Global Prefs",
         "ShouldUseCreatorAnchorUi",
-        "BuildCreatorAnchorUi",
-        "BuildCreatorAnchorPlacementUi",
+        "BuildEmptyAnchorUi",
+        "BuildEmptyAnchorPlacementUi",
+        "BuildSceneSessionUi",
+        "BuildSceneSessionPlacementUi",
         "ResetCreatorAnchorPlacement",
         "IsAttachedAtomAnchorHostActive",
+        "IsEmptyAnchorHostActive",
+        "IsSceneSessionPluginHostActive",
+        "ResolvePluginHostSurfaceName",
+        "ResolveDisplaySurfaceName",
+        "IsVrDisplayActive",
+        "hostSurfaceField",
+        "displaySurfaceField",
+        '"Host Surface"',
+        '"Display Surface"',
+        "SuperController.singleton.isOVR",
+        "SuperController.singleton.isOpenVR",
+        "SuperController.singleton.disableVR",
         "Creator anchor preset active.",
         "BuildPlacementUi();",
         "private void BuildPlacementUi()",
@@ -178,10 +192,16 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Desktop Placement",
         "DesktopPlacementAttachedToUi",
         "DesktopPlacementPinnedInWorld",
+        "vrPlacementField",
+        '"VR Placement"',
+        "ResolveSceneSessionPlacement",
         "ResolveDesktopPlacement",
+        "ResolveVRPlacement",
+        "ApplySceneSessionPlacementPreference",
         "NormalizeDesktopPlacement",
         "ApplyDesktopPlacementPreference",
         '"desktopPlacement"',
+        '"vrPlacement"',
         "Floor Area Scale",
         "Desktop Tilt Degrees",
         "Height Stems",
@@ -204,6 +224,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Show Sounds",
         "Show Triggers",
         "Show Other Atoms",
+        "proFilterDefaultsVersion",
+        "SetAllProAtomFiltersNoCallback",
         "Click Select Markers",
         "Marker Click Radius Pixels",
         "Atom Poll Seconds",
@@ -453,8 +475,20 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         }
     }
 
-    if ($plugin.Contains("CreateToggle(grabHapticsEnabledField, true)") -and $plugin.IndexOf("BuildCreatorAnchorUi") -gt $plugin.IndexOf("CreateToggle(grabHapticsEnabledField, true)")) {
+    if ($plugin.Contains("CreateToggle(grabHapticsEnabledField, true)") -and $plugin.IndexOf("BuildEmptyAnchorUi") -gt $plugin.IndexOf("CreateToggle(grabHapticsEnabledField, true)")) {
         Add-Failure "Creator-anchor UI must be separated before normal grab/haptics controls."
+    }
+
+    $emptyUiIndex = $plugin.IndexOf("private void BuildEmptyAnchorUi()")
+    $sceneSessionUiIndex = $plugin.IndexOf("private void BuildSceneSessionUi()")
+    if ($emptyUiIndex -ge 0 -and $sceneSessionUiIndex -gt $emptyUiIndex) {
+        $emptyUiBlock = $plugin.Substring($emptyUiIndex, $sceneSessionUiIndex - $emptyUiIndex)
+        if ($emptyUiBlock.Contains("CreatePopup(vrPlacementField")) {
+            Add-Failure "Empty/atom-anchor UI must not expose scene/session VR placement."
+        }
+        if (-not $emptyUiBlock.Contains("BuildEmptyAnchorPlacementUi();")) {
+            Add-Failure "Empty/atom-anchor UI must use the Empty placement block."
+        }
     }
 
     $forbiddenActiveGrabSnippets = @(
@@ -506,8 +540,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.28.dll",
-        "fa_radar.pro.0.1.28.dll",
+        "fa_radar.free.0.1.29.dll",
+        "fa_radar.pro.0.1.29.dll",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
         "Obfuscate-FaRadarPlugin.ps1",
@@ -553,8 +587,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.28.dll",
-        "fa_radar.pro.0.1.28.dll",
+        "fa_radar.free.0.1.29.dll",
+        "fa_radar.pro.0.1.29.dll",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom\Atom\Empty",
         "F:\sim\vam",
@@ -592,7 +626,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.28.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.29.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -641,11 +675,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.28") {
-        Add-Failure "Version config must declare version 0.1.28."
+    if ($version.version -ne "0.1.29") {
+        Add-Failure "Version config must declare version 0.1.29."
     }
-    if ($version.branch -ne "codex/0.1.28-desktop-filters-autosave") {
-        Add-Failure "Version config branch must match codex/0.1.28-desktop-filters-autosave."
+    if ($version.branch -ne "codex/0.1.29-host-display-placement") {
+        Add-Failure "Version config branch must match codex/0.1.29-host-display-placement."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -746,8 +780,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.28.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.28.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.29.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.29.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
@@ -776,7 +810,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.28."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.29."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
