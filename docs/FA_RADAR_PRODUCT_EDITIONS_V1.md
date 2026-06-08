@@ -7,11 +7,11 @@ Updated: 2026-06-07
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.27`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.28`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.27.dll`
-- `fa_radar.pro.0.1.27.dll`
+- `fa_radar.free.0.1.28.dll`
+- `fa_radar.pro.0.1.28.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -25,14 +25,15 @@ The first release uses native VaM plugin UI only.
 - no custom in-world Frame Angel switch surface
 - no separate control panel outside VaM's plugin UI
 
-Controls for the first version are ordinary plugin checkboxes, sliders,
-buttons, and text fields, but 0.1.27 keeps the normal UI limited to daily
-operation: HUD/wrist placement, mode, range, atom visibility, Pro filters, grab,
-haptics, prefs, and status. Prototype calibration controls remain registered
-but hidden. The first release should focus on core radar features: placement,
-scale up to a 1m rendered radar diameter, all-atom visibility in Free, Pro
-filters/colors, marker clarity, useful light discovery, package/deploy
-reliability, and stable performance.
+Controls for the first version are ordinary plugin checkboxes, sliders, popups,
+buttons, and text fields, but 0.1.28 keeps the normal UI limited to daily
+operation: desktop placement, HUD/wrist placement, mode, range, atom visibility,
+Pro filters, grab, haptics, reset, and status. Preference writes happen
+automatically after value changes; manual save buttons are not exposed.
+Prototype calibration controls remain registered but hidden. The first release
+should focus on core radar features: placement, scale up to a 1m rendered radar
+diameter, all-atom visibility in Free, Pro filters/colors, marker clarity,
+useful light discovery, package/deploy reliability, and stable performance.
 
 ## Free Edition
 
@@ -71,7 +72,8 @@ Pro is the operational radar.
 - native VaM plugin UI controls for first release filters and tuning
 - category colors, including customizable defaults for women and men
 - default people colors start as pink for women and blue for men
-- CUA, light, people, and other-atom visibility can be controlled separately
+- Light, Person, CUA, Empty, SubScene, ImagePanel, Animation, Force, Shapes,
+  Sounds, Triggers, and other-atom visibility can be controlled separately
 - light range visualization as generated spheres
 - spotlight visualization as generated cones
 - spotlight rotation, range, and spot-angle representation
@@ -119,8 +121,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.27.var`
-- `fa_radar.pro.0.1.27.var`
+- `fa_radar.free.0.1.28.var`
+- `fa_radar.pro.0.1.28.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.

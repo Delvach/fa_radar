@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.27"',
+        'private const string Version = "0.1.28"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -113,6 +113,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "ResolveCommonPreferencesSchemaVersion",
         "ResolveProPreferencesSchemaVersion",
         "Global Prefs Auto Save",
+        'AppendJsonBoolProperty(sb, ref wroteProperty, "globalPrefsAutoSave", true)',
         "Save Global Prefs",
         "Load Global Prefs",
         "Reset Global Prefs",
@@ -174,6 +175,13 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         '"anchorMode"',
         '"anchorAtomUid"',
         "Anchor To View",
+        "Desktop Placement",
+        "DesktopPlacementAttachedToUi",
+        "DesktopPlacementPinnedInWorld",
+        "ResolveDesktopPlacement",
+        "NormalizeDesktopPlacement",
+        "ApplyDesktopPlacementPreference",
+        '"desktopPlacement"',
         "Floor Area Scale",
         "Desktop Tilt Degrees",
         "Height Stems",
@@ -185,8 +193,16 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Depth Size Strength",
         "Available Atom Markers",
         "Show Lights",
-        "Show CUA",
+        "Show CUA Atoms",
         "Show People",
+        "Show Empty",
+        "Show SubScene",
+        "Show ImagePanel",
+        "Show Animation",
+        "Show Force",
+        "Show Shapes",
+        "Show Sounds",
+        "Show Triggers",
         "Show Other Atoms",
         "Click Select Markers",
         "Marker Click Radius Pixels",
@@ -238,6 +254,16 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "IsLightAtom",
         "IsCustomUnityAssetAtom",
         "IsPersonAtom",
+        "IsFemalePersonAtom",
+        "IsMalePersonAtom",
+        "IsEmptyAtom",
+        "IsSubSceneAtom",
+        "IsImagePanelAtom",
+        "IsAnimationAtom",
+        "IsForceAtom",
+        "IsShapeAtom",
+        "IsSoundAtom",
+        "IsTriggerAtom",
         "IsRadarGrabHandleAtom",
         "IsAtomVisibleByFilter",
         "return true",
@@ -411,6 +437,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CreateSlider(emissionStrengthField",
         "CreateSlider(pollIntervalField",
         "CreateSlider(atomPollSecondsField",
+        "CreateToggle(globalPrefsAutoSaveField",
+        'CreateButton("Save Global Prefs"',
+        'CreateButton("Save Anchor Prefs"',
         'CreateButton("Load Global Prefs"',
         'CreateButton("Use Selected As Anchor"',
         'CreateButton("Use Containing Atom Anchor"',
@@ -459,7 +488,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CreateSlider\(viewYawOffsetField",
         "CreateSlider\(axisYawOffsetField",
         "viewYawOffsetField\.val",
-        "axisYawOffsetField\.val"
+        "axisYawOffsetField\.val",
+        'ApplyBoolPreference\(preferencesJson, "globalPrefsAutoSave", globalPrefsAutoSaveField\);'
     )
 
     foreach ($pattern in $forbiddenPatterns) {
@@ -476,8 +506,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.27.dll",
-        "fa_radar.pro.0.1.27.dll",
+        "fa_radar.free.0.1.28.dll",
+        "fa_radar.pro.0.1.28.dll",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
         "Obfuscate-FaRadarPlugin.ps1",
@@ -523,8 +553,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.27.dll",
-        "fa_radar.pro.0.1.27.dll",
+        "fa_radar.free.0.1.28.dll",
+        "fa_radar.pro.0.1.28.dll",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom\Atom\Empty",
         "F:\sim\vam",
@@ -562,10 +592,11 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.27.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.28.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
+        '"Desktop Placement" : "Pinned In World"',
         '"CUA Anchor Preset" : "true"',
         '"HUD Offset X"',
         '"HUD Offset Y"',
@@ -610,11 +641,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.27") {
-        Add-Failure "Version config must declare version 0.1.27."
+    if ($version.version -ne "0.1.28") {
+        Add-Failure "Version config must declare version 0.1.28."
     }
-    if ($version.branch -ne "codex/0.1.27-empty-anchor-ui") {
-        Add-Failure "Version config branch must match codex/0.1.27-empty-anchor-ui."
+    if ($version.branch -ne "codex/0.1.28-desktop-filters-autosave") {
+        Add-Failure "Version config branch must match codex/0.1.28-desktop-filters-autosave."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -715,8 +746,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.27.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.27.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.28.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.28.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
@@ -745,7 +776,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.27."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.28."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."

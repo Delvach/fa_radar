@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.27";
+    private const string Version = "0.1.28";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -44,6 +44,8 @@ public class FrameAngelRadar : MVRScript
     private const string AnchorModeWorldStatic = "World Static";
     private const string AnchorModeContainingAtom = "Containing Atom";
     private const string AnchorModeAtomUid = "Anchor Atom UID";
+    private const string DesktopPlacementAttachedToUi = "Attached To UI";
+    private const string DesktopPlacementPinnedInWorld = "Pinned In World";
     private const string RadarModeHud = "HUD";
     private const string RadarModeWristLeft = "wrist-left";
     private const string RadarModeWristRight = "wrist-right";
@@ -107,6 +109,14 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showLightAtomsField;
     private JSONStorableBool showCustomUnityAssetAtomsField;
     private JSONStorableBool showPersonAtomsField;
+    private JSONStorableBool showEmptyAtomsField;
+    private JSONStorableBool showSubSceneAtomsField;
+    private JSONStorableBool showImagePanelAtomsField;
+    private JSONStorableBool showAnimationAtomsField;
+    private JSONStorableBool showForceAtomsField;
+    private JSONStorableBool showShapeAtomsField;
+    private JSONStorableBool showSoundAtomsField;
+    private JSONStorableBool showTriggerAtomsField;
     private JSONStorableBool showOtherAtomsField;
     private JSONStorableBool clickSelectMarkersField;
     private JSONStorableBool grabHandlesEnabledField;
@@ -161,6 +171,7 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableString anchorAtomUidField;
     private JSONStorableStringChooser anchorModeField;
     private JSONStorableStringChooser radarModeField;
+    private JSONStorableStringChooser desktopPlacementField;
 
     private GameObject hudRoot;
     private GameObject radarRoot;
@@ -329,8 +340,16 @@ public class FrameAngelRadar : MVRScript
         depthSizeCueField = new JSONStorableBool("Depth Size Cue", true);
         availableAtomMarkersEnabledField = new JSONStorableBool("Available Atom Markers", true);
         showLightAtomsField = new JSONStorableBool("Show Lights", true);
-        showCustomUnityAssetAtomsField = new JSONStorableBool("Show CUA", false);
+        showCustomUnityAssetAtomsField = new JSONStorableBool("Show CUA Atoms", false);
         showPersonAtomsField = new JSONStorableBool("Show People", false);
+        showEmptyAtomsField = new JSONStorableBool("Show Empty", false);
+        showSubSceneAtomsField = new JSONStorableBool("Show SubScene", false);
+        showImagePanelAtomsField = new JSONStorableBool("Show ImagePanel", false);
+        showAnimationAtomsField = new JSONStorableBool("Show Animation", false);
+        showForceAtomsField = new JSONStorableBool("Show Force", false);
+        showShapeAtomsField = new JSONStorableBool("Show Shapes", false);
+        showSoundAtomsField = new JSONStorableBool("Show Sounds", false);
+        showTriggerAtomsField = new JSONStorableBool("Show Triggers", false);
         showOtherAtomsField = new JSONStorableBool("Show Other Atoms", false);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
         // Session Grab Handles: Direct Grip Grab replaces the old visible-handle behavior.
@@ -365,6 +384,16 @@ public class FrameAngelRadar : MVRScript
             RadarModeWristRight,
             RadarModeWristLeftAlwaysOn,
             RadarModeWristRightAlwaysOn
+        };
+        desktopPlacementField = new JSONStorableStringChooser(
+            "Desktop Placement",
+            new List<string> { DesktopPlacementAttachedToUi, DesktopPlacementPinnedInWorld },
+            ResolveDefaultDesktopPlacement(),
+            "Desktop Placement");
+        desktopPlacementField.displayChoices = new List<string>
+        {
+            DesktopPlacementAttachedToUi,
+            DesktopPlacementPinnedInWorld
         };
 
         hudOffsetXField = new JSONStorableFloat("HUD Offset X", -0.59f, -1.0f, 1.0f, true, true);
@@ -432,6 +461,14 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showLightAtomsField);
         RegisterBool(showCustomUnityAssetAtomsField);
         RegisterBool(showPersonAtomsField);
+        RegisterBool(showEmptyAtomsField);
+        RegisterBool(showSubSceneAtomsField);
+        RegisterBool(showImagePanelAtomsField);
+        RegisterBool(showAnimationAtomsField);
+        RegisterBool(showForceAtomsField);
+        RegisterBool(showShapeAtomsField);
+        RegisterBool(showSoundAtomsField);
+        RegisterBool(showTriggerAtomsField);
         RegisterBool(showOtherAtomsField);
         RegisterBool(clickSelectMarkersField);
         RegisterBool(grabHandlesEnabledField);
@@ -486,6 +523,7 @@ public class FrameAngelRadar : MVRScript
         RegisterString(anchorAtomUidField);
         RegisterStringChooser(anchorModeField);
         RegisterStringChooser(radarModeField);
+        RegisterStringChooser(desktopPlacementField);
 
         RegisterAction(new JSONStorableAction("Capture HUD Offset From Atom", CaptureHudOffsetFromAttachedAtom));
         RegisterAction(new JSONStorableAction("Reset HUD Offset", ResetHudOffset));
@@ -507,16 +545,13 @@ public class FrameAngelRadar : MVRScript
         }
 
         CreateToggle(radarEnabledField, false);
-        CreateToggle(globalPrefsAutoSaveField, true);
+        CreatePopup(desktopPlacementField, true);
         BuildPlacementUi();
         BuildWristCompassUi();
         CreateSlider(radarRangeMetersField, false);
         CreateToggle(availableAtomMarkersEnabledField, true);
 #if FA_RADAR_PRO
-        CreateToggle(showLightAtomsField, false);
-        CreateToggle(showCustomUnityAssetAtomsField, true);
-        CreateToggle(showPersonAtomsField, false);
-        CreateToggle(showOtherAtomsField, true);
+        BuildProFilterUi();
 #endif
         CreateToggle(gridEnabledField, false);
         CreateToggle(grabHandlesEnabledField, false);
@@ -537,20 +572,14 @@ public class FrameAngelRadar : MVRScript
     private void BuildCreatorAnchorUi()
     {
         CreateToggle(radarEnabledField, false);
+        CreatePopup(desktopPlacementField, true);
         BuildCreatorAnchorPlacementUi();
         CreateSlider(radarRangeMetersField, false);
         CreateToggle(availableAtomMarkersEnabledField, true);
 #if FA_RADAR_PRO
-        CreateToggle(showLightAtomsField, false);
-        CreateToggle(showCustomUnityAssetAtomsField, true);
-        CreateToggle(showPersonAtomsField, false);
-        CreateToggle(showOtherAtomsField, true);
+        BuildProFilterUi();
 #endif
         CreateToggle(gridEnabledField, false);
-        CreateButton("Save Anchor Prefs", false).button.onClick.AddListener(delegate
-        {
-            SaveGlobalPreferencesAction();
-        });
         CreateButton("Reset Anchor Placement", false).button.onClick.AddListener(delegate
         {
             ResetCreatorAnchorPlacement();
@@ -575,10 +604,6 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(hudOffsetYField, false);
         CreateSlider(hudOffsetZField, false);
         CreateSlider(hudScaleField, false);
-        CreateButton("Save Global Prefs", false).button.onClick.AddListener(delegate
-        {
-            SaveGlobalPreferencesAction();
-        });
         CreateButton("Reset HUD Offset", false).button.onClick.AddListener(delegate
         {
             ResetHudOffset();
@@ -593,6 +618,24 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(wristOffsetYField, true);
         CreateSlider(wristOffsetZField, true);
     }
+
+#if FA_RADAR_PRO
+    private void BuildProFilterUi()
+    {
+        CreateToggle(showLightAtomsField, false);
+        CreateToggle(showPersonAtomsField, true);
+        CreateToggle(showCustomUnityAssetAtomsField, false);
+        CreateToggle(showEmptyAtomsField, true);
+        CreateToggle(showSubSceneAtomsField, false);
+        CreateToggle(showImagePanelAtomsField, true);
+        CreateToggle(showAnimationAtomsField, false);
+        CreateToggle(showForceAtomsField, true);
+        CreateToggle(showShapeAtomsField, false);
+        CreateToggle(showSoundAtomsField, true);
+        CreateToggle(showTriggerAtomsField, false);
+        CreateToggle(showOtherAtomsField, true);
+    }
+#endif
 
     private void ConfigureGlobalPreferenceCallbacks()
     {
@@ -625,6 +668,7 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(clickSelectMarkersField);
         ConfigureGlobalPreferenceCallback(grabHandlesEnabledField);
         ConfigureGlobalPreferenceCallback(radarModeField);
+        ConfigureGlobalPreferenceCallback(desktopPlacementField);
         ConfigureGlobalPreferenceCallback(grabHandleDebugVisibleField);
         ConfigureGlobalPreferenceCallback(grabHapticsEnabledField);
 
@@ -674,6 +718,14 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(showLightAtomsField);
         ConfigureGlobalPreferenceCallback(showCustomUnityAssetAtomsField);
         ConfigureGlobalPreferenceCallback(showPersonAtomsField);
+        ConfigureGlobalPreferenceCallback(showEmptyAtomsField);
+        ConfigureGlobalPreferenceCallback(showSubSceneAtomsField);
+        ConfigureGlobalPreferenceCallback(showImagePanelAtomsField);
+        ConfigureGlobalPreferenceCallback(showAnimationAtomsField);
+        ConfigureGlobalPreferenceCallback(showForceAtomsField);
+        ConfigureGlobalPreferenceCallback(showShapeAtomsField);
+        ConfigureGlobalPreferenceCallback(showSoundAtomsField);
+        ConfigureGlobalPreferenceCallback(showTriggerAtomsField);
         ConfigureGlobalPreferenceCallback(showOtherAtomsField);
     }
 
@@ -795,11 +847,7 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        if (globalPrefsAutoSaveField != null && !globalPrefsAutoSaveField.val)
-        {
-            return;
-        }
-
+        SetBoolNoCallback(globalPrefsAutoSaveField, true);
         globalPreferencesDirty = true;
         nextGlobalPreferencesFlushTime = Time.unscaledTime + GlobalPreferencesFlushDelaySeconds;
     }
@@ -811,11 +859,7 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        if (globalPrefsAutoSaveField != null && !globalPrefsAutoSaveField.val)
-        {
-            return;
-        }
-
+        SetBoolNoCallback(globalPrefsAutoSaveField, true);
         if (!force && Time.unscaledTime < nextGlobalPreferencesFlushTime)
         {
             return;
@@ -841,6 +885,7 @@ public class FrameAngelRadar : MVRScript
 #endif
 
         globalPreferencesDirty = false;
+        SetBoolNoCallback(globalPrefsAutoSaveField, true);
         if (loadedAny)
         {
             SetStatus("Global prefs loaded.");
@@ -1128,7 +1173,7 @@ public class FrameAngelRadar : MVRScript
         globalPreferencesLoading = true;
         try
         {
-            ApplyBoolPreference(preferencesJson, "globalPrefsAutoSave", globalPrefsAutoSaveField);
+            SetBoolNoCallback(globalPrefsAutoSaveField, true);
             ApplyBoolPreference(preferencesJson, "radarEnabled", radarEnabledField);
             ApplyBoolPreference(preferencesJson, "ignoreAttachedAtom", ignoreContainingAtomField);
             ApplyBoolPreference(preferencesJson, "ringsEnabled", ringsEnabledField);
@@ -1154,6 +1199,7 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "grabHaptics", grabHapticsEnabledField);
             ApplyStringPreference(preferencesJson, "anchorMode", anchorModeField);
             ApplyStringPreference(preferencesJson, "anchorAtomUid", anchorAtomUidField);
+            ApplyDesktopPlacementPreference(preferencesJson);
             ApplyRadarModePreference(preferencesJson);
 
             ApplyFloatPreference(preferencesJson, "hudOffsetX", hudOffsetXField);
@@ -1230,6 +1276,14 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "showLights", showLightAtomsField);
             ApplyBoolPreference(preferencesJson, "showCUA", showCustomUnityAssetAtomsField);
             ApplyBoolPreference(preferencesJson, "showPeople", showPersonAtomsField);
+            ApplyBoolPreference(preferencesJson, "showEmpty", showEmptyAtomsField);
+            ApplyBoolPreference(preferencesJson, "showSubScene", showSubSceneAtomsField);
+            ApplyBoolPreference(preferencesJson, "showImagePanel", showImagePanelAtomsField);
+            ApplyBoolPreference(preferencesJson, "showAnimation", showAnimationAtomsField);
+            ApplyBoolPreference(preferencesJson, "showForce", showForceAtomsField);
+            ApplyBoolPreference(preferencesJson, "showShapes", showShapeAtomsField);
+            ApplyBoolPreference(preferencesJson, "showSounds", showSoundAtomsField);
+            ApplyBoolPreference(preferencesJson, "showTriggers", showTriggerAtomsField);
             ApplyBoolPreference(preferencesJson, "showOtherAtoms", showOtherAtomsField);
         }
         finally
@@ -1267,9 +1321,18 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(showLightAtomsField, true);
         SetBoolNoCallback(showCustomUnityAssetAtomsField, false);
         SetBoolNoCallback(showPersonAtomsField, false);
+        SetBoolNoCallback(showEmptyAtomsField, false);
+        SetBoolNoCallback(showSubSceneAtomsField, false);
+        SetBoolNoCallback(showImagePanelAtomsField, false);
+        SetBoolNoCallback(showAnimationAtomsField, false);
+        SetBoolNoCallback(showForceAtomsField, false);
+        SetBoolNoCallback(showShapeAtomsField, false);
+        SetBoolNoCallback(showSoundAtomsField, false);
+        SetBoolNoCallback(showTriggerAtomsField, false);
         SetBoolNoCallback(showOtherAtomsField, false);
         SetStringNoCallback(anchorModeField, AnchorModeHud);
         SetStringNoCallback(anchorAtomUidField, "");
+        SetDesktopPlacementNoCallback(ResolveDefaultDesktopPlacement());
         SetRadarModeNoCallback(RadarModeHud);
 
         SetFloatNoCallback(hudOffsetXField, -0.59f);
@@ -1340,7 +1403,7 @@ public class FrameAngelRadar : MVRScript
         sb.Append('{');
         AppendJsonStringProperty(sb, ref wroteProperty, "schemaVersion", ResolveCommonPreferencesSchemaVersion());
         AppendJsonStringProperty(sb, ref wroteProperty, "savedAtUtc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-        AppendJsonBoolProperty(sb, ref wroteProperty, "globalPrefsAutoSave", ReadBool(globalPrefsAutoSaveField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "globalPrefsAutoSave", true);
         AppendJsonBoolProperty(sb, ref wroteProperty, "radarEnabled", ReadBool(radarEnabledField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "ignoreAttachedAtom", ReadBool(ignoreContainingAtomField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "ringsEnabled", ReadBool(ringsEnabledField, true));
@@ -1362,6 +1425,7 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHaptics", ReadBool(grabHapticsEnabledField, true));
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorMode", ResolveAnchorMode());
         AppendJsonStringProperty(sb, ref wroteProperty, "anchorAtomUid", ReadString(anchorAtomUidField, ""));
+        AppendJsonStringProperty(sb, ref wroteProperty, "desktopPlacement", ResolveDesktopPlacement());
         AppendJsonStringProperty(sb, ref wroteProperty, "radarMode", ResolveRadarMode());
 
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetX", ReadFloat(hudOffsetXField, -0.59f));
@@ -1418,6 +1482,14 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "showLights", ReadBool(showLightAtomsField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showCUA", ReadBool(showCustomUnityAssetAtomsField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showPeople", ReadBool(showPersonAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showEmpty", ReadBool(showEmptyAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showSubScene", ReadBool(showSubSceneAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showImagePanel", ReadBool(showImagePanelAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showAnimation", ReadBool(showAnimationAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showForce", ReadBool(showForceAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showShapes", ReadBool(showShapeAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showSounds", ReadBool(showSoundAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showTriggers", ReadBool(showTriggerAtomsField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showOtherAtoms", ReadBool(showOtherAtomsField, false));
         sb.Append('}');
         return sb.ToString();
@@ -1492,6 +1564,15 @@ public class FrameAngelRadar : MVRScript
         SetRadarModeNoCallback(legacyTwistReveal ? RadarModeWristLeft : RadarModeWristLeftAlwaysOn);
     }
 
+    private void ApplyDesktopPlacementPreference(string preferencesJson)
+    {
+        string value;
+        if (desktopPlacementField != null && TryReadStringPreference(preferencesJson, "desktopPlacement", out value))
+        {
+            SetDesktopPlacementNoCallback(value);
+        }
+    }
+
     private static void SetBoolNoCallback(JSONStorableBool field, bool value)
     {
         if (field != null)
@@ -1524,6 +1605,14 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private void SetDesktopPlacementNoCallback(string value)
+    {
+        if (desktopPlacementField != null)
+        {
+            desktopPlacementField.valNoCallback = NormalizeDesktopPlacement(value);
+        }
+    }
+
     private void SetRadarModeNoCallback(string value)
     {
         if (radarModeField != null)
@@ -1543,6 +1632,11 @@ public class FrameAngelRadar : MVRScript
     }
 
     private static string ReadString(JSONStorableString field, string fallback)
+    {
+        return field != null ? (field.val ?? "") : fallback;
+    }
+
+    private static string ReadString(JSONStorableStringChooser field, string fallback)
     {
         return field != null ? (field.val ?? "") : fallback;
     }
@@ -2633,8 +2727,56 @@ public class FrameAngelRadar : MVRScript
 
     private string ResolveAnchorMode()
     {
+        if (IsDesktopPlacementAttachedToUi())
+        {
+            return AnchorModeHud;
+        }
+
+        if (string.Equals(ResolveDesktopPlacement(), DesktopPlacementPinnedInWorld, StringComparison.Ordinal))
+        {
+            return IsCuaPreferenceProfileActive()
+                ? AnchorModeContainingAtom
+                : AnchorModeWorldStatic;
+        }
+
         string value = anchorModeField != null ? anchorModeField.val : "";
         return NormalizeAnchorMode(value);
+    }
+
+    private bool IsDesktopPlacementAttachedToUi()
+    {
+        return string.Equals(ResolveDesktopPlacement(), DesktopPlacementAttachedToUi, StringComparison.Ordinal);
+    }
+
+    private string ResolveDesktopPlacement()
+    {
+        string value = desktopPlacementField != null ? desktopPlacementField.val : "";
+        if (string.IsNullOrEmpty(value))
+        {
+            return ResolveDefaultDesktopPlacement();
+        }
+
+        return NormalizeDesktopPlacement(value);
+    }
+
+    private string ResolveDefaultDesktopPlacement()
+    {
+        return containingAtom != null
+            ? DesktopPlacementPinnedInWorld
+            : DesktopPlacementAttachedToUi;
+    }
+
+    private static string NormalizeDesktopPlacement(string value)
+    {
+        if (string.Equals(value, DesktopPlacementPinnedInWorld, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "Pinned In-World", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "Pinned", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "World Static", StringComparison.OrdinalIgnoreCase))
+        {
+            return DesktopPlacementPinnedInWorld;
+        }
+
+        return DesktopPlacementAttachedToUi;
     }
 
     private static string NormalizeAnchorMode(string value)
@@ -3002,11 +3144,27 @@ public class FrameAngelRadar : MVRScript
         bool light = IsLightAtom(atom);
         bool cua = IsCustomUnityAssetAtom(atom);
         bool person = IsPersonAtom(atom);
-        bool other = !light && !cua && !person;
+        bool empty = IsEmptyAtom(atom);
+        bool subScene = IsSubSceneAtom(atom);
+        bool imagePanel = IsImagePanelAtom(atom);
+        bool animation = IsAnimationAtom(atom);
+        bool force = IsForceAtom(atom);
+        bool shape = IsShapeAtom(atom);
+        bool sound = IsSoundAtom(atom);
+        bool trigger = IsTriggerAtom(atom);
+        bool other = !light && !cua && !person && !empty && !subScene && !imagePanel && !animation && !force && !shape && !sound && !trigger;
         return
             (light && showLightAtomsField.val) ||
             (cua && showCustomUnityAssetAtomsField.val) ||
             (person && showPersonAtomsField.val) ||
+            (empty && showEmptyAtomsField.val) ||
+            (subScene && showSubSceneAtomsField.val) ||
+            (imagePanel && showImagePanelAtomsField.val) ||
+            (animation && showAnimationAtomsField.val) ||
+            (force && showForceAtomsField.val) ||
+            (shape && showShapeAtomsField.val) ||
+            (sound && showSoundAtomsField.val) ||
+            (trigger && showTriggerAtomsField.val) ||
             (other && showOtherAtomsField.val);
 #else
         return true;
@@ -3033,6 +3191,69 @@ public class FrameAngelRadar : MVRScript
     private bool IsPersonAtom(Atom atom)
     {
         return AtomTextContains(atom, "person");
+    }
+
+    private bool IsFemalePersonAtom(Atom atom)
+    {
+        return IsPersonAtom(atom)
+            && (AtomTextContains(atom, "female")
+                || AtomTextContains(atom, "woman")
+                || AtomTextContains(atom, "girl"));
+    }
+
+    private bool IsMalePersonAtom(Atom atom)
+    {
+        return IsPersonAtom(atom)
+            && !IsFemalePersonAtom(atom)
+            && (AtomTextContains(atom, "male")
+                || AtomTextContains(atom, "man")
+                || AtomTextContains(atom, "boy"));
+    }
+
+    private bool IsEmptyAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "empty");
+    }
+
+    private bool IsSubSceneAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "subscene") || AtomTextContains(atom, "sub scene");
+    }
+
+    private bool IsImagePanelAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "imagepanel") || AtomTextContains(atom, "image panel");
+    }
+
+    private bool IsAnimationAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "animation")
+            || AtomTextContains(atom, "animationpattern")
+            || AtomTextContains(atom, "timeline");
+    }
+
+    private bool IsForceAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "force");
+    }
+
+    private bool IsShapeAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "shape")
+            || AtomTextContains(atom, "sphere")
+            || AtomTextContains(atom, "cube")
+            || AtomTextContains(atom, "capsule")
+            || AtomTextContains(atom, "plane");
+    }
+
+    private bool IsSoundAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "sound") || AtomTextContains(atom, "audio");
+    }
+
+    private bool IsTriggerAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "trigger");
     }
 
     private bool AtomTextContains(Atom atom, string value)
@@ -4528,7 +4749,48 @@ public class FrameAngelRadar : MVRScript
         }
         if (IsPersonAtom(atom))
         {
-            return new Color(0.96f, 0.42f, 0.90f, alpha);
+            if (IsFemalePersonAtom(atom))
+            {
+                return new Color(1.0f, 0.34f, 0.72f, alpha);
+            }
+            if (IsMalePersonAtom(atom))
+            {
+                return new Color(0.25f, 0.52f, 1.0f, alpha);
+            }
+
+            return new Color(0.78f, 0.54f, 1.0f, alpha);
+        }
+        if (IsEmptyAtom(atom))
+        {
+            return new Color(0.52f, 0.94f, 1.0f, alpha);
+        }
+        if (IsSubSceneAtom(atom))
+        {
+            return new Color(0.70f, 0.52f, 1.0f, alpha);
+        }
+        if (IsImagePanelAtom(atom))
+        {
+            return new Color(0.78f, 0.88f, 1.0f, alpha);
+        }
+        if (IsAnimationAtom(atom))
+        {
+            return new Color(0.36f, 1.0f, 0.56f, alpha);
+        }
+        if (IsForceAtom(atom))
+        {
+            return new Color(1.0f, 0.30f, 0.26f, alpha);
+        }
+        if (IsShapeAtom(atom))
+        {
+            return new Color(0.36f, 0.68f, 1.0f, alpha);
+        }
+        if (IsSoundAtom(atom))
+        {
+            return new Color(0.94f, 0.72f, 1.0f, alpha);
+        }
+        if (IsTriggerAtom(atom))
+        {
+            return new Color(1.0f, 0.72f, 0.32f, alpha);
         }
 
         return new Color(0.58f, 0.74f, 1.0f, alpha);
