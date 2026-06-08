@@ -76,11 +76,11 @@ if (-not (Test-Path -LiteralPath $VamManagedDir -PathType Container)) {
     throw "VaM managed directory does not exist: $VamManagedDir"
 }
 
-# Explicit 0.1.30 filenames keep this deploy helper auditable while version
+# Explicit 0.1.31 filenames keep this deploy helper auditable while version
 # metadata remains the source of truth consumed by Build-FaRadar.ps1.
 $expectedPluginFileNames = @(
-    "fa_radar.free.0.1.30.dll",
-    "fa_radar.pro.0.1.30.dll"
+    "fa_radar.free.0.1.31.dll",
+    "fa_radar.pro.0.1.31.dll"
 )
 $anchorPresetFileName = "Preset_FrameAngel_Radar_Empty.vap"
 $anchorPresetRelativeDirectory = "Custom\Atom\Empty"

@@ -7,11 +7,11 @@ Updated: 2026-06-08
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.30`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.31`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.30.dll`
-- `fa_radar.pro.0.1.30.dll`
+- `fa_radar.free.0.1.31.dll`
+- `fa_radar.pro.0.1.31.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -26,9 +26,10 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.30 keeps the normal UI limited to daily
+buttons, and text fields, but 0.1.31 keeps the normal UI limited to daily
 operation: host/display status, desktop/VR placement, HUD/wrist placement, mode,
-range, atom visibility, Pro filters, grab, haptics, reset, and status.
+range, atom visibility, Pro filters, Pro filming/lighting overlays, grab,
+haptics, reset, and status.
 Preference writes happen
 automatically after value changes; manual save buttons are not exposed.
 Prototype calibration controls remain registered but hidden. The first release
@@ -59,6 +60,7 @@ Free is the radar.
 - no in-game filter control surface
 - no category-specific Pro color system
 - no light volume/range/spot visualization
+- no rotation-axis or camera/frustum semantic overlays
 
 Free should stay useful, generous, and simple: the operator can make the radar
 look and sit how they want, but the radar does not become an atom-management
@@ -78,6 +80,8 @@ Pro is the operational radar.
 - light range visualization as generated spheres
 - spotlight visualization as generated cones
 - spotlight rotation, range, and spot-angle representation
+- per-marker rotation axes in VaM/world colors
+- optional user, desktop, and scene-camera frustum helpers for creator filming
 - color customization is a Pro feature
 - creator-facing Empty/atom resources should be thin anchor hosts around the shared
   runtime, not duplicate radar logic
@@ -109,7 +113,7 @@ Rules:
   foundation remains common code
 - Free builds exclude Pro-only controls and Pro-only generated visuals
 - Pro builds include filters, native plugin UI controls, color customization,
-  and light volume visuals
+  light volume visuals, rotation axes, and filming POV helpers
 - no raw runtime file IO, reflection, broad JSON object serializers, repo-local
   runtime JSON dependency, or absolute development paths are introduced for
   edition gating
@@ -122,8 +126,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.30.var`
-- `fa_radar.pro.0.1.30.var`
+- `fa_radar.free.0.1.31.var`
+- `fa_radar.pro.0.1.31.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.
@@ -143,3 +147,4 @@ architecture.
 - custom Frame Angel switch UI
 - external/browser/companion UI
 - final people classification source for women/men color defaults
+- Director Mode object grab/drag/rotate

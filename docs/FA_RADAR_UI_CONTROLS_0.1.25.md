@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.30
+# FA Radar UI Controls 0.1.31
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -29,6 +29,12 @@ VaM plugin UI now favors the controls needed during ordinary testing.
   `Show Shapes`, `Show Sounds`, `Show Triggers`,
   `Show Uncategorized Atoms`: Pro-only category filters, checked on by default
   when old prefs do not carry the current filter-defaults marker.
+- `Rotation Axes`, `Light Range Volumes`, `Spotlight Cones`, `User POV
+  Frustum`, `Desktop POV Frustum`, and `Scene Camera Frustums`: Pro-only
+  scene-map and filming overlays.
+- `Rotation Axis Length`, `Rotation Axis Width`, `Light Volume Alpha`, `Light
+  Marker Scale`, `POV Frustum Length`, and `POV Frustum Alpha`: Pro-only
+  overlay tuning.
 - `Grid Enabled`: shows or hides the meter grid.
 - `Grab Handles Enabled`: enables invisible direct grip placement.
 - `Grab Haptics`: enables controller feedback for grab, hand-off, reveal, and
@@ -59,7 +65,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.30 makes the visible range and one-meter grid contract the
+  registered, but 0.1.31 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision
