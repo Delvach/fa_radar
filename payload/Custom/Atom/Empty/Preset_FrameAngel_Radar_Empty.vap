@@ -32,7 +32,7 @@
       {
          "id" : "PluginManager",
          "plugins" : {
-            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.29.dll"
+            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.30.dll"
          }
       },
       {
@@ -60,7 +60,7 @@
          "Ground Axis Lock" : "true",
          "Height Stems" : "true",
          "Depth Size Cue" : "true",
-         "Available Atom Markers" : "true",
+         "Show Target Markers" : "true",
          "Click Select Markers" : "true"
       }
    ]
