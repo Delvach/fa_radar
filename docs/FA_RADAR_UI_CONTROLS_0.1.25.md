@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.28
+# FA Radar UI Controls 0.1.29
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -7,7 +7,14 @@ VaM plugin UI now favors the controls needed during ordinary testing.
 ## Normal UI
 
 - `Radar Enabled`: master runtime visibility and tick gate.
-- `Desktop Placement`: chooses `Attached To UI` or `Pinned In World`.
+- `Host Surface`: read-only surface classification, either scene/session or
+  Empty/atom anchor.
+- `Display Surface`: read-only display classification for scene/session,
+  desktop or VR.
+- `Desktop Placement`: scene/session desktop choice, `Attached To UI` or
+  `Pinned In World`.
+- `VR Placement`: scene/session VR choice, `Attached To UI` or
+  `Pinned In World`.
 - `HUD Offset X`, `HUD Offset Y`, `HUD Offset Z`: HUD-relative placement.
 - `HUD Scale`: HUD size only; it does not change represented meters.
 - `Reset HUD Offset`: restores the default HUD placement.
@@ -20,7 +27,8 @@ VaM plugin UI now favors the controls needed during ordinary testing.
 - `Show Lights`, `Show People`, `Show CUA Atoms`, `Show Empty`,
   `Show SubScene`, `Show ImagePanel`, `Show Animation`, `Show Force`,
   `Show Shapes`, `Show Sounds`, `Show Triggers`, `Show Other Atoms`: Pro-only
-  category filters.
+  category filters, checked on by default when old prefs do not carry the
+  current filter-defaults marker.
 - `Grid Enabled`: shows or hides the meter grid.
 - `Grab Handles Enabled`: enables invisible direct grip placement.
 - `Grab Haptics`: enables controller feedback for grab, hand-off, reveal, and
@@ -51,7 +59,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.28 makes the visible range and one-meter grid contract the
+  registered, but 0.1.29 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision
