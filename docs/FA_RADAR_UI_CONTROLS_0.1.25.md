@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.29
+# FA Radar UI Controls 0.1.30
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -23,12 +23,12 @@ VaM plugin UI now favors the controls needed during ordinary testing.
 - `Wrist Offset X`, `Wrist Offset Y`, `Wrist Offset Z`: wrist-relative
   placement.
 - `Radar Range Meters`: represented world radius in meters.
-- `Available Atom Markers`: shows or hides non-selected atom markers.
-- `Show Lights`, `Show People`, `Show CUA Atoms`, `Show Empty`,
+- `Show Target Markers`: shows or hides non-selected atom markers.
+- `Show Lights`, `Show People`, `Show Custom Unity Assets`, `Show Empty`,
   `Show SubScene`, `Show ImagePanel`, `Show Animation`, `Show Force`,
-  `Show Shapes`, `Show Sounds`, `Show Triggers`, `Show Other Atoms`: Pro-only
-  category filters, checked on by default when old prefs do not carry the
-  current filter-defaults marker.
+  `Show Shapes`, `Show Sounds`, `Show Triggers`,
+  `Show Uncategorized Atoms`: Pro-only category filters, checked on by default
+  when old prefs do not carry the current filter-defaults marker.
 - `Grid Enabled`: shows or hides the meter grid.
 - `Grab Handles Enabled`: enables invisible direct grip placement.
 - `Grab Haptics`: enables controller feedback for grab, hand-off, reveal, and
@@ -59,7 +59,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.29 makes the visible range and one-meter grid contract the
+  registered, but 0.1.30 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision

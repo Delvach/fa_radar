@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.29";
+    private const string Version = "0.1.30";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -346,9 +346,9 @@ public class FrameAngelRadar : MVRScript
         selectedGroundDropEnabledField = new JSONStorableBool("Selected Ground Drop", false);
         heightStemsEnabledField = new JSONStorableBool("Height Stems", true);
         depthSizeCueField = new JSONStorableBool("Depth Size Cue", true);
-        availableAtomMarkersEnabledField = new JSONStorableBool("Available Atom Markers", true);
+        availableAtomMarkersEnabledField = new JSONStorableBool("Show Target Markers", true);
         showLightAtomsField = new JSONStorableBool("Show Lights", true);
-        showCustomUnityAssetAtomsField = new JSONStorableBool("Show CUA Atoms", true);
+        showCustomUnityAssetAtomsField = new JSONStorableBool("Show Custom Unity Assets", true);
         showPersonAtomsField = new JSONStorableBool("Show People", true);
         showEmptyAtomsField = new JSONStorableBool("Show Empty", true);
         showSubSceneAtomsField = new JSONStorableBool("Show SubScene", true);
@@ -358,7 +358,7 @@ public class FrameAngelRadar : MVRScript
         showShapeAtomsField = new JSONStorableBool("Show Shapes", true);
         showSoundAtomsField = new JSONStorableBool("Show Sounds", true);
         showTriggerAtomsField = new JSONStorableBool("Show Triggers", true);
-        showOtherAtomsField = new JSONStorableBool("Show Other Atoms", true);
+        showOtherAtomsField = new JSONStorableBool("Show Uncategorized Atoms", true);
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
         // Session Grab Handles: Direct Grip Grab replaces the old visible-handle behavior.
         // Grip Grab Fallback is now active: grip near the radar, track controller movement, release to apply placement.
@@ -677,6 +677,7 @@ public class FrameAngelRadar : MVRScript
     private void ConfigureGlobalPreferenceCallbacks()
     {
         ConfigureGlobalPreferenceField(globalPrefsAutoSaveField);
+        ConfigureGlobalPreferenceField(cuaAnchorPresetField);
         ConfigureGlobalPreferenceField(hostSurfaceField);
         ConfigureGlobalPreferenceField(displaySurfaceField);
         if (globalPrefsAutoSaveField != null)
@@ -1162,8 +1163,7 @@ public class FrameAngelRadar : MVRScript
 
     private bool IsEmptyAnchorHostActive()
     {
-        return IsAttachedAtomAnchorHostActive()
-            || (cuaAnchorPresetField != null && cuaAnchorPresetField.val);
+        return IsAttachedAtomAnchorHostActive();
     }
 
     private bool IsSceneSessionPluginHostActive()
@@ -1173,7 +1173,56 @@ public class FrameAngelRadar : MVRScript
 
     private bool IsAttachedAtomAnchorHostActive()
     {
-        return containingAtom != null;
+        return ResolveAttachedAtomAnchorHost() != null;
+    }
+
+    private Atom ResolveAttachedAtomAnchorHost()
+    {
+        if (containingAtom == null || IsPluginManagerHostAtom(containingAtom))
+        {
+            return null;
+        }
+
+        return containingAtom;
+    }
+
+    private bool IsPluginManagerHostAtom(Atom atom)
+    {
+        if (atom == null)
+        {
+            return false;
+        }
+
+        string uid = atom.uid ?? "";
+        string type = atom.type ?? "";
+        string category = atom.category ?? "";
+
+        if (IsEmptyAtom(atom) || IsCustomUnityAssetAtom(atom))
+        {
+            return false;
+        }
+
+        if (atom.mainController == null)
+        {
+            return true;
+        }
+
+        return ContainsOrdinalIgnoreCase(uid, "PluginManager")
+            || ContainsOrdinalIgnoreCase(uid, "ScenePlugin")
+            || ContainsOrdinalIgnoreCase(uid, "SessionPlugin")
+            || ContainsOrdinalIgnoreCase(type, "PluginManager")
+            || ContainsOrdinalIgnoreCase(type, "ScenePlugin")
+            || ContainsOrdinalIgnoreCase(type, "SessionPlugin")
+            || ContainsOrdinalIgnoreCase(category, "PluginManager")
+            || ContainsOrdinalIgnoreCase(category, "ScenePlugin")
+            || ContainsOrdinalIgnoreCase(category, "SessionPlugin");
+    }
+
+    private static bool ContainsOrdinalIgnoreCase(string value, string fragment)
+    {
+        return !string.IsNullOrEmpty(value)
+            && !string.IsNullOrEmpty(fragment)
+            && value.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void UpdatePluginSurfaceStatus()
@@ -1471,7 +1520,8 @@ public class FrameAngelRadar : MVRScript
         if (IsCuaPreferenceProfileActive())
         {
             SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
-            SetStringNoCallback(anchorAtomUidField, containingAtom != null ? (containingAtom.uid ?? "") : "");
+            Atom anchorHost = ResolveAttachedAtomAnchorHost();
+            SetStringNoCallback(anchorAtomUidField, anchorHost != null ? (anchorHost.uid ?? "") : "");
             SetRadarModeNoCallback(RadarModeHud);
             ApplyCreatorAnchorPlacementDefaultsNoCallback();
         }
@@ -2162,7 +2212,8 @@ public class FrameAngelRadar : MVRScript
 
     private void ApplyCuaAnchorPresetMode()
     {
-        if (cuaAnchorPresetApplied || containingAtom == null || !IsCuaPreferenceProfileActive())
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (cuaAnchorPresetApplied || anchorHost == null || !IsCuaPreferenceProfileActive())
         {
             return;
         }
@@ -2171,12 +2222,12 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
         SetBoolNoCallback(radarEnabledField, true);
         SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
-        SetStringNoCallback(anchorAtomUidField, containingAtom.uid ?? "");
+        SetStringNoCallback(anchorAtomUidField, anchorHost.uid ?? "");
         ApplyCreatorAnchorPlacementDefaultsNoCallback();
         LoadGlobalPreferences();
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
         SetStringNoCallback(anchorModeField, AnchorModeContainingAtom);
-        SetStringNoCallback(anchorAtomUidField, containingAtom.uid ?? "");
+        SetStringNoCallback(anchorAtomUidField, anchorHost.uid ?? "");
         SetRadarModeNoCallback(RadarModeHud);
         haveSmoothedHudPosition = false;
         cuaAnchorPresetApplied = true;
@@ -2289,7 +2340,8 @@ public class FrameAngelRadar : MVRScript
             nextAtom = SuperController.singleton.GetSelectedAtom();
         }
 
-        if (ignoreContainingAtomField.val && nextAtom != null && containingAtom != null && nextAtom == containingAtom)
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (ignoreContainingAtomField.val && nextAtom != null && anchorHost != null && nextAtom == anchorHost)
         {
             nextAtom = null;
         }
@@ -2323,12 +2375,13 @@ public class FrameAngelRadar : MVRScript
 
     private void TrackAttachedAtomPlacement(Transform viewer)
     {
-        if (!placementModeField.val || containingAtom == null || containingAtom.mainController == null)
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (!placementModeField.val || anchorHost == null || anchorHost.mainController == null)
         {
             return;
         }
 
-        Vector3 worldPosition = containingAtom.mainController.transform.position;
+        Vector3 worldPosition = anchorHost.mainController.transform.position;
         Transform anchor = ResolveRadarAnchorTransform(ResolveAnchorMode());
         Vector3 localOffset = anchor != null
             ? anchor.InverseTransformPoint(worldPosition)
@@ -2607,7 +2660,7 @@ public class FrameAngelRadar : MVRScript
     {
         if (string.Equals(anchorMode, AnchorModeContainingAtom, StringComparison.Ordinal))
         {
-            return ResolveAtomRootTransform(containingAtom);
+            return ResolveAtomRootTransform(ResolveAttachedAtomAnchorHost());
         }
 
         if (string.Equals(anchorMode, AnchorModeAtomUid, StringComparison.Ordinal))
@@ -3297,7 +3350,8 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        if (ignoreContainingAtomField.val && containingAtom != null && atom == containingAtom)
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (ignoreContainingAtomField.val && anchorHost != null && atom == anchorHost)
         {
             return false;
         }
@@ -3687,7 +3741,8 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        if (containingAtom != null && IsCustomUnityAssetAtom(containingAtom))
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (anchorHost != null && IsCustomUnityAssetAtom(anchorHost))
         {
             return false;
         }
@@ -5640,17 +5695,18 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        if (containingAtom == null || containingAtom.mainController == null)
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (anchorHost == null || anchorHost.mainController == null)
         {
             SetStatus("Capture needs the plugin loaded on a movable atom.");
             return;
         }
 
-        Vector3 offset = viewer.InverseTransformPoint(containingAtom.mainController.transform.position);
+        Vector3 offset = viewer.InverseTransformPoint(anchorHost.mainController.transform.position);
         Transform anchor = ResolveRadarAnchorTransform(ResolveAnchorMode());
         if (anchor != null)
         {
-            offset = anchor.InverseTransformPoint(containingAtom.mainController.transform.position);
+            offset = anchor.InverseTransformPoint(anchorHost.mainController.transform.position);
         }
         SetHudOffset(offset);
         haveSmoothedHudPosition = false;
@@ -5686,7 +5742,8 @@ public class FrameAngelRadar : MVRScript
 
     private void UseContainingAtomAnchor()
     {
-        if (containingAtom == null)
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
+        if (anchorHost == null)
         {
             SetStatus("Containing atom anchor needs the plugin loaded on an atom or CUA.");
             return;
@@ -5694,7 +5751,7 @@ public class FrameAngelRadar : MVRScript
 
         if (anchorAtomUidField != null)
         {
-            anchorAtomUidField.SetVal(containingAtom.uid ?? "");
+            anchorAtomUidField.SetVal(anchorHost.uid ?? "");
         }
         if (anchorModeField != null)
         {
