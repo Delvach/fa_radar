@@ -1,22 +1,34 @@
-# FA Radar UI Controls 0.1.34
+# FA Radar UI Controls 0.1.35
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
 VaM plugin UI now favors the controls needed during ordinary testing.
 
-## Normal UI
+## Free UI
+
+- `Desktop Placement`: scene/session desktop choice, `Attached To UI` or
+  `Pinned In World`.
+- `VR Placement`: scene/session VR choice, `Attached To UI` or
+  `Pinned In World`.
+- `HUD Scale`: radar size only; it does not change represented meters.
+- `HUD Offset X`, `HUD Offset Y`, `HUD Offset Z`: HUD-relative placement.
+- `Static World X`, `Static World Y`, `Static World Z`: desktop/static
+  placement offsets for pinned in-world placement.
+
+Free keeps runtime grab, wrist reveal, haptics, all-atom visibility, grid,
+height stems, and default visual behavior active, but does not expose prototype
+tuning controls. All available atom markers render as the same yellow dot.
+
+## Pro UI
+
+Pro keeps the same placement controls and additionally exposes the operational
+scene-map controls:
 
 - `Radar Enabled`: master runtime visibility and tick gate.
 - `Host Surface`: read-only surface classification, either scene/session or
   Empty/atom anchor.
 - `Display Surface`: read-only display classification for scene/session,
   desktop or VR.
-- `Desktop Placement`: scene/session desktop choice, `Attached To UI` or
-  `Pinned In World`.
-- `VR Placement`: scene/session VR choice, `Attached To UI` or
-  `Pinned In World`.
-- `HUD Offset X`, `HUD Offset Y`, `HUD Offset Z`: HUD-relative placement.
-- `HUD Scale`: HUD size only; it does not change represented meters.
 - `Reset HUD Offset`: restores the default HUD placement.
 - `Radar Mode`: `HUD`, wrist-left/right, and wrist-left/right always-on.
 - `Wrist Scale`: wrist radar size only; it does not change represented meters.
@@ -55,8 +67,8 @@ anchoring surface:
 
 - Anchor controls: `Anchor Mode`, `Anchor Atom UID`, `Anchor To View`,
   `CUA Anchor Preset`, `Use Selected As Anchor`, `Use Containing Atom Anchor`,
-  `Capture Static From Current View`, static world position and rotation, and
-  manual anchor rotation.
+  `Capture Static From Current View`, static world rotation, and manual anchor
+  rotation.
 - Visual calibration: rings, ring rotation speed, shell/ring/grid/marker alpha,
   emission strength, target marker scale, height scale, height stem alpha,
   available atom alpha, legacy `Light Volume Alpha`, depth size cue and
@@ -67,12 +79,12 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.34 makes the visible range and one-meter grid contract the
+  registered, but 0.1.35 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision
 
-Agent review agreed that normal testing needs mode, HUD/wrist placement, grab,
-target visibility, Pro category filters, meter range, reset, and status. The
-rest is kept out of the main UI so stale prototype settings cannot hide the
-important controls or silently change the meter contract.
+The current Free testing pass needs only desktop/VR mode, scale, and basic
+placement offsets. The richer scene-map controls stay in Pro so stale prototype
+settings cannot hide the important controls or silently change the meter
+contract.

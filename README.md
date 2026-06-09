@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.34`.
+Current branch version: `0.1.35`.
 
-Current product contract version: `0.1.34`.
+Current product contract version: `0.1.35`.
 
 The current slice is compiled C# only:
 
@@ -68,9 +68,10 @@ The current slice is compiled C# only:
   read as a duplicate highlight by default
 - height stems for user, selected atom, and visible available atoms
 - range-edge fade and depth size cues for selected/available markers
-- edition-gated available atom markers: Free shows every eligible atom together,
-  Pro exposes Light, Person, CUA, Empty, SubScene, ImagePanel, Animation, Force,
-  Shapes, Sounds, Triggers, and other category filters
+- edition-gated available atom markers: Free shows every eligible atom as the
+  same yellow dot, while Pro exposes Light, Person, CUA, Empty, SubScene,
+  ImagePanel, Animation, Force, Shapes, Sounds, Triggers, and other category
+  filters
 - Pro-only rotation axes, light range spheres, spotlight cones, separate light
   alpha/size tuning, and optional user/desktop/scene-camera POV frustums as the
   first movie-studio scene-map layer
@@ -86,9 +87,10 @@ The current slice is compiled C# only:
 - the plugin UI reports `Host Surface` and `Display Surface` so a saved session
   can distinguish scene/session Desktop, scene/session VR, and Empty anchors
 - previous-selection rendering parked for now
-- Free/Pro editions compile from one codebase with static symbols; Free is the
-  unrestricted radar that shows everything, while Pro adds filters, category
-  colors, light volumes, rotation axes, and filming POV helpers
+- Free/Pro editions compile from one codebase with static symbols; Free exposes
+  only desktop/VR placement, scale, HUD offsets, and static desktop offsets,
+  while Pro adds filters, category colors, marker shapes, light volumes,
+  rotation axes, and filming POV helpers
 - FAAR/video-recorder integration consumes stable identifiers and visibility
   state only; Radar keeps placement authority
 - first release UI is native VaM plugin UI only; no external/browser/companion
@@ -125,12 +127,13 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.34.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.34.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.35.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.35.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.34.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.34.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.35.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.35.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
-Release `.var` names remain undecided; current package outputs use neutral
-dev candidate filenames under `build/packages`.
+The first Free test package output is
+`build/packages/FrameAngelDev.Radar.1.var`; public release `.var` branding
+remains undecided.

@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.34";
+    private const string Version = "0.1.35";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -85,6 +85,7 @@ public class FrameAngelRadar : MVRScript
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
     private static readonly Color AxisYColor = new Color(0.22f, 1.0f, 0.34f, 1.0f);
     private static readonly Color AxisZColor = new Color(0.26f, 0.52f, 1.0f, 1.0f);
+    private static readonly Color FreeAtomMarkerColor = new Color(1.0f, 0.78f, 0.18f, 1.0f);
     private static bool sharedRadarCommonPreferencesCacheKnown;
     private static string sharedRadarCommonPreferencesJson = "";
     private static float sharedRadarCommonPreferencesNextReadAt;
@@ -242,8 +243,10 @@ public class FrameAngelRadar : MVRScript
     private Mesh ringMesh;
     private Mesh gridMesh;
     private Mesh targetBlipMesh;
+#if FA_RADAR_PRO
     private Mesh panelMarkerMesh;
     private Mesh subSceneMarkerMesh;
+#endif
     private Mesh centerMarkerMesh;
     private Mesh heightStemMesh;
     private Mesh resizeGuideLineMesh;
@@ -672,6 +675,7 @@ public class FrameAngelRadar : MVRScript
     private void BuildSceneSessionUi()
     {
         UpdatePluginSurfaceStatus();
+#if FA_RADAR_PRO
         CreateToggle(radarEnabledField, false);
         CreateTextField(hostSurfaceField, true);
         CreateTextField(displaySurfaceField, true);
@@ -691,6 +695,16 @@ public class FrameAngelRadar : MVRScript
             ResetGlobalPreferencesAction();
         });
         CreateTextField(statusField, true);
+#else
+        BuildFreeSceneSessionUi();
+#endif
+    }
+
+    private void BuildFreeSceneSessionUi()
+    {
+        BuildSceneSessionPlacementUi();
+        BuildFreePlacementUi();
+        BuildFreeStaticWorldPlacementUi();
     }
 
     private bool ShouldUseCreatorAnchorUi()
@@ -701,6 +715,7 @@ public class FrameAngelRadar : MVRScript
     private void BuildEmptyAnchorUi()
     {
         UpdatePluginSurfaceStatus();
+#if FA_RADAR_PRO
         CreateToggle(radarEnabledField, false);
         CreateTextField(hostSurfaceField, true);
         BuildEmptyAnchorPlacementUi();
@@ -715,6 +730,14 @@ public class FrameAngelRadar : MVRScript
             ResetCreatorAnchorPlacement();
         });
         CreateTextField(statusField, true);
+#else
+        BuildFreeEmptyAnchorUi();
+#endif
+    }
+
+    private void BuildFreeEmptyAnchorUi()
+    {
+        BuildFreePlacementUi();
     }
 
     private void BuildEmptyAnchorPlacementUi()
@@ -744,6 +767,21 @@ public class FrameAngelRadar : MVRScript
         {
             ResetHudOffset();
         });
+    }
+
+    private void BuildFreePlacementUi()
+    {
+        CreateSlider(hudScaleField, false);
+        CreateSlider(hudOffsetXField, false);
+        CreateSlider(hudOffsetYField, false);
+        CreateSlider(hudOffsetZField, false);
+    }
+
+    private void BuildFreeStaticWorldPlacementUi()
+    {
+        CreateSlider(staticWorldXField, true);
+        CreateSlider(staticWorldYField, true);
+        CreateSlider(staticWorldZField, true);
     }
 
     private void BuildWristCompassUi()
@@ -2351,8 +2389,10 @@ public class FrameAngelRadar : MVRScript
         ringMesh = CreateRingMesh(72, 0.975f, 1.0f);
         centerMarkerMesh = CreateCenterMarkerMesh();
         targetBlipMesh = CreateTargetBlipMesh();
+#if FA_RADAR_PRO
         panelMarkerMesh = CreatePanelMarkerMesh();
         subSceneMarkerMesh = CreateSubSceneMarkerMesh();
+#endif
         heightStemMesh = CreateHeightStemMesh();
 #if FA_RADAR_PRO
         rotationAxisLineMesh = CreateAxisLineMesh();
@@ -3370,7 +3410,12 @@ public class FrameAngelRadar : MVRScript
 
         ApplyMarkerMeshForAtom(targetBlipObject, selectedAtom);
         PositionTargetSphere(targetBlipObject, radarLocal, visualRadius, markerScale, spin);
-        ApplyMaterialColor(targetMaterial, new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val));
+#if FA_RADAR_PRO
+        Color targetColor = new Color(1.0f, 0.68f, 0.16f, Mathf.Clamp01(markerAlphaField.val) * fadeAlpha);
+#else
+        Color targetColor = WithAlpha(FreeAtomMarkerColor, Mathf.Clamp01(markerAlphaField.val) * fadeAlpha);
+#endif
+        ApplyMaterialColor(targetMaterial, targetColor, Mathf.Max(0.0f, emissionStrengthField.val));
         UpdateHeightStem(targetHeightStemObject, radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && fadeAlpha > 0.01f);
 
         if (showGroundDrop)
@@ -3471,6 +3516,7 @@ public class FrameAngelRadar : MVRScript
 
     private Mesh ResolveMarkerMeshForAtom(Atom atom)
     {
+#if FA_RADAR_PRO
         if (IsSubSceneAtom(atom))
         {
             return subSceneMarkerMesh != null ? subSceneMarkerMesh : targetBlipMesh;
@@ -3480,6 +3526,7 @@ public class FrameAngelRadar : MVRScript
         {
             return panelMarkerMesh != null ? panelMarkerMesh : targetBlipMesh;
         }
+#endif
 
         return targetBlipMesh;
     }
@@ -3908,6 +3955,7 @@ public class FrameAngelRadar : MVRScript
         return AtomTextContains(atom, "imagepanel") || AtomTextContains(atom, "image panel");
     }
 
+#if FA_RADAR_PRO
     private bool IsPanelLikeAtom(Atom atom)
     {
         return IsImagePanelAtom(atom)
@@ -3918,6 +3966,7 @@ public class FrameAngelRadar : MVRScript
             || AtomTextContains(atom, "slate")
             || AtomTextContains(atom, "surface");
     }
+#endif
 
     private bool IsAnimationAtom(Atom atom)
     {
@@ -6088,7 +6137,7 @@ public class FrameAngelRadar : MVRScript
 
         return new Color(0.58f, 0.74f, 1.0f, alpha);
 #else
-        return new Color(0.62f, 0.82f, 1.0f, alpha);
+        return WithAlpha(FreeAtomMarkerColor, alpha);
 #endif
     }
 
@@ -6733,6 +6782,7 @@ public class FrameAngelRadar : MVRScript
         return mesh;
     }
 
+#if FA_RADAR_PRO
     private Mesh CreatePanelMarkerMesh()
     {
         return CreateBoxMarkerMesh("FA Radar Panel Marker Mesh", 1.35f, 0.74f, 0.14f);
@@ -6774,6 +6824,7 @@ public class FrameAngelRadar : MVRScript
         mesh.RecalculateBounds();
         return mesh;
     }
+#endif
 
     private Mesh CreateCenterMarkerMesh()
     {
@@ -7295,8 +7346,10 @@ public class FrameAngelRadar : MVRScript
         DestroyOwnedObject(ringMesh);
         DestroyOwnedObject(gridMesh);
         DestroyOwnedObject(targetBlipMesh);
+#if FA_RADAR_PRO
         DestroyOwnedObject(panelMarkerMesh);
         DestroyOwnedObject(subSceneMarkerMesh);
+#endif
         DestroyOwnedObject(centerMarkerMesh);
         DestroyOwnedObject(heightStemMesh);
         DestroyOwnedObject(resizeGuideLineMesh);
@@ -7311,8 +7364,10 @@ public class FrameAngelRadar : MVRScript
         ringMesh = null;
         gridMesh = null;
         targetBlipMesh = null;
+#if FA_RADAR_PRO
         panelMarkerMesh = null;
         subSceneMarkerMesh = null;
+#endif
         centerMarkerMesh = null;
         heightStemMesh = null;
         resizeGuideLineMesh = null;

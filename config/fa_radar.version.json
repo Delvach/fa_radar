@@ -1,11 +1,11 @@
 {
   "schemaVersion": "fa_radar_version_v2",
   "product": "fa_radar",
-  "version": "0.1.34",
+  "version": "0.1.35",
   "channel": "dev",
-  "branch": "codex/0.1.34-light-opacity-tuning",
-  "status": "light-opacity-tuning",
-  "versionNote": "0.1.34 adds separate Pro sliders for point-light range alpha, spotlight cone alpha, light volume scale, and light marker scale so VR light visuals can be tuned without changing represented meters. It keeps the old Light Volume Alpha pref as hidden compatibility and adds first-pass non-sphere markers for panel/slate/screen and SubScene-style atoms.",
+  "branch": "codex/0.1.35-free-edition-simplification",
+  "status": "free-edition-simplification",
+  "versionNote": "0.1.35 simplifies the Free edition for testing: Free exposes only desktop placement, VR placement, scale, and basic HUD/static offsets; all visible atoms render as plain yellow dot markers; richer marker shapes, custom colors, rotation axes, and light volume visuals stay Pro-gated.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
@@ -14,7 +14,7 @@
     "lineageNote": "FA Keyboard informed camera-relative placement and generated overlay visuals. FAP informs build, obfuscation, and package receipt shape. No source from either repo is copied into the runtime plugin."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.pro.0.1.34.dll",
+    "pluginFileName": "fa_radar.pro.0.1.35.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -28,11 +28,11 @@
       "compileSymbols": [
         "FA_RADAR_FREE"
       ],
-      "pluginFileName": "fa_radar.free.0.1.34.dll",
-      "packageFileName": "fa_radar.free.0.1.34.var",
-      "packageName": "FrameAngel.RadarFree",
-      "packageCreator": "FrameAngel",
-      "summary": "Movable, scalable, visually tunable radar that shows every eligible radar atom together as plain dots.",
+      "pluginFileName": "fa_radar.free.0.1.35.dll",
+      "packageFileName": "FrameAngelDev.Radar.1.var",
+      "packageName": "Radar",
+      "packageCreator": "FrameAngelDev",
+      "summary": "Movable, scalable Free radar that shows every eligible radar atom as the same plain yellow dot.",
       "filters": false,
       "inGameControlUi": false,
       "customCategoryColors": false,
@@ -43,8 +43,8 @@
       "compileSymbols": [
         "FA_RADAR_PRO"
       ],
-      "pluginFileName": "fa_radar.pro.0.1.34.dll",
-      "packageFileName": "fa_radar.pro.0.1.34.var",
+      "pluginFileName": "fa_radar.pro.0.1.35.dll",
+      "packageFileName": "fa_radar.pro.0.1.35.var",
       "packageName": "FrameAngel.RadarPro",
       "packageCreator": "FrameAngel",
       "summary": "Operational scene-map radar controls with native VaM plugin UI filters, category colors, rotation axes, light volumes, and filming POV helpers.",
@@ -69,17 +69,18 @@
       "creatorResources": {
         "emptyAtomPreset": "Custom\\Atom\\Empty\\Preset_FrameAngel_Radar_Empty.vap",
         "anchorMode": "Containing Atom",
-        "pluginFileName": "fa_radar.pro.0.1.34.dll"
+        "pluginFileName": "fa_radar.pro.0.1.35.dll"
       }
     }
   },
   "plannedRelease": {
     "varFileNameCandidates": [
+      "FrameAngelDev.Radar.1.var",
       "FrameAngel.DaFuqIzzit.1.var",
       "FrameAngel.Radar.1.var"
     ],
-    "status": "undecided",
-    "note": "Human-facing release package names are still undecided. Current build outputs use neutral dev candidate names."
+    "status": "dev-package-selected-for-first-build",
+    "note": "The first Free testing package is FrameAngelDev.Radar.1.var. Human-facing public release branding remains undecided."
   },
   "obfuscation": {
     "config": "config\\obfuscation.defaults.json",
@@ -87,5 +88,5 @@
     "profile": "vam_compat",
     "pluginKey": "fa_radar"
   },
-  "updatedAt": "2026-06-09T00:05:00-06:00"
+  "updatedAt": "2026-06-09T16:10:00-06:00"
 }

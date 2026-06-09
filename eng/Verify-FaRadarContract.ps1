@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.34"',
+        'private const string Version = "0.1.35"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -121,6 +121,10 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "BuildEmptyAnchorUi",
         "BuildEmptyAnchorPlacementUi",
         "BuildSceneSessionUi",
+        "BuildFreeSceneSessionUi",
+        "BuildFreeEmptyAnchorUi",
+        "BuildFreePlacementUi",
+        "BuildFreeStaticWorldPlacementUi",
         "BuildSceneSessionPlacementUi",
         "ResetCreatorAnchorPlacement",
         "IsAttachedAtomAnchorHostActive",
@@ -300,6 +304,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "IsAtomVisibleByFilter",
         "return true",
         "ResolveAvailableAtomColor",
+        "FreeAtomMarkerColor",
+        "return WithAlpha(FreeAtomMarkerColor, alpha)",
         "EnsureAvailableMarkerCapacity",
         "availableMarkerObjects",
         "availableStemObjects",
@@ -494,6 +500,130 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         }
     }
 
+    $buildSceneSessionUiIndex = $plugin.IndexOf("private void BuildSceneSessionUi()")
+    $shouldUseCreatorAnchorUiIndex = $plugin.IndexOf("private bool ShouldUseCreatorAnchorUi()")
+    if ($buildSceneSessionUiIndex -ge 0 -and $shouldUseCreatorAnchorUiIndex -gt $buildSceneSessionUiIndex) {
+        $sceneSessionUiBlock = $plugin.Substring($buildSceneSessionUiIndex, $shouldUseCreatorAnchorUiIndex - $buildSceneSessionUiIndex)
+        if (-not $sceneSessionUiBlock.Contains("#if FA_RADAR_PRO") -or -not $sceneSessionUiBlock.Contains("#else") -or -not $sceneSessionUiBlock.Contains("BuildFreeSceneSessionUi();")) {
+            Add-Failure "Scene/session UI must compile-gate Free edition to the simplified Free UI block before Pro controls."
+        }
+    }
+
+    $freeSceneUiIndex = $plugin.IndexOf("private void BuildFreeSceneSessionUi()")
+    $freeEmptyUiIndex = $plugin.IndexOf("private void BuildFreeEmptyAnchorUi()")
+    if ($freeSceneUiIndex -lt 0 -or $freeEmptyUiIndex -le $freeSceneUiIndex) {
+        Add-Failure "Free scene/session UI block must exist before Free Empty UI block."
+    } else {
+        $freeSceneUiEndIndex = $plugin.IndexOf("private bool ShouldUseCreatorAnchorUi()", $freeSceneUiIndex)
+        $freeSceneUiBlock = if ($freeSceneUiEndIndex -gt $freeSceneUiIndex) {
+            $plugin.Substring($freeSceneUiIndex, $freeSceneUiEndIndex - $freeSceneUiIndex)
+        } else {
+            $plugin.Substring($freeSceneUiIndex, $freeEmptyUiIndex - $freeSceneUiIndex)
+        }
+        $requiredFreeSceneUiSnippets = @(
+            "BuildSceneSessionPlacementUi();",
+            "BuildFreePlacementUi();",
+            "BuildFreeStaticWorldPlacementUi();"
+        )
+        foreach ($snippet in $requiredFreeSceneUiSnippets) {
+            if (-not $freeSceneUiBlock.Contains($snippet)) {
+                Add-Failure "Free scene/session UI missing simplified control snippet: $snippet"
+            }
+        }
+
+        $forbiddenFreeSceneUiSnippets = @(
+            "BuildWristCompassUi();",
+            "BuildProFilterUi();",
+            "CreateSlider(radarRangeMetersField",
+            "CreateToggle(availableAtomMarkersEnabledField",
+            "CreateToggle(gridEnabledField",
+            "CreateToggle(grabHandlesEnabledField",
+            "CreateToggle(grabHapticsEnabledField",
+            "CreateTextField(statusField"
+        )
+        foreach ($snippet in $forbiddenFreeSceneUiSnippets) {
+            if ($freeSceneUiBlock.Contains($snippet)) {
+                Add-Failure "Free scene/session UI must hide non-core control snippet: $snippet"
+            }
+        }
+    }
+
+    $buildSceneSessionPlacementUiIndex = $plugin.IndexOf("private void BuildSceneSessionPlacementUi()")
+    $buildPlacementUiIndex = $plugin.IndexOf("private void BuildPlacementUi()")
+    if ($buildSceneSessionPlacementUiIndex -ge 0 -and $buildPlacementUiIndex -gt $buildSceneSessionPlacementUiIndex) {
+        $scenePlacementUiBlock = $plugin.Substring($buildSceneSessionPlacementUiIndex, $buildPlacementUiIndex - $buildSceneSessionPlacementUiIndex)
+        if (-not $scenePlacementUiBlock.Contains("CreatePopup(desktopPlacementField, false);") -or -not $scenePlacementUiBlock.Contains("CreatePopup(vrPlacementField, true);")) {
+            Add-Failure "Free scene/session UI must expose Desktop Placement and VR Placement through the shared placement block."
+        }
+    }
+
+    $buildFreePlacementUiIndex = $plugin.IndexOf("private void BuildFreePlacementUi()")
+    $buildFreeStaticWorldPlacementUiIndex = $plugin.IndexOf("private void BuildFreeStaticWorldPlacementUi()")
+    if ($buildFreePlacementUiIndex -ge 0 -and $buildFreeStaticWorldPlacementUiIndex -gt $buildFreePlacementUiIndex) {
+        $freePlacementUiBlock = $plugin.Substring($buildFreePlacementUiIndex, $buildFreeStaticWorldPlacementUiIndex - $buildFreePlacementUiIndex)
+        $requiredFreePlacementUiSnippets = @(
+            "CreateSlider(hudScaleField, false);",
+            "CreateSlider(hudOffsetXField, false);",
+            "CreateSlider(hudOffsetYField, false);",
+            "CreateSlider(hudOffsetZField, false);"
+        )
+        foreach ($snippet in $requiredFreePlacementUiSnippets) {
+            if (-not $freePlacementUiBlock.Contains($snippet)) {
+                Add-Failure "Free HUD placement UI missing control snippet: $snippet"
+            }
+        }
+    }
+
+    $buildWristCompassUiIndex = $plugin.IndexOf("private void BuildWristCompassUi()")
+    if ($buildFreeStaticWorldPlacementUiIndex -ge 0 -and $buildWristCompassUiIndex -gt $buildFreeStaticWorldPlacementUiIndex) {
+        $freeStaticWorldPlacementUiBlock = $plugin.Substring($buildFreeStaticWorldPlacementUiIndex, $buildWristCompassUiIndex - $buildFreeStaticWorldPlacementUiIndex)
+        $requiredFreeStaticUiSnippets = @(
+            "CreateSlider(staticWorldXField, true);",
+            "CreateSlider(staticWorldYField, true);",
+            "CreateSlider(staticWorldZField, true);"
+        )
+        foreach ($snippet in $requiredFreeStaticUiSnippets) {
+            if (-not $freeStaticWorldPlacementUiBlock.Contains($snippet)) {
+                Add-Failure "Free desktop/static placement UI missing control snippet: $snippet"
+            }
+        }
+    }
+
+    if ($freeEmptyUiIndex -ge 0) {
+        $buildEmptyPlacementUiIndex = $plugin.IndexOf("private void BuildEmptyAnchorPlacementUi()")
+        if ($buildEmptyPlacementUiIndex -gt $freeEmptyUiIndex) {
+            $freeEmptyUiBlock = $plugin.Substring($freeEmptyUiIndex, $buildEmptyPlacementUiIndex - $freeEmptyUiIndex)
+            if (-not $freeEmptyUiBlock.Contains("BuildFreePlacementUi();")) {
+                Add-Failure "Free Empty/atom-anchor UI must expose only the simplified placement block."
+            }
+            if ($freeEmptyUiBlock.Contains("BuildProFilterUi();") -or $freeEmptyUiBlock.Contains("CreateSlider(radarRangeMetersField")) {
+                Add-Failure "Free Empty/atom-anchor UI must hide filters and radar range tuning."
+            }
+        }
+    }
+
+    $markerMeshFieldSnippet = @"
+#if FA_RADAR_PRO
+    private Mesh panelMarkerMesh;
+    private Mesh subSceneMarkerMesh;
+#endif
+"@
+    if (-not $plugin.Contains($markerMeshFieldSnippet.Trim())) {
+        Add-Failure "Panel/SubScene marker meshes must be compiled only for Pro."
+    }
+
+    $resolveMarkerMeshIndex = $plugin.IndexOf("private Mesh ResolveMarkerMeshForAtom(Atom atom)")
+    $resolveTargetRadarLocalIndex = $plugin.IndexOf("private Vector3 ResolveTargetRadarLocal")
+    if ($resolveMarkerMeshIndex -ge 0 -and $resolveTargetRadarLocalIndex -gt $resolveMarkerMeshIndex) {
+        $resolveMarkerMeshBlock = $plugin.Substring($resolveMarkerMeshIndex, $resolveTargetRadarLocalIndex - $resolveMarkerMeshIndex)
+        if (-not $resolveMarkerMeshBlock.Contains("#if FA_RADAR_PRO")) {
+            Add-Failure "Free marker mesh resolution must compile to plain dots; panel/subscene shape logic must be Pro-gated."
+        }
+        if (-not $resolveMarkerMeshBlock.Contains("return targetBlipMesh;")) {
+            Add-Failure "Marker mesh resolver must fall back to the plain dot mesh."
+        }
+    }
+
     $placementUiIndex = $plugin.IndexOf("BuildPlacementUi();")
     $grabUiIndex = $plugin.IndexOf("CreateToggle(grabHandlesEnabledField")
     if ($placementUiIndex -lt 0) {
@@ -523,7 +653,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CreateSlider(radarVisualRadiusField",
         "CreateSlider(desktopTiltDegreesField",
         "CreateSlider(responseSmoothingField",
-        "CreateSlider(staticWorldXField",
         "CreateSlider(wristTwistDegreesField",
         "CreateSlider(ringRotationSpeedField",
         "CreateSlider(targetMarkerScaleField",
@@ -638,8 +767,9 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.34.dll",
-        "fa_radar.pro.0.1.34.dll",
+        "fa_radar.free.0.1.35.dll",
+        "fa_radar.pro.0.1.35.dll",
+        "FrameAngelDev.Radar.1.var",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
         "Obfuscate-FaRadarPlugin.ps1",
@@ -685,8 +815,8 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.34.dll",
-        "fa_radar.pro.0.1.34.dll",
+        "fa_radar.free.0.1.35.dll",
+        "fa_radar.pro.0.1.35.dll",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom\Atom\Empty",
         "F:\sim\vam",
@@ -724,7 +854,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.34.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.35.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -773,11 +903,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.34") {
-        Add-Failure "Version config must declare version 0.1.34."
+    if ($version.version -ne "0.1.35") {
+        Add-Failure "Version config must declare version 0.1.35."
     }
-    if ($version.branch -ne "codex/0.1.34-light-opacity-tuning") {
-        Add-Failure "Version config branch must match codex/0.1.34-light-opacity-tuning."
+    if ($version.branch -ne "codex/0.1.35-free-edition-simplification") {
+        Add-Failure "Version config branch must match codex/0.1.35-free-edition-simplification."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -785,6 +915,21 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     }
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
+    }
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.35.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.35.dll."
+    }
+    if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
+        Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
+    }
+    if ($version.editions.free.packageCreator -ne "FrameAngelDev") {
+        Add-Failure "Free edition config must use FrameAngelDev package creator for the first dev package."
+    }
+    if ($version.editions.free.packageName -ne "Radar") {
+        Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
+    }
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.35.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.35.dll."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -878,8 +1023,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.34.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.34.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.35.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.35.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
@@ -908,7 +1053,7 @@ if ($ValidateLiveDeploy.IsPresent) {
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-        Add-Failure "Previous-selection rendering must stay disabled in 0.1.34."
+        Add-Failure "Previous-selection rendering must stay disabled in 0.1.35."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."

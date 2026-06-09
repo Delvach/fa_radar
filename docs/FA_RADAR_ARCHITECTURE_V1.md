@@ -1,6 +1,6 @@
 # FA Radar Architecture V1
 
-Updated: 2026-06-08
+Updated: 2026-06-09
 
 ## Goal
 
@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.34` on branch
-  `codex/0.1.34-light-opacity-tuning`.
+- Version: `0.1.35` on branch
+  `codex/0.1.35-free-edition-simplification`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.34.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.34.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.35.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.35.dll`.
 - Pro also ships a thin Empty atom preset:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,11 +27,16 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.34` branch preserves the generated visual treatment, keeps the normal
+The `0.1.35` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, and
 keeps separate scene/session `Desktop Placement` and `VR Placement` prefs. It
 also keeps optional wrist compass projection modes that can reveal on an
-outward twist or stay always-on per hand. The 0.1.34 behavior change is VR
+outward twist or stay always-on per hand. The 0.1.35 behavior change is Free
+edition simplification: Free exposes only desktop placement, VR placement,
+scale, HUD offsets, and static desktop offsets; all item markers are plain
+yellow dots. Pro remains the richer studio-map surface.
+
+The previous behavior change was VR
 readability tuning: point-light range spheres and spotlight cones get separate
 alpha sliders plus a light volume scale slider, the old `Light Volume Alpha`
 pref remains hidden compatibility, and the first non-sphere markers are routed
@@ -114,7 +119,7 @@ is available for VR comparison. Markers remain reference-frame-relative;
 grid-drop markers are projected onto the ground-axis root from target world X/Z
 delta against the active radar reference position.
 
-Previous-selection rendering is parked in `0.1.34`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.35`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
@@ -123,7 +128,7 @@ controls only the current atom's optional ground projection dot.
 The creator-anchor preference profile and atom-host path skip this system so
 Empty/CUA creator-anchor behavior remains separate.
 
-The active 0.1.34 session path is direct grip only: when a controller grip press
+The active 0.1.35 session path is direct grip only: when a controller grip press
 starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
 that controller position plus the radar world center. During the grab, the
 controller owns the radar's world-space center; HUD, static, atom-anchor, and
@@ -223,7 +228,7 @@ the viewer, so movement slides the grid under the centered user marker. In
 static world and Empty/atom-anchor modes the reference is the radar itself, so
 the grid and scene atoms stay stable while the user marker moves. `Grid Follows
 User`, `Grid Step Meters`, and `Floor Area Scale` remain registered legacy
-prefs, but 0.1.34 makes panning always-on, keeps the visible grid at one meter,
+prefs, but 0.1.35 keeps panning always-on, keeps the visible grid at one meter,
 and makes `Radar Range Meters` the authority for how much world the sphere
 represents.
 
@@ -352,8 +357,8 @@ offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.34.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.34.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.35.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.35.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -361,24 +366,24 @@ The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 VaM lifecycle callback skip rules, and a `.obf-report.json` next to each output
 DLL.
 
-The build helper also stages neutral candidate `.var` packages under
-`build\packages` with DLLs under `Custom/Plugins` and a root `meta.json`.
-The Pro package additionally stages
+The build helper also stages candidate `.var` packages under `build\packages`
+with DLLs under `Custom/Plugins` and a root `meta.json`. The first Free test
+package is `FrameAngelDev.Radar.1.var`. The Pro package additionally stages
 `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
 
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.34.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.34.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.35.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.35.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.34.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.34.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.35.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.35.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
-Future `.var` product naming is undecided. Current candidates are
-`FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; current package
-outputs remain dev candidates until the product name is chosen.
+Future public `.var` product naming is undecided. Current candidates are
+`FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; the first Free
+test package is `FrameAngelDev.Radar.1.var`.
 
 ## Product Editions
 
@@ -387,6 +392,8 @@ editions, not separate runtime forks.
 
 - Free is the movable, scalable, visually tunable radar, but it shows all
   supported radar atoms together.
+- Free exposes desktop/VR placement, scale, HUD offsets, static desktop offsets,
+  and all atoms as plain yellow dots.
 - Pro adds visibility switches in the native VaM plugin UI, customizable
   category colors, per-item rotation axes, richer light visuals such as range
   spheres and spotlight cones, and filming POV/frustum helpers.
@@ -402,7 +409,7 @@ The current product split authority is
 
 ## Planned Interaction Extensions
 
-Overlap clustering and God Mode are planned but not implemented in 0.1.34.
+Overlap clustering and God Mode are planned but not implemented in 0.1.35.
 The implementation should preserve the current marker identity path: visible
 atoms are still collected into `trackedAvailableAtoms`, projected into radar
 local space, and represented by pooled marker objects.
