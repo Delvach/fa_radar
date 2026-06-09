@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.32`.
+Current branch version: `0.1.33`.
 
-Current product contract version: `0.1.32`.
+Current product contract version: `0.1.33`.
 
 The current slice is compiled C# only:
 
@@ -13,8 +13,8 @@ The current slice is compiled C# only:
 - no asset bundle
 - compiled VaM plugin DLL
 - no raw runtime file IO; global prefs use VaM `FileManagerSecure` only
-- generated translucent/emissive sphere shell with a subtle lit material and
-  higher subdivisions
+- generated translucent/emissive sphere shell with a subtle unlit overlay
+  material and higher subdivisions
 - generated HUD objects and materials carry the `favr.hud.radar` filming
   identifier so FAAR/recorder tooling can locate the radar without scene
   storage or a product dependency
@@ -123,11 +123,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.32.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.32.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.33.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.33.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.32.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.32.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.33.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.33.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral

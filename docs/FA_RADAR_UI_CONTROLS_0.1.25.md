@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.32
+# FA Radar UI Controls 0.1.33
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -29,6 +29,8 @@ VaM plugin UI now favors the controls needed during ordinary testing.
   `Show Shapes`, `Show Sounds`, `Show Triggers`,
   `Show Uncategorized Atoms`: Pro-only category filters, checked on by default
   when old prefs do not carry the current filter-defaults marker.
+- `Show Navigation Panels` and `Show Camera Atoms`: Pro-only utility atom
+  filters, separated from uncategorized atoms and off by default.
 - `Rotation Axes`, `Light Range Volumes`, `Spotlight Cones`, `User POV
   Frustum`, `Desktop POV Frustum`, and `Scene Camera Frustums`: Pro-only
   scene-map and filming overlays.
@@ -65,7 +67,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.32 makes the visible range and one-meter grid contract the
+  registered, but 0.1.33 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision
