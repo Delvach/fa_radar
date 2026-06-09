@@ -1,20 +1,20 @@
 # FA Radar Product Editions V1
 
-Updated: 2026-06-08
+Updated: 2026-06-09
 
 ## Decision
 
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.34`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.35`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.34.dll`
-- `fa_radar.pro.0.1.34.dll`
+- `fa_radar.free.0.1.35.dll`
+- `fa_radar.pro.0.1.35.dll`
 
-Current package outputs use neutral dev candidate names while release branding
-remains undecided.
+The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
+branding remains undecided.
 
 ## First Release UI Scope
 
@@ -26,20 +26,20 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.34 keeps the normal UI limited to daily
-operation: host/display status, desktop/VR placement, HUD/wrist placement, mode,
-range, atom visibility, Pro filters, Pro filming/lighting overlays, grab,
-haptics, reset, and status.
+buttons, and text fields, but 0.1.35 intentionally keeps Free sparse: desktop
+placement, VR placement, scale, HUD offsets, and static desktop offsets.
+Free's grab/wrist behavior remains available through the default runtime path
+and saved preferences without exposing prototype tuning controls.
 Preference writes happen
 automatically after value changes; manual save buttons are not exposed.
 Prototype calibration controls remain registered but hidden. The first release
 should focus on core radar features: placement, scale up to a 1m rendered radar
 diameter, all-atom visibility in Free, Pro filters/colors, marker clarity,
 useful light discovery, package/deploy reliability, and stable performance.
-The `0.1.34` Pro filters keep navigation panel and camera/display-control atoms
+The `0.1.35` Pro filters keep navigation panel and camera/display-control atoms
 as separate default-hidden categories; this is distinct from optional POV and
 scene-camera frustum overlays.
-The `0.1.34` Pro tuning pass also splits light alpha into point-light and
+The `0.1.35` Pro tuning pass keeps split light alpha for point-light and
 spotlight controls, adds a light volume scale control, and starts the
 non-sphere marker language with flat rectangles for panel/slate/screen-style
 atoms and wider rectangles for SubScene atoms.
@@ -49,25 +49,21 @@ atoms and wider rectangles for SubScene atoms.
 Free is the radar.
 
 - same generated HUD radar foundation
-- free movement, scale, placement, and appearance controls
+- free movement, scale, and placement controls
 - session-plugin direct grip movement with OVR haptics; grip near the radar,
   move the controller, and release to apply the HUD/static/wrist placement state
 - two-hand outward-twist accordion scaling for HUD and wrist modes
-- optional `Radar Mode` values for HUD and wrist-left/right projection,
-  including always-on wrist variants
-- wrist modes keep their own wrist-relative offset/scale preferences and can
-  hand off to the opposing controller with a cross-body grip drag
-- shared HUD/static/atom anchor modes
-- global placement/scale/look preferences under
+- wrist/HUD placement behavior and handoff logic remain runtime features, but
+  Free does not expose prototype wrist tuning controls in the plugin UI
+- global placement/scale preferences under
   `Custom\PluginData\FrameAngel\Radar`
 - normal HUD/session prefs are separate from Empty/atom-anchor prefs
-- user-controlled visual tuning for the radar itself
 - no visibility filtering
-- all available radar-supported atoms are shown together
+- all available radar-supported atoms are shown together as the same yellow dot
 - no in-game filter control surface
-- no category-specific Pro color system
+- no category-specific Pro color system or custom appearance controls
 - no light volume/range/spot visualization
-- no rotation-axis or camera/frustum semantic overlays
+- no rotation-axis, richer marker-shape, or camera/frustum semantic overlays
 
 Free should stay useful, generous, and simple: the operator can make the radar
 look and sit how they want, but the radar does not become an atom-management
@@ -138,8 +134,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.34.var`
-- `fa_radar.pro.0.1.34.var`
+- `FrameAngelDev.Radar.1.var`
+- `fa_radar.pro.0.1.35.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.
@@ -147,6 +143,7 @@ The Pro candidate package includes the Empty atom preset under
 Human-facing release `.var` product naming remains undecided. Current
 candidates:
 
+- `FrameAngelDev.Radar.1.var`
 - `FrameAngel.DaFuqIzzit.1.var`
 - `FrameAngel.Radar.1.var`
 
