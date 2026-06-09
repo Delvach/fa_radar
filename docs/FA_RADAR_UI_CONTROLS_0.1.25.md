@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.31
+# FA Radar UI Controls 0.1.32
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -65,7 +65,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.31 makes the visible range and one-meter grid contract the
+  registered, but 0.1.32 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision

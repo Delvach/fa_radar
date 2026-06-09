@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.31";
+    private const string Version = "0.1.32";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -46,6 +46,7 @@ public class FrameAngelRadar : MVRScript
     private const string AnchorModeAtomUid = "Anchor Atom UID";
     private const string DesktopPlacementAttachedToUi = "Attached To UI";
     private const string DesktopPlacementPinnedInWorld = "Pinned In World";
+    private const string DesktopVisibilityRecoveryVersion = "desktop_visibility_recovery_v1";
     private const string PluginHostSurfaceEmptyAnchor = "Empty / Atom Anchor";
     private const string PluginHostSurfaceSceneSession = "Scene / Session Plugin";
     private const string DisplaySurfaceDesktop = "Desktop";
@@ -290,6 +291,7 @@ public class FrameAngelRadar : MVRScript
     private bool haveSmoothedHudPosition;
     private bool globalPreferencesLoading;
     private bool globalPreferencesDirty;
+    private bool globalPreferencesWriteAfterApply;
     private bool recorderRadarVisible = true;
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
@@ -1028,8 +1030,16 @@ public class FrameAngelRadar : MVRScript
         }
 #endif
 
-        globalPreferencesDirty = false;
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
+        bool writeAfterApply = globalPreferencesWriteAfterApply;
+        globalPreferencesWriteAfterApply = false;
+        globalPreferencesDirty = false;
+        if (writeAfterApply)
+        {
+            WriteGlobalPreferences();
+            return;
+        }
+
         if (loadedAny)
         {
             SetStatus("Global prefs loaded.");
@@ -1067,6 +1077,13 @@ public class FrameAngelRadar : MVRScript
 
         if (applied)
         {
+            if (globalPreferencesWriteAfterApply)
+            {
+                globalPreferencesWriteAfterApply = false;
+                WriteGlobalPreferences();
+                return;
+            }
+
             SetStatus("Global prefs refreshed.");
         }
     }
@@ -1445,6 +1462,7 @@ public class FrameAngelRadar : MVRScript
             ApplyStringPreference(preferencesJson, "anchorMode", anchorModeField);
             ApplyStringPreference(preferencesJson, "anchorAtomUid", anchorAtomUidField);
             ApplySceneSessionPlacementPreference(preferencesJson);
+            ApplyDesktopVisibilityRecoveryIfNeeded(preferencesJson);
             ApplyRadarModePreference(preferencesJson);
 
             ApplyFloatPreference(preferencesJson, "hudOffsetX", hudOffsetXField);
@@ -1703,6 +1721,7 @@ public class FrameAngelRadar : MVRScript
         AppendJsonStringProperty(sb, ref wroteProperty, "desktopPlacement", ResolveDesktopPlacement());
         AppendJsonStringProperty(sb, ref wroteProperty, "vrPlacement", ResolveVRPlacement());
         AppendJsonStringProperty(sb, ref wroteProperty, "radarMode", ResolveRadarMode());
+        AppendJsonStringProperty(sb, ref wroteProperty, "desktopVisibilityRecoveryVersion", DesktopVisibilityRecoveryVersion);
 
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetX", ReadFloat(hudOffsetXField, -0.59f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "hudOffsetY", ReadFloat(hudOffsetYField, 0.22f));
@@ -1868,6 +1887,29 @@ public class FrameAngelRadar : MVRScript
         {
             SetDesktopPlacementNoCallback(value);
         }
+    }
+
+    private void ApplyDesktopVisibilityRecoveryIfNeeded(string preferencesJson)
+    {
+        string recoveryVersion;
+        if (TryReadStringPreference(preferencesJson, "desktopVisibilityRecoveryVersion", out recoveryVersion)
+            && string.Equals(recoveryVersion, DesktopVisibilityRecoveryVersion, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (IsSceneSessionPluginHostActive() && !IsVrDisplayActive())
+        {
+            string desktopPlacement;
+            if (TryReadStringPreference(preferencesJson, "desktopPlacement", out desktopPlacement)
+                && string.Equals(NormalizeDesktopPlacement(desktopPlacement), DesktopPlacementPinnedInWorld, StringComparison.Ordinal))
+            {
+                SetDesktopPlacementNoCallback(DesktopPlacementAttachedToUi);
+                haveSmoothedHudPosition = false;
+            }
+        }
+
+        globalPreferencesWriteAfterApply = true;
     }
 
     private void ApplyVRPlacementPreference(string preferencesJson)
@@ -2342,6 +2384,7 @@ public class FrameAngelRadar : MVRScript
         {
             ApplyRecorderRadarVisibility(false);
             DestroySessionGrabHandles();
+            SetStatus("Hidden by FAAR radarHudVisible=false.");
             return;
         }
         ApplyRecorderRadarVisibility(true);

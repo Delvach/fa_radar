@@ -1,0 +1,98 @@
+﻿{
+    "schemaVersion":  "fa_radar_deploy_receipt_v1",
+    "createdAtUtc":  "2026-06-09T00:36:28.8137712Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "branch":  "codex/0.1.32-desktop-visibility-recovery",
+    "commit":  "4f06a07caceb71ee2dc23cb4d6d848ac55897495",
+    "dirtyState":  [
+                       " M README.md",
+                       " M config/fa_radar.version.json",
+                       " M docs/FA_RADAR_ARCHITECTURE_V1.md",
+                       " M docs/FA_RADAR_PRODUCT_EDITIONS_V1.md",
+                       " M docs/FA_RADAR_UI_CONTROLS_0.1.25.md",
+                       " M eng/Verify-FaRadarContract.ps1",
+                       " M payload/Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
+                       " M payload/Custom/Scripts/FrameAngel/Radar/FrameAngelRadar.cs",
+                       " M scripts/Build-FaRadar.ps1",
+                       " M scripts/Deploy-FaRadar.ps1",
+                       "?? build/receipts/fa_radar_build_20260608_183627.json"
+                   ],
+    "version":  "0.1.32",
+    "editionRequest":  "All",
+    "expectedPluginFileNames":  [
+                                    "fa_radar.free.0.1.32.dll",
+                                    "fa_radar.pro.0.1.32.dll"
+                                ],
+    "anchorPresetFileName":  "Preset_FrameAngel_Radar_Empty.vap",
+    "configuration":  "Release",
+    "buildReceiptPath":  "C:\\projects\\fa_radar\\build\\receipts\\fa_radar_build_20260608_183627.json",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "skipBuild":  false,
+    "skipObfuscation":  false,
+    "skipPackage":  false,
+    "deployedDlls":  [
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.free.0.1.32.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.32.dll",
+                             "sha256":  "5356B5008D14C5D442647A1D1DB00B67DD67B66525C2007A97EA932866864DB3",
+                             "sourceSha256":  "5356B5008D14C5D442647A1D1DB00B67DD67B66525C2007A97EA932866864DB3",
+                             "bytes":  92672
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.pro.0.1.32.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.32.dll",
+                             "sha256":  "81C5B64E7FD7CD2C12A0D782F9426E69B523B9C8A8665E2B47BB50F04BFE8836",
+                             "sourceSha256":  "81C5B64E7FD7CD2C12A0D782F9426E69B523B9C8A8665E2B47BB50F04BFE8836",
+                             "bytes":  107520
+                         },
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.free.0.1.32.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.32.dll",
+                             "sha256":  "5356B5008D14C5D442647A1D1DB00B67DD67B66525C2007A97EA932866864DB3",
+                             "sourceSha256":  "5356B5008D14C5D442647A1D1DB00B67DD67B66525C2007A97EA932866864DB3",
+                             "bytes":  92672
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.pro.0.1.32.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.32.dll",
+                             "sha256":  "81C5B64E7FD7CD2C12A0D782F9426E69B523B9C8A8665E2B47BB50F04BFE8836",
+                             "sourceSha256":  "81C5B64E7FD7CD2C12A0D782F9426E69B523B9C8A8665E2B47BB50F04BFE8836",
+                             "bytes":  107520
+                         }
+                     ],
+    "deployedPresets":  [
+                            {
+                                "vamRoot":  "F:\\sim\\vam",
+                                "presetDirectory":  "F:\\sim\\vam\\Custom\\Atom\\Empty",
+                                "path":  "F:\\sim\\vam\\Custom\\Atom\\Empty\\Preset_FrameAngel_Radar_Empty.vap",
+                                "presetFileName":  "Preset_FrameAngel_Radar_Empty.vap",
+                                "sha256":  "DF1FC7D989DF77029D38A9FEF471A17162940A7507CC38AA45C2ACD659540F5C",
+                                "sourceSha256":  "DF1FC7D989DF77029D38A9FEF471A17162940A7507CC38AA45C2ACD659540F5C",
+                                "bytes":  2011
+                            },
+                            {
+                                "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                                "presetDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Atom\\Empty",
+                                "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Atom\\Empty\\Preset_FrameAngel_Radar_Empty.vap",
+                                "presetFileName":  "Preset_FrameAngel_Radar_Empty.vap",
+                                "sha256":  "DF1FC7D989DF77029D38A9FEF471A17162940A7507CC38AA45C2ACD659540F5C",
+                                "sourceSha256":  "DF1FC7D989DF77029D38A9FEF471A17162940A7507CC38AA45C2ACD659540F5C",
+                                "bytes":  2011
+                            }
+                        ],
+    "archivedLegacyScripts":  [
+
+                              ]
+}

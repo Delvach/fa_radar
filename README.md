@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.31`.
+Current branch version: `0.1.32`.
 
-Current product contract version: `0.1.31`.
+Current product contract version: `0.1.32`.
 
 The current slice is compiled C# only:
 
@@ -38,6 +38,9 @@ The current slice is compiled C# only:
   with automatic global preference saves after values change
 - scene/session plugins expose separate `Desktop Placement` and `VR Placement`
   choices, while Empty/atom-hosted instances stay scene-anchored to their host
+- scene/session desktop loads recover older pinned-world desktop prefs back to
+  `Attached To UI` once, so a saved off-screen/static desktop placement cannot
+  make Radar appear lost; Empty/atom-anchor prefs are not migrated
 - scene/session placement controls stay visible even if older saved plugin
   state contains the legacy `CUA Anchor Preset` compatibility flag
 - session grab movement is default-on and direct: grip near the radar, move the
@@ -51,7 +54,8 @@ The current slice is compiled C# only:
   `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - FAAR visibility handshake reads
   `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
-  Radar visuals when `radarHudVisible` is false
+  Radar visuals when `radarHudVisible` is false; the plugin status reports
+  `Hidden by FAAR radarHudVisible=false.` when that is the reason it is hidden
 - optional world-axis alignment for the grid and rings
 - ground-axis lock so the grid represents real world X/Z and camera roll does
   not roll the radar Z axis
@@ -119,11 +123,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.31.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.31.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.32.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.32.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.31.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.31.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.32.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.32.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Release `.var` names remain undecided; current package outputs use neutral

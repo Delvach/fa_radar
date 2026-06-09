@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.31` on branch
-  `codex/0.1.31-static-reference-pro-volumes`.
+- Version: `0.1.32` on branch
+  `codex/0.1.32-desktop-visibility-recovery`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.31.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.31.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.32.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.32.dll`.
 - Pro also ships a thin Empty atom preset:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,18 +27,18 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.31` branch preserves the generated visual treatment, keeps the normal
+The `0.1.32` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, adds a
 separate scene/session `Desktop Placement` and `VR Placement` split, keeps
 Empty/atom-hosted instances anchored to their host, and raises HUD/wrist
-placement scale so the
-rendered radar can reach a 1m diameter without changing represented meters. It
-also keeps optional wrist compass projection modes that can reveal on an
-outward twist or stay always-on per hand. The 0.1.31 behavior change is that
-static scene and Empty/atom-anchor radar displays use the radar's own world pose
-as the map origin, so scene items stay stable in the radar while the user moves
-as a green marker. It uses generated emissive polygons so targeting can be
-tested before any art polish:
+placement scale so the rendered radar can reach a 1m diameter without changing
+represented meters. It also keeps optional wrist compass projection modes that
+can reveal on an outward twist or stay always-on per hand. The 0.1.32 behavior
+change is desktop visibility recovery: older scene/session desktop prefs that
+predate the recovery marker and were saved as `Pinned In World` are migrated
+once to `Attached To UI`, while Empty/static-anchor prefs keep their static
+scene behavior. It uses generated emissive polygons so targeting can be tested
+before any art polish:
 
 - unified desktop/VR treatment using the same sphere shell, meter grid, and
   target markers
@@ -112,7 +112,7 @@ is available for VR comparison. Markers remain reference-frame-relative;
 grid-drop markers are projected onto the ground-axis root from target world X/Z
 delta against the active radar reference position.
 
-Previous-selection rendering is parked in `0.1.31`. `Selected Ground Drop`
+Previous-selection rendering is parked in `0.1.32`. `Selected Ground Drop`
 controls only the current atom's optional ground projection dot.
 
 ## Session Grab Handles
@@ -121,7 +121,7 @@ controls only the current atom's optional ground projection dot.
 The creator-anchor preference profile and atom-host path skip this system so
 Empty/CUA creator-anchor behavior remains separate.
 
-The active 0.1.31 session path is direct grip only: when a controller grip press
+The active 0.1.32 session path is direct grip only: when a controller grip press
 starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
 that controller position plus the radar world center. During the grab, the
 controller owns the radar's world-space center; HUD, static, atom-anchor, and
@@ -221,7 +221,7 @@ the viewer, so movement slides the grid under the centered user marker. In
 static world and Empty/atom-anchor modes the reference is the radar itself, so
 the grid and scene atoms stay stable while the user marker moves. `Grid Follows
 User`, `Grid Step Meters`, and `Floor Area Scale` remain registered legacy
-prefs, but 0.1.31 makes panning always-on, keeps the visible grid at one meter,
+prefs, but 0.1.32 makes panning always-on, keeps the visible grid at one meter,
 and makes `Radar Range Meters` the authority for how much world the sphere
 represents.
 
@@ -350,8 +350,8 @@ offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.31.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.31.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.32.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.32.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -367,11 +367,11 @@ The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.31.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.31.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.32.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.32.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.31.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.31.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.32.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.32.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Future `.var` product naming is undecided. Current candidates are
@@ -400,7 +400,7 @@ The current product split authority is
 
 ## Planned Interaction Extensions
 
-Overlap clustering and God Mode are planned but not implemented in 0.1.31.
+Overlap clustering and God Mode are planned but not implemented in 0.1.32.
 The implementation should preserve the current marker identity path: visible
 atoms are still collected into `trackedAvailableAtoms`, projected into radar
 local space, and represented by pooled marker objects.
