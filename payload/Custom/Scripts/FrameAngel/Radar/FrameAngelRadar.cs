@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.32";
+    private const string Version = "0.1.33";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -51,7 +51,7 @@ public class FrameAngelRadar : MVRScript
     private const string PluginHostSurfaceSceneSession = "Scene / Session Plugin";
     private const string DisplaySurfaceDesktop = "Desktop";
     private const string DisplaySurfaceVR = "VR";
-    private const string ProFilterDefaultsVersion = "all_on_v2";
+    private const string ProFilterDefaultsVersion = "utility_hidden_v3";
     private const string RadarModeHud = "HUD";
     private const string RadarModeWristLeft = "wrist-left";
     private const string RadarModeWristRight = "wrist-right";
@@ -66,6 +66,8 @@ public class FrameAngelRadar : MVRScript
     private const float WristRevealGraceSeconds = 0.55f;
     private const float WristHandOffDistanceMeters = 0.61f;
     private const float WristHandOffMinimumTravelMeters = 0.30f;
+    private const float HudHandOffDistanceMeters = 0.38f;
+    private const float HudDetachToWristDistanceMeters = 0.55f;
     private const float GrabResizeMinimumStartDistanceMeters = 0.05f;
     private const float AccordionResizeMinimumStartDistanceMeters = 0.08f;
     private const float GrabHapticCooldownSeconds = 0.08f;
@@ -123,6 +125,8 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showShapeAtomsField;
     private JSONStorableBool showSoundAtomsField;
     private JSONStorableBool showTriggerAtomsField;
+    private JSONStorableBool showNavigationPanelAtomsField;
+    private JSONStorableBool showCameraAtomsField;
     private JSONStorableBool showOtherAtomsField;
 #if FA_RADAR_PRO
     private JSONStorableBool showRotationAxesField;
@@ -405,6 +409,8 @@ public class FrameAngelRadar : MVRScript
         showShapeAtomsField = new JSONStorableBool("Show Shapes", true);
         showSoundAtomsField = new JSONStorableBool("Show Sounds", true);
         showTriggerAtomsField = new JSONStorableBool("Show Triggers", true);
+        showNavigationPanelAtomsField = new JSONStorableBool("Show Navigation Panels", false);
+        showCameraAtomsField = new JSONStorableBool("Show Camera Atoms", false);
         showOtherAtomsField = new JSONStorableBool("Show Uncategorized Atoms", true);
 #if FA_RADAR_PRO
         showRotationAxesField = new JSONStorableBool("Rotation Axes", true);
@@ -552,6 +558,8 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showShapeAtomsField);
         RegisterBool(showSoundAtomsField);
         RegisterBool(showTriggerAtomsField);
+        RegisterBool(showNavigationPanelAtomsField);
+        RegisterBool(showCameraAtomsField);
         RegisterBool(showOtherAtomsField);
 #if FA_RADAR_PRO
         RegisterBool(showRotationAxesField);
@@ -749,6 +757,8 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(showShapeAtomsField, false);
         CreateToggle(showSoundAtomsField, true);
         CreateToggle(showTriggerAtomsField, false);
+        CreateToggle(showNavigationPanelAtomsField, true);
+        CreateToggle(showCameraAtomsField, false);
         CreateToggle(showOtherAtomsField, true);
         CreateToggle(showRotationAxesField, false);
         CreateToggle(showLightRangeVolumesField, true);
@@ -858,6 +868,8 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(showShapeAtomsField);
         ConfigureGlobalPreferenceCallback(showSoundAtomsField);
         ConfigureGlobalPreferenceCallback(showTriggerAtomsField);
+        ConfigureGlobalPreferenceCallback(showNavigationPanelAtomsField);
+        ConfigureGlobalPreferenceCallback(showCameraAtomsField);
         ConfigureGlobalPreferenceCallback(showOtherAtomsField);
 #if FA_RADAR_PRO
         ConfigureGlobalPreferenceCallback(showRotationAxesField);
@@ -1540,23 +1552,23 @@ public class FrameAngelRadar : MVRScript
             if (!TryReadStringPreference(preferencesJson, "proFilterDefaultsVersion", out filterDefaultsVersion)
                 || !string.Equals(filterDefaultsVersion, ProFilterDefaultsVersion, StringComparison.Ordinal))
             {
-                SetAllProAtomFiltersNoCallback(true);
+                SetDefaultProAtomFiltersNoCallback();
+                globalPreferencesWriteAfterApply = true;
             }
-            else
-            {
-                ApplyBoolPreference(preferencesJson, "showLights", showLightAtomsField);
-                ApplyBoolPreference(preferencesJson, "showCUA", showCustomUnityAssetAtomsField);
-                ApplyBoolPreference(preferencesJson, "showPeople", showPersonAtomsField);
-                ApplyBoolPreference(preferencesJson, "showEmpty", showEmptyAtomsField);
-                ApplyBoolPreference(preferencesJson, "showSubScene", showSubSceneAtomsField);
-                ApplyBoolPreference(preferencesJson, "showImagePanel", showImagePanelAtomsField);
-                ApplyBoolPreference(preferencesJson, "showAnimation", showAnimationAtomsField);
-                ApplyBoolPreference(preferencesJson, "showForce", showForceAtomsField);
-                ApplyBoolPreference(preferencesJson, "showShapes", showShapeAtomsField);
-                ApplyBoolPreference(preferencesJson, "showSounds", showSoundAtomsField);
-                ApplyBoolPreference(preferencesJson, "showTriggers", showTriggerAtomsField);
-                ApplyBoolPreference(preferencesJson, "showOtherAtoms", showOtherAtomsField);
-            }
+            ApplyBoolPreference(preferencesJson, "showLights", showLightAtomsField);
+            ApplyBoolPreference(preferencesJson, "showCUA", showCustomUnityAssetAtomsField);
+            ApplyBoolPreference(preferencesJson, "showPeople", showPersonAtomsField);
+            ApplyBoolPreference(preferencesJson, "showEmpty", showEmptyAtomsField);
+            ApplyBoolPreference(preferencesJson, "showSubScene", showSubSceneAtomsField);
+            ApplyBoolPreference(preferencesJson, "showImagePanel", showImagePanelAtomsField);
+            ApplyBoolPreference(preferencesJson, "showAnimation", showAnimationAtomsField);
+            ApplyBoolPreference(preferencesJson, "showForce", showForceAtomsField);
+            ApplyBoolPreference(preferencesJson, "showShapes", showShapeAtomsField);
+            ApplyBoolPreference(preferencesJson, "showSounds", showSoundAtomsField);
+            ApplyBoolPreference(preferencesJson, "showTriggers", showTriggerAtomsField);
+            ApplyBoolPreference(preferencesJson, "showNavigationPanels", showNavigationPanelAtomsField);
+            ApplyBoolPreference(preferencesJson, "showCameraAtoms", showCameraAtomsField);
+            ApplyBoolPreference(preferencesJson, "showOtherAtoms", showOtherAtomsField);
 #if FA_RADAR_PRO
             ApplyBoolPreference(preferencesJson, "showRotationAxes", showRotationAxesField);
             ApplyBoolPreference(preferencesJson, "showLightRangeVolumes", showLightRangeVolumesField);
@@ -1604,7 +1616,7 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(grabHandlesEnabledField, true);
         SetBoolNoCallback(grabHandleDebugVisibleField, false);
         SetBoolNoCallback(grabHapticsEnabledField, true);
-        SetAllProAtomFiltersNoCallback(true);
+        SetDefaultProAtomFiltersNoCallback();
 #if FA_RADAR_PRO
         SetBoolNoCallback(showRotationAxesField, true);
         SetBoolNoCallback(showLightRangeVolumesField, true);
@@ -1786,6 +1798,8 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "showShapes", ReadBool(showShapeAtomsField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showSounds", ReadBool(showSoundAtomsField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showTriggers", ReadBool(showTriggerAtomsField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showNavigationPanels", ReadBool(showNavigationPanelAtomsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "showCameraAtoms", ReadBool(showCameraAtomsField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showOtherAtoms", ReadBool(showOtherAtomsField, true));
 #if FA_RADAR_PRO
         AppendJsonBoolProperty(sb, ref wroteProperty, "showRotationAxes", ReadBool(showRotationAxesField, true));
@@ -1990,7 +2004,16 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(showShapeAtomsField, value);
         SetBoolNoCallback(showSoundAtomsField, value);
         SetBoolNoCallback(showTriggerAtomsField, value);
+        SetBoolNoCallback(showNavigationPanelAtomsField, value);
+        SetBoolNoCallback(showCameraAtomsField, value);
         SetBoolNoCallback(showOtherAtomsField, value);
+    }
+
+    private void SetDefaultProAtomFiltersNoCallback()
+    {
+        SetAllProAtomFiltersNoCallback(true);
+        SetBoolNoCallback(showNavigationPanelAtomsField, false);
+        SetBoolNoCallback(showCameraAtomsField, false);
     }
 
     private static bool ReadBool(JSONStorableBool field, bool fallback)
@@ -3268,7 +3291,7 @@ public class FrameAngelRadar : MVRScript
 
     private Quaternion ResolveDishLocalRotation()
     {
-        if (!desktopTopDownField.val)
+        if (!ShouldFlattenRadarY())
         {
             return Quaternion.identity;
         }
@@ -3276,12 +3299,18 @@ public class FrameAngelRadar : MVRScript
         return Quaternion.Euler(Mathf.Clamp(desktopTiltDegreesField.val, 0.0f, 90.0f), 0.0f, 0.0f);
     }
 
+    private bool ShouldFlattenRadarY()
+    {
+        return desktopTopDownField != null && desktopTopDownField.val && !IsVrDisplayActive();
+    }
+
     private void UpdateTargetBlip(Transform viewer, Transform target, bool showGroundDrop)
     {
         float visualRadius = ResolveVisualRadius();
-        Vector3 radarLocal = ResolveTargetWorldRadarLocal(viewer, target);
-        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, target);
-        float distanceMeters = ResolveWorldDistanceMeters(viewer, target);
+        Vector3 targetWorldPosition = ResolveAtomMarkerWorldPosition(selectedAtom, target);
+        Vector3 radarLocal = ResolveWorldPositionRadarLocal(viewer, targetWorldPosition);
+        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, targetWorldPosition);
+        float distanceMeters = ResolveWorldDistanceMeters(viewer, targetWorldPosition);
         float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
         float depthScale = ResolveDepthScale(distanceMeters);
         float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * depthScale;
@@ -3307,7 +3336,7 @@ public class FrameAngelRadar : MVRScript
             targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
         }
 
-        Vector3 meterLocal = ResolveWorldMetersFromReference(viewer, target.position);
+        Vector3 meterLocal = ResolveWorldMetersFromReference(viewer, targetWorldPosition);
         SetStatus(string.Format(
             "Selected: {0}  x:{1:0.0}m y:{2:0.0}m z:{3:0.0}m",
             selectedUid,
@@ -3344,8 +3373,9 @@ public class FrameAngelRadar : MVRScript
         ApplyMaterialColor(lastTargetDropMaterial, new Color(1.0f, 0.48f, 0.12f, Mathf.Clamp01(markerAlphaField.val) * 0.20f * fade), Mathf.Max(0.0f, emissionStrengthField.val));
 
         float visualRadius = ResolveVisualRadius();
-        Vector3 radarLocal = ResolveTargetRadarLocal(viewer, lastTarget);
-        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, lastTarget);
+        Vector3 lastTargetWorldPosition = ResolveAtomMarkerWorldPosition(lastSelectedAtom, lastTarget);
+        Vector3 radarLocal = ResolveWorldPositionRadarLocal(viewer, lastTargetWorldPosition);
+        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, lastTargetWorldPosition);
         float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * 0.82f;
         float spin = Time.time * Mathf.Max(10.0f, ringRotationSpeedField.val);
 
@@ -3381,7 +3411,7 @@ public class FrameAngelRadar : MVRScript
         Vector3 meterLocal = ResolveWorldMetersFromReference(viewer, target.position);
         float range = ResolveEffectiveRadarRangeMeters();
         Vector3 radarLocal;
-        if (desktopTopDownField.val)
+        if (ShouldFlattenRadarY())
         {
             radarLocal = new Vector3(meterLocal.x, 0.0f, meterLocal.z) / range;
         }
@@ -3405,8 +3435,18 @@ public class FrameAngelRadar : MVRScript
             return Vector3.zero;
         }
 
+        return ResolveTargetGroundRadarLocal(viewer, target.position);
+    }
+
+    private Vector3 ResolveTargetGroundRadarLocal(Transform viewer, Vector3 worldPosition)
+    {
+        if (viewer == null)
+        {
+            return Vector3.zero;
+        }
+
         Vector3 referencePosition = ResolveRadarReferencePosition(viewer);
-        Vector3 worldDelta = target.position - referencePosition;
+        Vector3 worldDelta = worldPosition - referencePosition;
         float range = ResolveEffectiveRadarRangeMeters();
         Vector3 radarLocal = new Vector3(
             worldDelta.x / range,
@@ -3437,7 +3477,7 @@ public class FrameAngelRadar : MVRScript
     {
         Vector3 worldDelta = ResolveWorldMetersFromReference(viewer, worldPosition);
         float range = ResolveEffectiveRadarRangeMeters();
-        Vector3 radarLocal = desktopTopDownField.val
+        Vector3 radarLocal = ShouldFlattenRadarY()
             ? new Vector3(worldDelta.x / range, 0.0f, worldDelta.z / range)
             : new Vector3(worldDelta.x / range, ResolveHeightRadarY(worldDelta.y), worldDelta.z / range);
         Vector2 horizontal = new Vector2(radarLocal.x, radarLocal.z);
@@ -3517,7 +3557,12 @@ public class FrameAngelRadar : MVRScript
             return 0.0f;
         }
 
-        return Vector3.Distance(ResolveRadarReferencePosition(viewer), target.position);
+        return ResolveRadarReferenceDistanceMeters(viewer, target.position);
+    }
+
+    private float ResolveRadarReferenceDistanceMeters(Transform viewer, Vector3 worldPosition)
+    {
+        return Vector3.Distance(ResolveRadarReferencePosition(viewer), worldPosition);
     }
 
     private float ResolveHeightRadarY(float worldYDeltaMeters)
@@ -3534,6 +3579,16 @@ public class FrameAngelRadar : MVRScript
         }
 
         return ResolveRadarReferenceDistanceMeters(viewer, target);
+    }
+
+    private float ResolveWorldDistanceMeters(Transform viewer, Vector3 worldPosition)
+    {
+        if (viewer == null)
+        {
+            return 0.0f;
+        }
+
+        return ResolveRadarReferenceDistanceMeters(viewer, worldPosition);
     }
 
     private float ResolveRangeFadeAlpha(float distanceMeters)
@@ -3644,8 +3699,8 @@ public class FrameAngelRadar : MVRScript
             {
                 Transform leftTransform = ResolveAtomRootTransform(left);
                 Transform rightTransform = ResolveAtomRootTransform(right);
-                float leftDistance = leftTransform != null ? (leftTransform.position - viewer.position).sqrMagnitude : float.MaxValue;
-                float rightDistance = rightTransform != null ? (rightTransform.position - viewer.position).sqrMagnitude : float.MaxValue;
+                float leftDistance = leftTransform != null ? (ResolveAtomMarkerWorldPosition(left, leftTransform) - viewer.position).sqrMagnitude : float.MaxValue;
+                float rightDistance = rightTransform != null ? (ResolveAtomMarkerWorldPosition(right, rightTransform) - viewer.position).sqrMagnitude : float.MaxValue;
                 return leftDistance.CompareTo(rightDistance);
             });
         }
@@ -3693,7 +3748,9 @@ public class FrameAngelRadar : MVRScript
         bool shape = IsShapeAtom(atom);
         bool sound = IsSoundAtom(atom);
         bool trigger = IsTriggerAtom(atom);
-        bool other = !light && !cua && !person && !empty && !subScene && !imagePanel && !animation && !force && !shape && !sound && !trigger;
+        bool navigationPanel = IsNavigationPanelAtom(atom);
+        bool camera = IsCameraAtom(atom);
+        bool other = !light && !cua && !person && !empty && !subScene && !imagePanel && !animation && !force && !shape && !sound && !trigger && !navigationPanel && !camera;
         return
             (light && showLightAtomsField.val) ||
             (cua && showCustomUnityAssetAtomsField.val) ||
@@ -3706,6 +3763,8 @@ public class FrameAngelRadar : MVRScript
             (shape && showShapeAtomsField.val) ||
             (sound && showSoundAtomsField.val) ||
             (trigger && showTriggerAtomsField.val) ||
+            (navigationPanel && showNavigationPanelAtomsField.val) ||
+            (camera && showCameraAtomsField.val) ||
             (other && showOtherAtomsField.val);
 #else
         return true;
@@ -3795,6 +3854,21 @@ public class FrameAngelRadar : MVRScript
     private bool IsTriggerAtom(Atom atom)
     {
         return AtomTextContains(atom, "trigger");
+    }
+
+    private bool IsNavigationPanelAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "playernavigationpanel")
+            || AtomTextContains(atom, "navigationpanel")
+            || AtomTextContains(atom, "navigation panel");
+    }
+
+    private bool IsCameraAtom(Atom atom)
+    {
+        return AtomTextContains(atom, "windowcamera")
+            || AtomTextContains(atom, "displaycontrol")
+            || AtomTextContains(atom, "display control")
+            || AtomTextContains(atom, "camera");
     }
 
     private bool AtomTextContains(Atom atom, string value)
@@ -3939,9 +4013,10 @@ public class FrameAngelRadar : MVRScript
                 continue;
             }
 
-            Vector3 radarLocal = ResolveTargetWorldRadarLocal(viewer, target);
-            Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, target);
-            float distanceMeters = ResolveWorldDistanceMeters(viewer, target);
+            Vector3 targetWorldPosition = ResolveAtomMarkerWorldPosition(atom, target);
+            Vector3 radarLocal = ResolveWorldPositionRadarLocal(viewer, targetWorldPosition);
+            Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, targetWorldPosition);
+            float distanceMeters = ResolveWorldDistanceMeters(viewer, targetWorldPosition);
             float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
             if (fadeAlpha <= 0.01f)
             {
@@ -4153,6 +4228,8 @@ public class FrameAngelRadar : MVRScript
             && hasLight
             && IsLightAtom(atom)
             && light != null
+            && light.type == LightType.Point
+            && light.type != LightType.Directional
             && fadeAlpha > 0.01f;
         SetActiveIfChanged(volumeObject, show);
         if (!show)
@@ -4838,9 +4915,19 @@ public class FrameAngelRadar : MVRScript
     {
         moveGrabCurrentRadarWorldCenter = moveGrabStartRadarWorldCenter + worldDelta;
         moveGrabWorldOverrideActive = true;
+        if (TryCompleteHudDetachToWrist(moveGrabCurrentRadarWorldCenter, worldDelta, viewer))
+        {
+            return;
+        }
+
         if (IsWristCompassModeActive())
         {
-            if (TryCompleteWristGrabHandOff(moveGrabCurrentRadarWorldCenter, worldDelta))
+            if (TryCompleteWristGrabHandOff(moveGrabCurrentRadarWorldCenter, worldDelta, viewer))
+            {
+                return;
+            }
+
+            if (TryCompleteHudGrabHandOff(moveGrabCurrentRadarWorldCenter, worldDelta, viewer))
             {
                 return;
             }
@@ -4894,7 +4981,7 @@ public class FrameAngelRadar : MVRScript
         haveSmoothedHudPosition = false;
     }
 
-    private bool TryCompleteWristGrabHandOff(Vector3 proposedRadarPosition, Vector3 worldDelta)
+    private bool TryCompleteWristGrabHandOff(Vector3 proposedRadarPosition, Vector3 worldDelta, Transform viewer)
     {
         int activeHand = ResolveWristCompassHand();
         if (moveGrabHand == GrabHandUnknown || moveGrabHand == activeHand)
@@ -4918,13 +5005,84 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        bool alwaysOn = IsWristCompassAlwaysOn();
+        bool alwaysOn = ResolveHandoffAlwaysOn(targetAnchor, moveGrabHand, viewer);
         SetRadarModeNoCallback(ResolveRadarModeForHand(moveGrabHand, alwaysOn));
-        SetWristOffsetNoCallback(moveStartWristOffset);
+        SetWristOffsetNoCallback(targetAnchor.InverseTransformPoint(proposedRadarPosition));
         wristCompassRevealed = true;
         wristRevealGraceUntil = Time.unscaledTime + WristRevealGraceSeconds;
         FinishMoveGrabAfterWristHandOff(moveGrabHand);
         return true;
+    }
+
+    private bool TryCompleteHudGrabHandOff(Vector3 proposedRadarPosition, Vector3 worldDelta, Transform viewer)
+    {
+        if (!IsWristCompassModeActive() || viewer == null || worldDelta.magnitude < WristHandOffMinimumTravelMeters)
+        {
+            return false;
+        }
+
+        Vector3 hudTargetPosition = viewer.TransformPoint(moveStartHudOffset);
+        if (Vector3.Distance(proposedRadarPosition, hudTargetPosition) > HudHandOffDistanceMeters)
+        {
+            return false;
+        }
+
+        SetActiveDisplayPlacementNoCallback(DesktopPlacementAttachedToUi);
+        SetRadarModeNoCallback(RadarModeHud);
+        SetHudOffsetNoCallback(viewer.InverseTransformPoint(proposedRadarPosition));
+        wristCompassRevealed = false;
+        FinishMoveGrabAfterHudHandOff();
+        return true;
+    }
+
+    private bool TryCompleteHudDetachToWrist(Vector3 proposedRadarPosition, Vector3 worldDelta, Transform viewer)
+    {
+        if (IsWristCompassModeActive()
+            || moveGrabHand == GrabHandUnknown
+            || viewer == null
+            || !string.Equals(ResolveAnchorMode(), AnchorModeHud, StringComparison.Ordinal)
+            || worldDelta.magnitude < WristHandOffMinimumTravelMeters)
+        {
+            return false;
+        }
+
+        Transform targetAnchor = ResolveHandOrControllerTransform(moveGrabHand);
+        if (targetAnchor == null)
+        {
+            return false;
+        }
+
+        float handDistance = Vector3.Distance(proposedRadarPosition, targetAnchor.position);
+        float hudDistance = Vector3.Distance(proposedRadarPosition, viewer.TransformPoint(moveStartHudOffset));
+        if (handDistance > WristHandOffDistanceMeters || hudDistance < HudDetachToWristDistanceMeters)
+        {
+            return false;
+        }
+
+        bool alwaysOn = ResolveHandoffAlwaysOn(targetAnchor, moveGrabHand, viewer);
+        SetRadarModeNoCallback(ResolveRadarModeForHand(moveGrabHand, alwaysOn));
+        SetWristOffsetNoCallback(targetAnchor.InverseTransformPoint(proposedRadarPosition));
+        wristCompassRevealed = true;
+        wristRevealGraceUntil = Time.unscaledTime + WristRevealGraceSeconds;
+        FinishMoveGrabAfterWristHandOff(moveGrabHand);
+        return true;
+    }
+
+    private bool ResolveHandoffAlwaysOn(Transform targetAnchor, int hand, Transform viewer)
+    {
+        float threshold = Mathf.Clamp(ReadFloat(wristTwistDegreesField, 65.0f), 15.0f, 120.0f);
+        return ResolveControllerOutwardTwistDegrees(targetAnchor, hand, viewer) < threshold;
+    }
+
+    private void SetActiveDisplayPlacementNoCallback(string value)
+    {
+        if (IsVrDisplayActive())
+        {
+            SetVRPlacementNoCallback(value);
+            return;
+        }
+
+        SetDesktopPlacementNoCallback(value);
     }
 
     private string ResolveRadarModeForHand(int hand, bool alwaysOn)
@@ -4953,6 +5111,24 @@ public class FrameAngelRadar : MVRScript
         DestroyResizeGrabHandleAtom();
         EndDirectGripAccordionResize(false);
         SetStatus(hand == GrabHandRight ? "Wrist compass moved to right hand." : "Wrist compass moved to left hand.");
+    }
+
+    private void FinishMoveGrabAfterHudHandOff()
+    {
+        MarkGlobalPreferencesDirty();
+        FlushGlobalPreferencesIfDue(true);
+        PulseGrabHandleHaptics(moveGrabHand, 0.42f, 0.32f, 0.05f);
+        moveGrabActive = false;
+        resizeGrabActive = false;
+        moveGrabUsesGripFallback = false;
+        resizeGrabUsesGripFallback = false;
+        resizeHandleDismissedUntilMoveRelease = false;
+        moveGrabWorldOverrideActive = false;
+        moveGrabHand = GrabHandUnknown;
+        resizeGrabHand = GrabHandUnknown;
+        DestroyResizeGrabHandleAtom();
+        EndDirectGripAccordionResize(false);
+        SetStatus("Radar moved to HUD.");
     }
 
     private bool TryApplyPrimaryHandleDisplacement(Transform viewer, Vector3 radarCenter, FreeControllerV3 primaryController)
@@ -5791,6 +5967,14 @@ public class FrameAngelRadar : MVRScript
         {
             return new Color(1.0f, 0.72f, 0.32f, alpha);
         }
+        if (IsNavigationPanelAtom(atom))
+        {
+            return new Color(0.56f, 0.86f, 0.86f, alpha);
+        }
+        if (IsCameraAtom(atom))
+        {
+            return new Color(0.84f, 0.84f, 0.92f, alpha);
+        }
 
         return new Color(0.58f, 0.74f, 1.0f, alpha);
 #else
@@ -5965,6 +6149,74 @@ public class FrameAngelRadar : MVRScript
         return atom.transform;
     }
 
+    private Vector3 ResolveAtomMarkerWorldPosition(Atom atom, Transform fallback)
+    {
+        Vector3 center;
+        if (ResolveAtomVisualBoundsCenter(atom, fallback, out center))
+        {
+            return center;
+        }
+
+        return fallback != null ? fallback.position : Vector3.zero;
+    }
+
+    private bool ResolveAtomVisualBoundsCenter(Atom atom, Transform fallback, out Vector3 center)
+    {
+        center = fallback != null ? fallback.position : Vector3.zero;
+        Transform root = atom != null && atom.transform != null ? atom.transform : fallback;
+        if (root == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length <= 0)
+            {
+                return false;
+            }
+
+            bool hasBounds = false;
+            Bounds bounds = new Bounds(center, Vector3.zero);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || !renderer.enabled)
+                {
+                    continue;
+                }
+
+                if (radarRoot != null && renderer.transform != null && renderer.transform.IsChildOf(radarRoot.transform))
+                {
+                    continue;
+                }
+
+                if (!hasBounds)
+                {
+                    bounds = renderer.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+
+            if (!hasBounds)
+            {
+                return false;
+            }
+
+            center = bounds.center;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void UpdateMaterials()
     {
         float emission = Mathf.Max(0.0f, emissionStrengthField.val);
@@ -6039,14 +6291,14 @@ public class FrameAngelRadar : MVRScript
 
     private Material CreateSphereShellMaterial(string materialName, Color color, int renderQueue)
     {
-        Shader shader = Shader.Find("Standard");
-        if (shader == null)
-        {
-            shader = Shader.Find("Hidden/Internal-Colored");
-        }
+        Shader shader = Shader.Find("Hidden/Internal-Colored");
         if (shader == null)
         {
             shader = Shader.Find("Unlit/Color");
+        }
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
         }
         if (shader == null)
         {
@@ -6123,6 +6375,10 @@ public class FrameAngelRadar : MVRScript
         }
 
         renderer.sortingOrder = sortingOrder;
+        renderer.shadowCastingMode = ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        renderer.lightProbeUsage = LightProbeUsage.Off;
+        renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
         if (renderer.sharedMaterial != null)
         {
             ApplyOverlayMaterialSettings(renderer.sharedMaterial, renderQueue);
