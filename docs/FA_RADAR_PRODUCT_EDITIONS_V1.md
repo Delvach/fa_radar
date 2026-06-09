@@ -7,11 +7,11 @@ Updated: 2026-06-08
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.31`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.32`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.31.dll`
-- `fa_radar.pro.0.1.31.dll`
+- `fa_radar.free.0.1.32.dll`
+- `fa_radar.pro.0.1.32.dll`
 
 Current package outputs use neutral dev candidate names while release branding
 remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.31 keeps the normal UI limited to daily
+buttons, and text fields, but 0.1.32 keeps the normal UI limited to daily
 operation: host/display status, desktop/VR placement, HUD/wrist placement, mode,
 range, atom visibility, Pro filters, Pro filming/lighting overlays, grab,
 haptics, reset, and status.
@@ -126,8 +126,8 @@ Rules:
 
 Current build helpers stage candidate `.var` packages:
 
-- `fa_radar.free.0.1.31.var`
-- `fa_radar.pro.0.1.31.var`
+- `fa_radar.free.0.1.32.var`
+- `fa_radar.pro.0.1.32.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.
