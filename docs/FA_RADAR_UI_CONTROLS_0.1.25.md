@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.33
+# FA Radar UI Controls 0.1.34
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -34,9 +34,9 @@ VaM plugin UI now favors the controls needed during ordinary testing.
 - `Rotation Axes`, `Light Range Volumes`, `Spotlight Cones`, `User POV
   Frustum`, `Desktop POV Frustum`, and `Scene Camera Frustums`: Pro-only
   scene-map and filming overlays.
-- `Rotation Axis Length`, `Rotation Axis Width`, `Light Volume Alpha`, `Light
-  Marker Scale`, `POV Frustum Length`, and `POV Frustum Alpha`: Pro-only
-  overlay tuning.
+- `Rotation Axis Length`, `Rotation Axis Width`, `Point Light Alpha`,
+  `Spotlight Cone Alpha`, `Light Volume Scale`, `Light Marker Scale`, `POV
+  Frustum Length`, and `POV Frustum Alpha`: Pro-only overlay tuning.
 - `Grid Enabled`: shows or hides the meter grid.
 - `Grab Handles Enabled`: enables invisible direct grip placement.
 - `Grab Haptics`: enables controller feedback for grab, hand-off, reveal, and
@@ -59,15 +59,15 @@ anchoring surface:
   manual anchor rotation.
 - Visual calibration: rings, ring rotation speed, shell/ring/grid/marker alpha,
   emission strength, target marker scale, height scale, height stem alpha,
-  available atom alpha, depth size cue and strength, selected ground drop, and
-  range fade.
+  available atom alpha, legacy `Light Volume Alpha`, depth size cue and
+  strength, selected ground drop, and range fade.
 - Prototype behavior switches: `Flatten Target Y`, `World Axis Align`,
   `Ground Axis Lock`, `Grid Follows User`, `Grid Clip Circle`,
   `Placement Mode`, `Capture HUD Offset From Atom`, `Wrist Twist Degrees`,
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.33 makes the visible range and one-meter grid contract the
+  registered, but 0.1.34 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision
