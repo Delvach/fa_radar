@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.35";
+    private const string Version = "0.1.36";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -74,6 +74,13 @@ public class FrameAngelRadar : MVRScript
     private const float GrabHapticCooldownSeconds = 0.08f;
     private const float GripGrabPressThreshold = 0.62f;
     private const float GripGrabReleaseThreshold = 0.34f;
+#if FA_RADAR_PRO
+    private const float GrabThrowMinimumReleaseVelocity = 0.18f;
+    private const float GrabThrowStopVelocity = 0.04f;
+    private const float GrabThrowScaleSeconds = 0.45f;
+    private const float GrabThrowMaxSeconds = 2.5f;
+    private const float GrabThrowSurfaceInsetMeters = 0.03f;
+#endif
     private const float DefaultRadarVisualRadiusMeters = 0.08f;
     private const float MaxRadarVisualDiameterMeters = 1.0f;
     private const float MaxRadarPlacementScale = MaxRadarVisualDiameterMeters / (DefaultRadarVisualRadiusMeters * 2.0f);
@@ -137,6 +144,9 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableBool showUserPovFrustumField;
     private JSONStorableBool showDesktopPovFrustumField;
     private JSONStorableBool showSceneCameraFrustumsField;
+    private JSONStorableBool grabThrowPinEnabledField;
+    private JSONStorableBool grabThrowSurfaceStopField;
+    private JSONStorableBool grabThrowPinnedField;
 #endif
     private JSONStorableBool clickSelectMarkersField;
     private JSONStorableBool grabHandlesEnabledField;
@@ -183,6 +193,10 @@ public class FrameAngelRadar : MVRScript
     private JSONStorableFloat lightMarkerScaleField;
     private JSONStorableFloat povFrustumLengthField;
     private JSONStorableFloat povFrustumAlphaField;
+    private JSONStorableFloat grabThrowGrowScaleField;
+    private JSONStorableFloat grabThrowVelocityScaleField;
+    private JSONStorableFloat grabThrowDecelerationField;
+    private JSONStorableFloat grabThrowReturnScaleField;
 #endif
     private JSONStorableFloat grabHitRadiusMetersField;
     private JSONStorableFloat wristTwistDegreesField;
@@ -320,6 +334,9 @@ public class FrameAngelRadar : MVRScript
     private bool resizeHandleDismissedUntilMoveRelease;
     private bool ovrLeftGrabHapticActive;
     private bool ovrRightGrabHapticActive;
+#if FA_RADAR_PRO
+    private bool grabThrowActive;
+#endif
     private Vector3 smoothedHudPosition;
     private Vector3 moveStartHandlePosition;
     private Vector3 moveGrabStartRadarWorldCenter;
@@ -327,6 +344,13 @@ public class FrameAngelRadar : MVRScript
     private Vector3 moveStartHudOffset;
     private Vector3 moveStartWristOffset;
     private Vector3 moveStartStaticPosition;
+#if FA_RADAR_PRO
+    private Vector3 moveGrabPreviousControllerPosition;
+    private Vector3 moveGrabReleaseVelocity;
+    private Vector3 grabThrowPosition;
+    private Vector3 grabThrowStartPosition;
+    private Vector3 grabThrowVelocity;
+#endif
     private Vector3 resizeStartPrimaryPosition;
     private Vector3 resizeStartHandlePosition;
     private float nextGlobalPreferencesFlushTime;
@@ -347,6 +371,12 @@ public class FrameAngelRadar : MVRScript
     private float ovrLeftGrabHapticStopAt;
     private float ovrRightGrabHapticStopAt;
     private float radarMaterialAlphaMultiplier = 1.0f;
+#if FA_RADAR_PRO
+    private float moveGrabPreviousSampleTime;
+    private float grabThrowStartedAt;
+    private float grabThrowStartScale;
+    private float grabThrowTargetScale;
+#endif
     private int moveGrabHand = GrabHandUnknown;
     private int resizeGrabHand = GrabHandUnknown;
     private bool moveGrabWorldOverrideActive;
@@ -428,6 +458,9 @@ public class FrameAngelRadar : MVRScript
         showUserPovFrustumField = new JSONStorableBool("User POV Frustum", false);
         showDesktopPovFrustumField = new JSONStorableBool("Desktop POV Frustum", false);
         showSceneCameraFrustumsField = new JSONStorableBool("Scene Camera Frustums", false);
+        grabThrowPinEnabledField = new JSONStorableBool("Throw Pin On Release", false);
+        grabThrowSurfaceStopField = new JSONStorableBool("Throw Surface Stop", true);
+        grabThrowPinnedField = new JSONStorableBool("Throw Pinned State", false);
 #endif
         clickSelectMarkersField = new JSONStorableBool("Click Select Markers", true);
         // Session Grab Handles: Direct Grip Grab replaces the old visible-handle behavior.
@@ -522,6 +555,10 @@ public class FrameAngelRadar : MVRScript
         lightMarkerScaleField = new JSONStorableFloat("Light Marker Scale", 0.38f, 0.12f, 1.0f, true, true);
         povFrustumLengthField = new JSONStorableFloat("POV Frustum Length", 2.0f, 0.25f, 8.0f, true, true);
         povFrustumAlphaField = new JSONStorableFloat("POV Frustum Alpha", 0.12f, 0.0f, 0.5f, true, true);
+        grabThrowGrowScaleField = new JSONStorableFloat("Throw Grow Scale", 1.0f, 0.25f, MaxRadarPlacementScale, true, true);
+        grabThrowVelocityScaleField = new JSONStorableFloat("Throw Velocity Scale", 0.45f, 0.05f, 2.0f, true, true);
+        grabThrowDecelerationField = new JSONStorableFloat("Throw Deceleration", 1.5f, 0.2f, 8.0f, true, true);
+        grabThrowReturnScaleField = new JSONStorableFloat("Throw Return Scale", 0.49f, 0.05f, MaxRadarPlacementScale, true, true);
 #endif
         grabHitRadiusMetersField = new JSONStorableFloat("Grab Hit Radius Meters", 0.16f, 0.04f, 0.45f, true, true);
         wristTwistDegreesField = new JSONStorableFloat("Wrist Twist Degrees", 65.0f, 15.0f, 120.0f, true, true);
@@ -580,6 +617,9 @@ public class FrameAngelRadar : MVRScript
         RegisterBool(showUserPovFrustumField);
         RegisterBool(showDesktopPovFrustumField);
         RegisterBool(showSceneCameraFrustumsField);
+        RegisterBool(grabThrowPinEnabledField);
+        RegisterBool(grabThrowSurfaceStopField);
+        RegisterBool(grabThrowPinnedField);
 #endif
         RegisterBool(clickSelectMarkersField);
         RegisterBool(grabHandlesEnabledField);
@@ -626,6 +666,10 @@ public class FrameAngelRadar : MVRScript
         RegisterFloat(lightMarkerScaleField);
         RegisterFloat(povFrustumLengthField);
         RegisterFloat(povFrustumAlphaField);
+        RegisterFloat(grabThrowGrowScaleField);
+        RegisterFloat(grabThrowVelocityScaleField);
+        RegisterFloat(grabThrowDecelerationField);
+        RegisterFloat(grabThrowReturnScaleField);
 #endif
         RegisterFloat(grabHitRadiusMetersField);
         RegisterFloat(wristTwistDegreesField);
@@ -824,6 +868,10 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(lightMarkerScaleField, true);
         CreateSlider(povFrustumLengthField, false);
         CreateSlider(povFrustumAlphaField, true);
+        CreateToggle(grabThrowPinEnabledField, false);
+        CreateToggle(grabThrowSurfaceStopField, true);
+        CreateSlider(grabThrowGrowScaleField, false);
+        CreateSlider(grabThrowVelocityScaleField, true);
     }
 #endif
 
@@ -930,6 +978,9 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(showUserPovFrustumField);
         ConfigureGlobalPreferenceCallback(showDesktopPovFrustumField);
         ConfigureGlobalPreferenceCallback(showSceneCameraFrustumsField);
+        ConfigureGlobalPreferenceCallback(grabThrowPinEnabledField);
+        ConfigureGlobalPreferenceCallback(grabThrowSurfaceStopField);
+        ConfigureGlobalPreferenceCallback(grabThrowPinnedField);
         ConfigureGlobalPreferenceCallback(rotationAxisLengthField);
         ConfigureGlobalPreferenceCallback(rotationAxisWidthField);
         ConfigureGlobalPreferenceCallback(lightVolumeAlphaField);
@@ -939,6 +990,10 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(lightVolumeScaleField);
         ConfigureGlobalPreferenceCallback(povFrustumLengthField);
         ConfigureGlobalPreferenceCallback(povFrustumAlphaField);
+        ConfigureGlobalPreferenceCallback(grabThrowGrowScaleField);
+        ConfigureGlobalPreferenceCallback(grabThrowVelocityScaleField);
+        ConfigureGlobalPreferenceCallback(grabThrowDecelerationField);
+        ConfigureGlobalPreferenceCallback(grabThrowReturnScaleField);
 #endif
     }
 
@@ -1631,6 +1686,9 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "showUserPovFrustum", showUserPovFrustumField);
             ApplyBoolPreference(preferencesJson, "showDesktopPovFrustum", showDesktopPovFrustumField);
             ApplyBoolPreference(preferencesJson, "showSceneCameraFrustums", showSceneCameraFrustumsField);
+            ApplyBoolPreference(preferencesJson, "grabThrowPinEnabled", grabThrowPinEnabledField);
+            ApplyBoolPreference(preferencesJson, "grabThrowSurfaceStop", grabThrowSurfaceStopField);
+            ApplyBoolPreference(preferencesJson, "grabThrowPinned", grabThrowPinnedField);
             ApplySplitLightAlphaDefaultsIfNeeded(preferencesJson);
             ApplyFloatPreference(preferencesJson, "rotationAxisLength", rotationAxisLengthField);
             ApplyFloatPreference(preferencesJson, "rotationAxisWidth", rotationAxisWidthField);
@@ -1641,6 +1699,10 @@ public class FrameAngelRadar : MVRScript
             ApplyFloatPreference(preferencesJson, "lightMarkerScale", lightMarkerScaleField);
             ApplyFloatPreference(preferencesJson, "povFrustumLength", povFrustumLengthField);
             ApplyFloatPreference(preferencesJson, "povFrustumAlpha", povFrustumAlphaField);
+            ApplyFloatPreference(preferencesJson, "grabThrowGrowScale", grabThrowGrowScaleField);
+            ApplyFloatPreference(preferencesJson, "grabThrowVelocityScale", grabThrowVelocityScaleField);
+            ApplyFloatPreference(preferencesJson, "grabThrowDeceleration", grabThrowDecelerationField);
+            ApplyFloatPreference(preferencesJson, "grabThrowReturnScale", grabThrowReturnScaleField);
 #endif
         }
         finally
@@ -1699,6 +1761,9 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(showUserPovFrustumField, false);
         SetBoolNoCallback(showDesktopPovFrustumField, false);
         SetBoolNoCallback(showSceneCameraFrustumsField, false);
+        SetBoolNoCallback(grabThrowPinEnabledField, false);
+        SetBoolNoCallback(grabThrowSurfaceStopField, true);
+        SetBoolNoCallback(grabThrowPinnedField, false);
 #endif
         SetStringNoCallback(anchorModeField, AnchorModeHud);
         SetStringNoCallback(anchorAtomUidField, "");
@@ -1743,6 +1808,10 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(lightMarkerScaleField, 0.38f);
         SetFloatNoCallback(povFrustumLengthField, 2.0f);
         SetFloatNoCallback(povFrustumAlphaField, 0.12f);
+        SetFloatNoCallback(grabThrowGrowScaleField, 1.0f);
+        SetFloatNoCallback(grabThrowVelocityScaleField, 0.45f);
+        SetFloatNoCallback(grabThrowDecelerationField, 1.5f);
+        SetFloatNoCallback(grabThrowReturnScaleField, 0.49f);
 #endif
         SetFloatNoCallback(grabHitRadiusMetersField, 0.16f);
         SetFloatNoCallback(wristTwistDegreesField, 65.0f);
@@ -1886,6 +1955,9 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "showUserPovFrustum", ReadBool(showUserPovFrustumField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showDesktopPovFrustum", ReadBool(showDesktopPovFrustumField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "showSceneCameraFrustums", ReadBool(showSceneCameraFrustumsField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabThrowPinEnabled", ReadBool(grabThrowPinEnabledField, false));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabThrowSurfaceStop", ReadBool(grabThrowSurfaceStopField, true));
+        AppendJsonBoolProperty(sb, ref wroteProperty, "grabThrowPinned", ReadBool(grabThrowPinnedField, false));
         AppendJsonStringProperty(sb, ref wroteProperty, "lightAlphaDefaultsVersion", LightAlphaDefaultsVersion);
         AppendJsonFloatProperty(sb, ref wroteProperty, "rotationAxisLength", ReadFloat(rotationAxisLengthField, 0.18f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "rotationAxisWidth", ReadFloat(rotationAxisWidthField, 0.012f));
@@ -1896,6 +1968,10 @@ public class FrameAngelRadar : MVRScript
         AppendJsonFloatProperty(sb, ref wroteProperty, "lightMarkerScale", ReadFloat(lightMarkerScaleField, 0.38f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "povFrustumLength", ReadFloat(povFrustumLengthField, 2.0f));
         AppendJsonFloatProperty(sb, ref wroteProperty, "povFrustumAlpha", ReadFloat(povFrustumAlphaField, 0.12f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "grabThrowGrowScale", ReadFloat(grabThrowGrowScaleField, 1.0f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "grabThrowVelocityScale", ReadFloat(grabThrowVelocityScaleField, 0.45f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "grabThrowDeceleration", ReadFloat(grabThrowDecelerationField, 1.5f));
+        AppendJsonFloatProperty(sb, ref wroteProperty, "grabThrowReturnScale", ReadFloat(grabThrowReturnScaleField, 0.49f));
 #endif
         sb.Append('}');
         return sb.ToString();
@@ -2517,6 +2593,9 @@ public class FrameAngelRadar : MVRScript
         TrackAttachedAtomPlacement(viewer);
         RefreshGridMeshIfNeeded(viewer);
         UpdateMaterials();
+#if FA_RADAR_PRO
+        UpdateGrabThrowPin(viewer);
+#endif
         UpdateSessionGrabHandles(viewer);
         UpdateRadarDish(viewer);
         UpdateUserMarker(viewer);
@@ -5001,6 +5080,10 @@ public class FrameAngelRadar : MVRScript
 
     private void StartMoveGrabAtPosition(Vector3 handlePosition, int hand, bool gripFallback, Vector3 radarWorldCenter)
     {
+#if FA_RADAR_PRO
+        CancelGrabThrowPinForGrab();
+        ResetMoveGrabVelocitySample(handlePosition);
+#endif
         moveGrabActive = true;
         resizeGrabActive = false;
         moveGrabUsesGripFallback = gripFallback;
@@ -5027,7 +5110,11 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        Vector3 worldDelta = GetControllerWorldPosition(primaryController) - moveStartHandlePosition;
+        Vector3 controllerPosition = GetControllerWorldPosition(primaryController);
+#if FA_RADAR_PRO
+        UpdateMoveGrabVelocitySample(controllerPosition);
+#endif
+        Vector3 worldDelta = controllerPosition - moveStartHandlePosition;
         ApplyMoveGrabDelta(viewer, worldDelta);
     }
 
@@ -5044,17 +5131,29 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
+#if FA_RADAR_PRO
+        UpdateMoveGrabVelocitySample(controllerPosition);
+#endif
         ApplyMoveGrabDelta(viewer, controllerPosition - moveStartHandlePosition);
     }
 
     private void EndMoveGrab()
     {
+        bool startedThrowPin = false;
         if (moveGrabActive)
         {
+#if FA_RADAR_PRO
+            startedThrowPin = TryStartGrabThrowPinOnRelease(ResolveViewerTransform());
+            if (!startedThrowPin)
+            {
+#endif
             ApplyMoveGrabWorldCenterToPreferences(ResolveViewerTransform());
             MarkGlobalPreferencesDirty();
             FlushGlobalPreferencesIfDue(true);
             PulseGrabHandleHaptics(moveGrabHand, 0.22f, 0.20f, 0.035f);
+#if FA_RADAR_PRO
+            }
+#endif
         }
 
         moveGrabActive = false;
@@ -5062,13 +5161,190 @@ public class FrameAngelRadar : MVRScript
         moveGrabUsesGripFallback = false;
         resizeGrabUsesGripFallback = false;
         resizeHandleDismissedUntilMoveRelease = false;
+#if FA_RADAR_PRO
+        if (!startedThrowPin)
+        {
+            moveGrabWorldOverrideActive = false;
+        }
+#else
         moveGrabWorldOverrideActive = false;
+#endif
         moveGrabHand = GrabHandUnknown;
         resizeGrabHand = GrabHandUnknown;
         DestroyResizeGrabHandleAtom();
         EndDirectGripAccordionResize(false);
-        SetStatus("Radar grab move applied.");
+        if (!startedThrowPin)
+        {
+            SetStatus("Radar grab move applied.");
+        }
     }
+
+#if FA_RADAR_PRO
+    private void ResetMoveGrabVelocitySample(Vector3 controllerPosition)
+    {
+        moveGrabPreviousControllerPosition = controllerPosition;
+        moveGrabPreviousSampleTime = Time.unscaledTime;
+        moveGrabReleaseVelocity = Vector3.zero;
+    }
+
+    private void UpdateMoveGrabVelocitySample(Vector3 controllerPosition)
+    {
+        float now = Time.unscaledTime;
+        float dt = now - moveGrabPreviousSampleTime;
+        if (dt > 0.0001f && dt < 0.25f)
+        {
+            Vector3 instantVelocity = (controllerPosition - moveGrabPreviousControllerPosition) / dt;
+            if (instantVelocity.sqrMagnitude < 100.0f)
+            {
+                moveGrabReleaseVelocity = Vector3.Lerp(moveGrabReleaseVelocity, instantVelocity, 0.45f);
+            }
+        }
+
+        moveGrabPreviousControllerPosition = controllerPosition;
+        moveGrabPreviousSampleTime = now;
+    }
+
+    private bool TryStartGrabThrowPinOnRelease(Transform viewer)
+    {
+        if (!ReadBool(grabThrowPinEnabledField, false)
+            || IsCuaPreferenceProfileActive()
+            || IsEmptyAnchorHostActive()
+            || viewer == null)
+        {
+            return false;
+        }
+
+        float velocityScale = Mathf.Clamp(ReadFloat(grabThrowVelocityScaleField, 0.45f), 0.05f, 2.0f);
+        Vector3 launchVelocity = moveGrabReleaseVelocity * velocityScale;
+        if (launchVelocity.sqrMagnitude < GrabThrowMinimumReleaseVelocity * GrabThrowMinimumReleaseVelocity)
+        {
+            return false;
+        }
+
+        grabThrowActive = true;
+        grabThrowPosition = moveGrabCurrentRadarWorldCenter;
+        grabThrowStartPosition = grabThrowPosition;
+        grabThrowVelocity = launchVelocity;
+        grabThrowStartedAt = Time.unscaledTime;
+        grabThrowStartScale = ResolveActivePlacementScale();
+        grabThrowTargetScale = Mathf.Clamp(
+            ReadFloat(grabThrowGrowScaleField, 1.0f),
+            0.25f,
+            ResolveMaxPlacementScale());
+        if (grabThrowTargetScale < grabThrowStartScale)
+        {
+            grabThrowTargetScale = grabThrowStartScale;
+        }
+
+        SetFloatNoCallback(grabThrowReturnScaleField, grabThrowStartScale);
+        SetBoolNoCallback(grabThrowPinnedField, false);
+        SetActiveDisplayPlacementNoCallback(DesktopPlacementPinnedInWorld);
+        SetRadarModeNoCallback(RadarModeHud);
+        SetActivePlacementScaleNoCallback(grabThrowStartScale);
+        moveGrabCurrentRadarWorldCenter = grabThrowPosition;
+        moveGrabWorldOverrideActive = true;
+        haveSmoothedHudPosition = false;
+        MarkGlobalPreferencesDirty();
+        PulseGrabHandleHaptics(moveGrabHand, 0.38f, 0.26f, 0.05f);
+        SetStatus("Radar throw pin launched.");
+        return true;
+    }
+
+    private void UpdateGrabThrowPin(Transform viewer)
+    {
+        if (!grabThrowActive)
+        {
+            return;
+        }
+
+        float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.0f, 0.05f);
+        if (dt <= 0.0f)
+        {
+            dt = 0.016f;
+        }
+
+        bool hitSurface = false;
+        Vector3 previousPosition = grabThrowPosition;
+        float frameDistance = grabThrowVelocity.magnitude * dt;
+        if (ReadBool(grabThrowSurfaceStopField, true) && frameDistance > 0.0001f)
+        {
+            Vector3 direction = grabThrowVelocity.normalized;
+            RaycastHit hit;
+            if (Physics.Raycast(previousPosition, direction, out hit, frameDistance + GrabThrowSurfaceInsetMeters))
+            {
+                grabThrowPosition = hit.point - direction * GrabThrowSurfaceInsetMeters;
+                grabThrowVelocity = Vector3.zero;
+                hitSurface = true;
+            }
+        }
+
+        if (!hitSurface)
+        {
+            grabThrowPosition += grabThrowVelocity * dt;
+            float speed = grabThrowVelocity.magnitude;
+            float deceleration = Mathf.Clamp(ReadFloat(grabThrowDecelerationField, 1.5f), 0.2f, 8.0f);
+            speed = Mathf.Max(0.0f, speed - deceleration * dt);
+            grabThrowVelocity = speed > 0.0f ? grabThrowVelocity.normalized * speed : Vector3.zero;
+        }
+
+        moveGrabCurrentRadarWorldCenter = grabThrowPosition;
+        moveGrabWorldOverrideActive = true;
+        haveSmoothedHudPosition = false;
+
+        float scaleT = Mathf.Clamp01((Time.unscaledTime - grabThrowStartedAt) / GrabThrowScaleSeconds);
+        SetActivePlacementScaleNoCallback(Mathf.Lerp(grabThrowStartScale, grabThrowTargetScale, scaleT));
+
+        bool timedOut = Time.unscaledTime - grabThrowStartedAt >= GrabThrowMaxSeconds;
+        bool stopped = grabThrowVelocity.magnitude <= GrabThrowStopVelocity;
+        if (hitSurface || stopped || timedOut)
+        {
+            FinishGrabThrowPin(viewer, hitSurface);
+        }
+    }
+
+    private void FinishGrabThrowPin(Transform viewer, bool hitSurface)
+    {
+        Quaternion rotation = hudRoot != null
+            ? hudRoot.transform.rotation
+            : (viewer != null ? viewer.rotation : Quaternion.identity);
+
+        grabThrowActive = false;
+        moveGrabWorldOverrideActive = false;
+        moveGrabCurrentRadarWorldCenter = grabThrowPosition;
+        SetActiveDisplayPlacementNoCallback(DesktopPlacementPinnedInWorld);
+        SetRadarModeNoCallback(RadarModeHud);
+        SetStaticWorldPositionNoCallback(grabThrowPosition);
+        SetStaticWorldRotationNoCallback(rotation);
+        SetActivePlacementScaleNoCallback(grabThrowTargetScale);
+        SetBoolNoCallback(grabThrowPinnedField, true);
+        MarkGlobalPreferencesDirty();
+        FlushGlobalPreferencesIfDue(true);
+        PulseGrabHandleHaptics(GrabHandUnknown, hitSurface ? 0.35f : 0.22f, 0.18f, 0.04f);
+        SetStatus(hitSurface ? "Radar throw pinned to surface." : "Radar throw pinned in world.");
+    }
+
+    private void CancelGrabThrowPinForGrab()
+    {
+        if (!grabThrowActive && !ReadBool(grabThrowPinnedField, false))
+        {
+            return;
+        }
+
+        float returnScale = Mathf.Clamp(
+            ReadFloat(grabThrowReturnScaleField, 0.49f),
+            0.05f,
+            ResolveMaxPlacementScale());
+        grabThrowActive = false;
+        SetBoolNoCallback(grabThrowPinnedField, false);
+        SetActiveDisplayPlacementNoCallback(DesktopPlacementAttachedToUi);
+        SetRadarModeNoCallback(RadarModeHud);
+        SetActivePlacementScaleNoCallback(returnScale);
+        moveGrabWorldOverrideActive = true;
+        haveSmoothedHudPosition = false;
+        MarkGlobalPreferencesDirty();
+        SetStatus("Radar throw pin picked up.");
+    }
+#endif
 
     private void ApplyMoveGrabDelta(Transform viewer, Vector3 worldDelta)
     {
@@ -7032,6 +7308,14 @@ public class FrameAngelRadar : MVRScript
         SetFloatNoCallback(staticWorldXField, ClampStorableFloat(staticWorldXField, position.x, -20.0f, 20.0f));
         SetFloatNoCallback(staticWorldYField, ClampStorableFloat(staticWorldYField, position.y, -5.0f, 20.0f));
         SetFloatNoCallback(staticWorldZField, ClampStorableFloat(staticWorldZField, position.z, -20.0f, 20.0f));
+    }
+
+    private void SetStaticWorldRotationNoCallback(Quaternion rotation)
+    {
+        Vector3 euler = rotation.eulerAngles;
+        SetFloatNoCallback(staticWorldPitchField, NormalizeEulerDegrees(euler.x));
+        SetFloatNoCallback(staticWorldYawField, NormalizeEulerDegrees(euler.y));
+        SetFloatNoCallback(staticWorldRollField, NormalizeEulerDegrees(euler.z));
     }
 
     private static float ClampStorableFloat(JSONStorableFloat field, float value, float fallbackMin, float fallbackMax)
