@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.35
+# FA Radar UI Controls 0.1.36
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -53,6 +53,9 @@ scene-map controls:
 - `Grab Handles Enabled`: enables invisible direct grip placement.
 - `Grab Haptics`: enables controller feedback for grab, hand-off, reveal, and
   scale gestures.
+- `Throw Pin On Release`, `Throw Surface Stop`, `Throw Grow Scale`, and `Throw
+  Velocity Scale`: Pro-only, default-off throw-to-world pin behavior for direct
+  grip release.
 - `Reset Global Prefs`: factory-reset global prefs.
 - `Status`: read-only runtime feedback.
 
@@ -79,7 +82,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.35 makes the visible range and one-meter grid contract the
+  registered, but 0.1.36 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision
