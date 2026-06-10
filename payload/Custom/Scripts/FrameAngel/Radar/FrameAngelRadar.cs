@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.37";
+    private const string Version = "0.1.38";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -51,7 +51,8 @@ public class FrameAngelRadar : MVRScript
     private const string PluginHostSurfaceSceneSession = "Scene / Session Plugin";
     private const string DisplaySurfaceDesktop = "Desktop";
     private const string DisplaySurfaceVR = "VR";
-    private const string ProFilterDefaultsVersion = "utility_hidden_v3";
+    private const string CommonMarkerDefaultsVersion = "target_markers_on_v1";
+    private const string ProFilterDefaultsVersion = "utility_hidden_v4";
     private const string LightAlphaDefaultsVersion = "split_alpha_v1";
     private const string RadarModeHud = "HUD";
     private const string RadarModeWristLeft = "wrist-left";
@@ -89,6 +90,26 @@ public class FrameAngelRadar : MVRScript
     private const int GrabHandUnknown = -1;
     private const int GrabHandLeft = 0;
     private const int GrabHandRight = 1;
+    private const int AvailableMarkerPoolBlockSize = 16;
+    private const float AvailableMarkerFrameMoveThresholdMeters = 0.0025f;
+    private const float AvailableMarkerFrameRotateThresholdDegrees = 0.25f;
+    private const float AvailableMarkerTransformMoveThresholdMeters = 0.0025f;
+    private const float AvailableMarkerStatusIntervalSeconds = 0.25f;
+    private const int AtomCategoryLight = 1 << 0;
+    private const int AtomCategoryCua = 1 << 1;
+    private const int AtomCategoryPerson = 1 << 2;
+    private const int AtomCategoryFemale = 1 << 3;
+    private const int AtomCategoryMale = 1 << 4;
+    private const int AtomCategoryEmpty = 1 << 5;
+    private const int AtomCategorySubScene = 1 << 6;
+    private const int AtomCategoryImagePanel = 1 << 7;
+    private const int AtomCategoryAnimation = 1 << 8;
+    private const int AtomCategoryForce = 1 << 9;
+    private const int AtomCategoryShape = 1 << 10;
+    private const int AtomCategorySound = 1 << 11;
+    private const int AtomCategoryTrigger = 1 << 12;
+    private const int AtomCategoryNavigationPanel = 1 << 13;
+    private const int AtomCategoryCamera = 1 << 14;
     private static readonly Color AxisXColor = new Color(1.0f, 0.18f, 0.12f, 1.0f);
     private static readonly Color AxisYColor = new Color(0.22f, 1.0f, 0.34f, 1.0f);
     private static readonly Color AxisZColor = new Color(0.26f, 0.52f, 1.0f, 1.0f);
@@ -105,6 +126,65 @@ public class FrameAngelRadar : MVRScript
     private static bool sharedRadarCuaProPreferencesCacheKnown;
     private static string sharedRadarCuaProPreferencesJson = "";
     private static float sharedRadarCuaProPreferencesNextReadAt;
+
+    private struct RadarFrame
+    {
+        public Transform viewer;
+        public Vector3 referencePosition;
+        public Quaternion referenceRotation;
+        public Quaternion inverseReferenceRotation;
+        public float rangeMeters;
+        public float heightScaleMeters;
+        public float visualRadius;
+        public bool flattenY;
+        public int signature;
+    }
+
+    private sealed class AtomRecord
+    {
+        public int recordId;
+        public Atom atom;
+        public string uid;
+        public Transform root;
+        public Vector3 markerLocalOffset;
+        public bool markerLocalOffsetKnown;
+        public Vector3 markerWorldPosition;
+        public Vector3 lastRootPosition;
+        public Quaternion lastRootRotation;
+        public bool hasTransformSample;
+        public float distanceSq;
+        public int categoryFlags;
+        public Mesh markerMesh;
+#if FA_RADAR_PRO
+        public Light light;
+        public bool hasLight;
+        public bool lightResolved;
+#endif
+    }
+
+    private sealed class MarkerSlot
+    {
+        public GameObject markerObject;
+        public GameObject stemObject;
+        public Material markerMaterial;
+        public MeshFilter markerFilter;
+        public int recordId = -1;
+        public Mesh markerMesh;
+#if FA_RADAR_PRO
+        public GameObject[] rotationAxisObjects;
+        public GameObject lightRangeObject;
+        public GameObject spotlightConeObject;
+        public Material lightRangeMaterial;
+        public Material spotlightConeMaterial;
+#endif
+    }
+
+    private struct CachedMaterialState
+    {
+        public Color color;
+        public float emissionStrength;
+        public bool known;
+    }
 
     private JSONStorableBool radarEnabledField;
     private JSONStorableBool ignoreContainingAtomField;
@@ -304,6 +384,11 @@ public class FrameAngelRadar : MVRScript
     private Atom selectedAtom;
     private Atom lastSelectedAtom;
     private List<Atom> trackedAvailableAtoms = new List<Atom>();
+    private List<AtomRecord> availableAtomRecords = new List<AtomRecord>();
+    private MarkerSlot[] availableMarkerSlots;
+    private Dictionary<Material, CachedMaterialState> materialStateByMaterial = new Dictionary<Material, CachedMaterialState>();
+    private AtomRecord selectedAtomRecord;
+    private Atom cachedAnchorAtom;
     private int lastAvailableAtomSceneCount;
     private int lastAvailableAtomTrackedCount;
     private int lastAvailableAtomVisibleCount;
@@ -311,9 +396,12 @@ public class FrameAngelRadar : MVRScript
     private int lastAvailableAtomMissingTargetCount;
     private string selectedUid = "";
     private string lastSelectedUid = "";
+    private string cachedAnchorAtomUid = "";
     private float nextSelectionPollTime;
     private float nextAtomPollTime;
+    private float nextAvailableMarkerStatusTime;
     private float lastSelectedAtTime = -1000.0f;
+    private float nextSelectedStatusTime;
     private float lastGridRangeMeters = -1.0f;
     private float lastGridStepMeters = -1.0f;
     private Vector2 lastGridOffsetMeters;
@@ -324,6 +412,8 @@ public class FrameAngelRadar : MVRScript
     private bool globalPreferencesLoading;
     private bool globalPreferencesDirty;
     private bool globalPreferencesWriteAfterApply;
+    private bool materialsDirty = true;
+    private bool availableMarkersDirty = true;
     private bool recorderRadarVisible = true;
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
@@ -392,6 +482,8 @@ public class FrameAngelRadar : MVRScript
     private string resizeGrabHandleUid = "";
     private Transform currentHudAnchor;
     private Transform lastGoodViewerTransform;
+    private int availableAtomRevision;
+    private int lastAvailableMarkerFrameSignature = int.MinValue;
 
     public override void Init()
     {
@@ -1122,6 +1214,8 @@ public class FrameAngelRadar : MVRScript
 
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
         globalPreferencesDirty = true;
+        materialsDirty = true;
+        availableMarkersDirty = true;
         nextGlobalPreferencesFlushTime = Time.unscaledTime + GlobalPreferencesFlushDelaySeconds;
     }
 
@@ -1576,7 +1670,15 @@ public class FrameAngelRadar : MVRScript
             ApplyBoolPreference(preferencesJson, "selectedGroundDrop", selectedGroundDropEnabledField);
             ApplyBoolPreference(preferencesJson, "heightStems", heightStemsEnabledField);
             ApplyBoolPreference(preferencesJson, "depthSizeCue", depthSizeCueField);
+            string markerDefaultsVersion;
+            bool markerDefaultsCurrent = TryReadStringPreference(preferencesJson, "commonMarkerDefaultsVersion", out markerDefaultsVersion)
+                && string.Equals(markerDefaultsVersion, CommonMarkerDefaultsVersion, StringComparison.Ordinal);
             ApplyBoolPreference(preferencesJson, "availableAtomMarkers", availableAtomMarkersEnabledField);
+            if (!markerDefaultsCurrent)
+            {
+                SetBoolNoCallback(availableAtomMarkersEnabledField, true);
+                globalPreferencesWriteAfterApply = true;
+            }
             ApplyBoolPreference(preferencesJson, "clickSelectMarkers", clickSelectMarkersField);
             bool hasDirectGripDefaultMarker = preferencesJson.Contains("\"directGripGrabDefaulted\"");
             ApplyBoolPreference(preferencesJson, "grabHandlesEnabled", grabHandlesEnabledField);
@@ -1640,6 +1742,8 @@ public class FrameAngelRadar : MVRScript
 
         lastAppliedCommonPreferencesJson = preferencesJson;
         haveSmoothedHudPosition = false;
+        materialsDirty = true;
+        availableMarkersDirty = true;
         InvalidateGridMesh();
         return true;
     }
@@ -1877,6 +1981,7 @@ public class FrameAngelRadar : MVRScript
         AppendJsonBoolProperty(sb, ref wroteProperty, "availableAtomMarkers", ReadBool(availableAtomMarkersEnabledField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "clickSelectMarkers", ReadBool(clickSelectMarkersField, true));
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandlesEnabled", ReadBool(grabHandlesEnabledField, true));
+        AppendJsonStringProperty(sb, ref wroteProperty, "commonMarkerDefaultsVersion", CommonMarkerDefaultsVersion);
         AppendJsonBoolProperty(sb, ref wroteProperty, "directGripGrabDefaulted", true);
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHandleDebugVisible", ReadBool(grabHandleDebugVisibleField, false));
         AppendJsonBoolProperty(sb, ref wroteProperty, "grabHaptics", ReadBool(grabHapticsEnabledField, true));
@@ -2594,10 +2699,12 @@ public class FrameAngelRadar : MVRScript
         UpdateWristCompassReveal(viewer);
         SetRadarVisualsVisible(ResolveRadarRuntimeVisible(viewer));
         PollSelectionIfDue();
-        PollAvailableAtomsIfDue(viewer);
+        RadarFrame frame = BuildRadarFrame(viewer);
+        PollAvailableAtomsIfDue(frame);
+        frame.signature = BuildRadarFrameSignature(frame);
         TrackAttachedAtomPlacement(viewer);
-        RefreshGridMeshIfNeeded(viewer);
-        UpdateMaterials();
+        RefreshGridMeshIfNeeded(frame);
+        UpdateMaterialsIfNeeded();
 #if FA_RADAR_PRO
         UpdateGrabThrowPin(viewer);
 #endif
@@ -2614,7 +2721,7 @@ public class FrameAngelRadar : MVRScript
 
         if (hasSelection)
         {
-            UpdateTargetBlip(viewer, target, showSelectedGroundDrop);
+            UpdateTargetBlip(frame, target, showSelectedGroundDrop);
         }
 #if FA_RADAR_PRO
         else
@@ -2627,7 +2734,7 @@ public class FrameAngelRadar : MVRScript
 
         SetActiveIfChanged(lastTargetBlipObject, false);
         SetActiveIfChanged(lastTargetGridDropObject, false);
-        UpdateAvailableAtomMarkers(viewer);
+        UpdateAvailableAtomMarkers(frame);
         UpdateAvailableAtomMarkerStatus();
 #if FA_RADAR_PRO
         UpdateProCameraFrustums(viewer);
@@ -2787,6 +2894,9 @@ public class FrameAngelRadar : MVRScript
 
         selectedAtom = nextAtom;
         selectedUid = nextUid;
+        selectedAtomRecord = null;
+        availableMarkersDirty = true;
+        availableAtomRevision++;
 
         if (selectedAtom != null)
         {
@@ -3095,8 +3205,23 @@ public class FrameAngelRadar : MVRScript
 
     private Atom ResolveAnchorAtom()
     {
+        return ResolveAnchorAtomCached();
+    }
+
+    private Atom ResolveAnchorAtomCached()
+    {
         string uid = anchorAtomUidField != null ? (anchorAtomUidField.val ?? "") : "";
-        return FindAtomByUid(uid);
+        string trimmedUid = uid.Trim();
+        if (string.Equals(trimmedUid, cachedAnchorAtomUid, StringComparison.OrdinalIgnoreCase)
+            && cachedAnchorAtom != null
+            && string.Equals(cachedAnchorAtom.uid, trimmedUid, StringComparison.OrdinalIgnoreCase))
+        {
+            return cachedAnchorAtom;
+        }
+
+        cachedAnchorAtomUid = trimmedUid;
+        cachedAnchorAtom = FindAtomByUid(trimmedUid);
+        return cachedAnchorAtom;
     }
 
     private Atom FindAtomByUid(string uid)
@@ -3460,6 +3585,47 @@ public class FrameAngelRadar : MVRScript
             staticWorldRollField != null ? staticWorldRollField.val : 0.0f);
     }
 
+    private RadarFrame BuildRadarFrame(Transform viewer)
+    {
+        RadarFrame frame = new RadarFrame();
+        frame.viewer = viewer;
+        frame.referencePosition = ResolveRadarReferencePosition(viewer);
+        frame.referenceRotation = ResolveRadarReferenceRotation(viewer);
+        frame.inverseReferenceRotation = Quaternion.Inverse(frame.referenceRotation);
+        frame.rangeMeters = ResolveEffectiveRadarRangeMeters();
+        frame.heightScaleMeters = ResolveEffectiveHeightScaleMeters();
+        frame.visualRadius = ResolveVisualRadius();
+        frame.flattenY = ShouldFlattenRadarY();
+        frame.signature = BuildRadarFrameSignature(frame);
+        return frame;
+    }
+
+    private int BuildRadarFrameSignature(RadarFrame frame)
+    {
+        unchecked
+        {
+            int hash = 17;
+            hash = (hash * 31) + Quantize(frame.referencePosition.x, AvailableMarkerFrameMoveThresholdMeters);
+            hash = (hash * 31) + Quantize(frame.referencePosition.y, AvailableMarkerFrameMoveThresholdMeters);
+            hash = (hash * 31) + Quantize(frame.referencePosition.z, AvailableMarkerFrameMoveThresholdMeters);
+            Vector3 euler = frame.referenceRotation.eulerAngles;
+            hash = (hash * 31) + Quantize(euler.x, AvailableMarkerFrameRotateThresholdDegrees);
+            hash = (hash * 31) + Quantize(euler.y, AvailableMarkerFrameRotateThresholdDegrees);
+            hash = (hash * 31) + Quantize(euler.z, AvailableMarkerFrameRotateThresholdDegrees);
+            hash = (hash * 31) + Quantize(frame.rangeMeters, 0.01f);
+            hash = (hash * 31) + Quantize(frame.heightScaleMeters, 0.01f);
+            hash = (hash * 31) + Quantize(frame.visualRadius, 0.001f);
+            hash = (hash * 31) + (frame.flattenY ? 1 : 0);
+            hash = (hash * 31) + availableAtomRevision;
+            return hash;
+        }
+    }
+
+    private int Quantize(float value, float step)
+    {
+        return Mathf.RoundToInt(value / Mathf.Max(0.00001f, step));
+    }
+
     private Quaternion ResolveDishLocalRotation()
     {
         if (!ShouldFlattenRadarY())
@@ -3475,18 +3641,24 @@ public class FrameAngelRadar : MVRScript
         return desktopTopDownField != null && desktopTopDownField.val && !IsVrDisplayActive();
     }
 
-    private void UpdateTargetBlip(Transform viewer, Transform target, bool showGroundDrop)
+    private void UpdateTargetBlip(RadarFrame frame, Transform target, bool showGroundDrop)
     {
-        float visualRadius = ResolveVisualRadius();
-        Vector3 targetWorldPosition = ResolveAtomMarkerWorldPosition(selectedAtom, target);
-        Vector3 radarLocal = ResolveWorldPositionRadarLocal(viewer, targetWorldPosition);
-        Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, targetWorldPosition);
-        float distanceMeters = ResolveWorldDistanceMeters(viewer, targetWorldPosition);
+        if (selectedAtomRecord == null || selectedAtomRecord.atom != selectedAtom)
+        {
+            selectedAtomRecord = BuildAtomRecord(selectedAtom, frame, -1);
+        }
+        RefreshAtomRecordTransform(selectedAtomRecord);
+
+        float visualRadius = frame.visualRadius;
+        Vector3 targetWorldPosition = selectedAtomRecord != null ? selectedAtomRecord.markerWorldPosition : (target != null ? target.position : Vector3.zero);
+        Vector3 radarLocal = ResolveWorldPositionRadarLocal(frame, targetWorldPosition);
+        Vector3 groundLocal = ResolveTargetGroundRadarLocal(frame, targetWorldPosition);
+        float distanceMeters = ResolveWorldDistanceMeters(frame, targetWorldPosition);
         float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
         float depthScale = ResolveDepthScale(distanceMeters);
         float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * depthScale;
 #if FA_RADAR_PRO
-        if (IsLightAtom(selectedAtom))
+        if (selectedAtomRecord != null && HasCategory(selectedAtomRecord, AtomCategoryLight))
         {
             markerScale *= Mathf.Clamp(ReadFloat(lightMarkerScaleField, 0.38f), 0.12f, 1.0f);
         }
@@ -3500,7 +3672,7 @@ public class FrameAngelRadar : MVRScript
 #else
         Color targetColor = WithAlpha(FreeAtomMarkerColor, Mathf.Clamp01(markerAlphaField.val) * fadeAlpha);
 #endif
-        ApplyMaterialColor(targetMaterial, targetColor, Mathf.Max(0.0f, emissionStrengthField.val));
+        ApplyMaterialColorIfChanged(targetMaterial, targetColor, Mathf.Max(0.0f, emissionStrengthField.val));
         UpdateHeightStem(targetHeightStemObject, radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && fadeAlpha > 0.01f);
 
         if (showGroundDrop)
@@ -3513,15 +3685,19 @@ public class FrameAngelRadar : MVRScript
             targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
         }
 
-        Vector3 meterLocal = ResolveWorldMetersFromReference(viewer, targetWorldPosition);
-        SetStatus(string.Format(
-            "Selected: {0}  x:{1:0.0}m y:{2:0.0}m z:{3:0.0}m",
-            selectedUid,
-            meterLocal.x,
-            meterLocal.y,
-            meterLocal.z));
+        if (Time.unscaledTime >= nextSelectedStatusTime)
+        {
+            nextSelectedStatusTime = Time.unscaledTime + AvailableMarkerStatusIntervalSeconds;
+            Vector3 meterLocal = ResolveWorldMetersFromReference(frame, targetWorldPosition);
+            SetStatus(string.Format(
+                "Selected: {0}  x:{1:0.0}m y:{2:0.0}m z:{3:0.0}m",
+                selectedUid,
+                meterLocal.x,
+                meterLocal.y,
+                meterLocal.z));
+        }
 #if FA_RADAR_PRO
-        UpdateProTargetVisuals(viewer, target, radarLocal, markerScale, fadeAlpha);
+        UpdateProTargetVisuals(frame, target, radarLocal, markerScale, fadeAlpha);
 #endif
     }
 
@@ -3616,6 +3792,23 @@ public class FrameAngelRadar : MVRScript
         return targetBlipMesh;
     }
 
+    private Mesh ResolveMarkerMeshForRecord(AtomRecord record)
+    {
+#if FA_RADAR_PRO
+        if (HasCategory(record, AtomCategorySubScene))
+        {
+            return subSceneMarkerMesh != null ? subSceneMarkerMesh : targetBlipMesh;
+        }
+
+        if (record != null && (HasCategory(record, AtomCategoryImagePanel) || IsPanelLikeAtom(record.atom)))
+        {
+            return panelMarkerMesh != null ? panelMarkerMesh : targetBlipMesh;
+        }
+#endif
+
+        return targetBlipMesh;
+    }
+
     private Vector3 ResolveTargetRadarLocal(Transform viewer, Transform target)
     {
         if (viewer == null || target == null)
@@ -3678,6 +3871,24 @@ public class FrameAngelRadar : MVRScript
         return radarLocal;
     }
 
+    private Vector3 ResolveTargetGroundRadarLocal(RadarFrame frame, Vector3 worldPosition)
+    {
+        Vector3 worldDelta = worldPosition - frame.referencePosition;
+        Vector3 radarLocal = new Vector3(
+            worldDelta.x / frame.rangeMeters,
+            ResolveHeightRadarY(frame, -frame.referencePosition.y),
+            worldDelta.z / frame.rangeMeters);
+        Vector2 horizontal = new Vector2(radarLocal.x, radarLocal.z);
+        if (horizontal.sqrMagnitude > 1.0f)
+        {
+            horizontal.Normalize();
+            radarLocal.x = horizontal.x;
+            radarLocal.z = horizontal.y;
+        }
+
+        return radarLocal;
+    }
+
     private Vector3 ResolveTargetWorldRadarLocal(Transform viewer, Transform target)
     {
         if (viewer == null || target == null)
@@ -3706,10 +3917,32 @@ public class FrameAngelRadar : MVRScript
         return radarLocal;
     }
 
+    private Vector3 ResolveWorldPositionRadarLocal(RadarFrame frame, Vector3 worldPosition)
+    {
+        Vector3 worldDelta = ResolveWorldMetersFromReference(frame, worldPosition);
+        Vector3 radarLocal = frame.flattenY
+            ? new Vector3(worldDelta.x / frame.rangeMeters, 0.0f, worldDelta.z / frame.rangeMeters)
+            : new Vector3(worldDelta.x / frame.rangeMeters, ResolveHeightRadarY(frame, worldDelta.y), worldDelta.z / frame.rangeMeters);
+        Vector2 horizontal = new Vector2(radarLocal.x, radarLocal.z);
+        if (horizontal.sqrMagnitude > 1.0f)
+        {
+            horizontal.Normalize();
+            radarLocal.x = horizontal.x;
+            radarLocal.z = horizontal.y;
+        }
+
+        return radarLocal;
+    }
+
     private Vector3 ResolveWorldMetersFromReference(Transform viewer, Vector3 worldPosition)
     {
         Quaternion referenceRotation = ResolveRadarReferenceRotation(viewer);
         return Quaternion.Inverse(referenceRotation) * (worldPosition - ResolveRadarReferencePosition(viewer));
+    }
+
+    private Vector3 ResolveWorldMetersFromReference(RadarFrame frame, Vector3 worldPosition)
+    {
+        return frame.inverseReferenceRotation * (worldPosition - frame.referencePosition);
     }
 
     private bool IsStaticRadarReferenceActive()
@@ -3786,6 +4019,11 @@ public class FrameAngelRadar : MVRScript
         return Mathf.Clamp(worldYDeltaMeters / heightScale, -1.0f, 1.0f);
     }
 
+    private float ResolveHeightRadarY(RadarFrame frame, float worldYDeltaMeters)
+    {
+        return Mathf.Clamp(worldYDeltaMeters / Mathf.Max(0.25f, frame.heightScaleMeters), -1.0f, 1.0f);
+    }
+
     private float ResolveWorldDistanceMeters(Transform viewer, Transform target)
     {
         if (viewer == null || target == null)
@@ -3804,6 +4042,11 @@ public class FrameAngelRadar : MVRScript
         }
 
         return ResolveRadarReferenceDistanceMeters(viewer, worldPosition);
+    }
+
+    private float ResolveWorldDistanceMeters(RadarFrame frame, Vector3 worldPosition)
+    {
+        return Vector3.Distance(frame.referencePosition, worldPosition);
     }
 
     private float ResolveRangeFadeAlpha(float distanceMeters)
@@ -3875,9 +4118,9 @@ public class FrameAngelRadar : MVRScript
         stemObject.transform.localScale = new Vector3(visualRadius, visualRadius * length, visualRadius);
     }
 
-    private void PollAvailableAtomsIfDue(Transform viewer)
+    private void PollAvailableAtomsIfDue(RadarFrame frame)
     {
-        if (Time.time < nextAtomPollTime)
+        if (Time.time < nextAtomPollTime && !availableMarkersDirty)
         {
             return;
         }
@@ -3885,6 +4128,7 @@ public class FrameAngelRadar : MVRScript
         float interval = Mathf.Max(0.15f, atomPollSecondsField.val);
         nextAtomPollTime = Time.time + interval;
         trackedAvailableAtoms.Clear();
+        availableAtomRecords.Clear();
         lastAvailableAtomSceneCount = 0;
         lastAvailableAtomTrackedCount = 0;
         lastAvailableAtomVisibleCount = 0;
@@ -3903,35 +4147,205 @@ public class FrameAngelRadar : MVRScript
         }
         lastAvailableAtomSceneCount = atoms.Count;
 
+        Atom anchorHost = ResolveAttachedAtomAnchorHost();
         for (int i = 0; i < atoms.Count; i++)
         {
             Atom atom = atoms[i];
-            if (!IsAtomVisibleByFilter(atom))
+            AtomRecord record = BuildAtomRecord(atom, frame, availableAtomRecords.Count);
+            if (!IsAtomVisibleByFilter(record, anchorHost))
             {
                 continue;
             }
 
+            record.distanceSq = (record.markerWorldPosition - frame.referencePosition).sqrMagnitude;
+            availableAtomRecords.Add(record);
             trackedAvailableAtoms.Add(atom);
         }
 
-        if (viewer != null)
+        availableAtomRecords.Sort(delegate(AtomRecord left, AtomRecord right)
         {
-            trackedAvailableAtoms.Sort(delegate(Atom left, Atom right)
+            float leftDistance = left != null ? left.distanceSq : float.MaxValue;
+            float rightDistance = right != null ? right.distanceSq : float.MaxValue;
+            return leftDistance.CompareTo(rightDistance);
+        });
+
+        trackedAvailableAtoms.Clear();
+        for (int i = 0; i < availableAtomRecords.Count; i++)
+        {
+            AtomRecord record = availableAtomRecords[i];
+            if (record == null)
             {
-                Transform leftTransform = ResolveAtomRootTransform(left);
-                Transform rightTransform = ResolveAtomRootTransform(right);
-                float leftDistance = leftTransform != null ? (ResolveAtomMarkerWorldPosition(left, leftTransform) - viewer.position).sqrMagnitude : float.MaxValue;
-                float rightDistance = rightTransform != null ? (ResolveAtomMarkerWorldPosition(right, rightTransform) - viewer.position).sqrMagnitude : float.MaxValue;
-                return leftDistance.CompareTo(rightDistance);
-            });
+                continue;
+            }
+
+            record.recordId = i;
+            trackedAvailableAtoms.Add(record.atom);
         }
 
-        lastAvailableAtomTrackedCount = trackedAvailableAtoms.Count;
-        EnsureAvailableMarkerCapacity(trackedAvailableAtoms.Count);
+        lastAvailableAtomTrackedCount = availableAtomRecords.Count;
+        EnsureAvailableMarkerCapacity(availableAtomRecords.Count);
+        availableAtomRevision++;
+        availableMarkersDirty = true;
     }
 
-    private bool IsAtomVisibleByFilter(Atom atom)
+    private AtomRecord BuildAtomRecord(Atom atom, RadarFrame frame, int recordId)
     {
+        AtomRecord record = new AtomRecord();
+        record.recordId = recordId;
+        record.atom = atom;
+        record.uid = atom != null ? (atom.uid ?? "") : "";
+        record.root = ResolveAtomRootTransform(atom);
+        record.categoryFlags = ResolveAtomCategoryFlags(atom);
+        record.markerMesh = ResolveMarkerMeshForRecord(record);
+        RecordAtomVisualCenterOffset(record);
+        RefreshAtomRecordTransform(record);
+#if FA_RADAR_PRO
+        if (HasCategory(record, AtomCategoryLight))
+        {
+            Light ignored;
+            TryResolveUnityLight(record, out ignored);
+        }
+#endif
+        record.distanceSq = (record.markerWorldPosition - frame.referencePosition).sqrMagnitude;
+        return record;
+    }
+
+    private bool RefreshAtomRecordTransform(AtomRecord record)
+    {
+        if (record == null)
+        {
+            return false;
+        }
+
+        if (record.root == null)
+        {
+            record.root = ResolveAtomRootTransform(record.atom);
+        }
+
+        if (record.root == null)
+        {
+            return false;
+        }
+
+        Vector3 rootPosition = record.root.position;
+        Quaternion rootRotation = record.root.rotation;
+        bool changed = !record.hasTransformSample
+            || (rootPosition - record.lastRootPosition).sqrMagnitude > (AvailableMarkerTransformMoveThresholdMeters * AvailableMarkerTransformMoveThresholdMeters)
+            || Quaternion.Angle(rootRotation, record.lastRootRotation) > AvailableMarkerFrameRotateThresholdDegrees;
+
+        if (!changed)
+        {
+            return false;
+        }
+
+        record.markerWorldPosition = record.markerLocalOffsetKnown
+            ? record.root.TransformPoint(record.markerLocalOffset)
+            : rootPosition;
+        record.lastRootPosition = rootPosition;
+        record.lastRootRotation = rootRotation;
+        record.hasTransformSample = true;
+        return true;
+    }
+
+    private void RecordAtomVisualCenterOffset(AtomRecord record)
+    {
+        if (record == null || record.root == null)
+        {
+            return;
+        }
+
+        Vector3 center;
+        if (!ResolveAtomVisualBoundsCenter(record.atom, record.root, out center))
+        {
+            record.markerLocalOffset = Vector3.zero;
+            record.markerLocalOffsetKnown = false;
+            return;
+        }
+
+        record.markerLocalOffset = Quaternion.Inverse(record.root.rotation) * (center - record.root.position);
+        record.markerLocalOffsetKnown = true;
+    }
+
+    private int ResolveAtomCategoryFlags(Atom atom)
+    {
+        int flags = 0;
+        if (IsLightAtom(atom))
+        {
+            flags |= AtomCategoryLight;
+        }
+        if (IsCustomUnityAssetAtom(atom))
+        {
+            flags |= AtomCategoryCua;
+        }
+        if (IsPersonAtom(atom))
+        {
+            flags |= AtomCategoryPerson;
+            if (IsFemalePersonAtom(atom))
+            {
+                flags |= AtomCategoryFemale;
+            }
+            if (IsMalePersonAtom(atom))
+            {
+                flags |= AtomCategoryMale;
+            }
+        }
+        if (IsEmptyAtom(atom))
+        {
+            flags |= AtomCategoryEmpty;
+        }
+        if (IsSubSceneAtom(atom))
+        {
+            flags |= AtomCategorySubScene;
+        }
+        if (IsImagePanelAtom(atom))
+        {
+            flags |= AtomCategoryImagePanel;
+        }
+        if (IsAnimationAtom(atom))
+        {
+            flags |= AtomCategoryAnimation;
+        }
+        if (IsForceAtom(atom))
+        {
+            flags |= AtomCategoryForce;
+        }
+        if (IsShapeAtom(atom))
+        {
+            flags |= AtomCategoryShape;
+        }
+        if (IsSoundAtom(atom))
+        {
+            flags |= AtomCategorySound;
+        }
+        if (IsTriggerAtom(atom))
+        {
+            flags |= AtomCategoryTrigger;
+        }
+        if (IsNavigationPanelAtom(atom))
+        {
+            flags |= AtomCategoryNavigationPanel;
+        }
+        if (IsCameraAtom(atom))
+        {
+            flags |= AtomCategoryCamera;
+        }
+
+        return flags;
+    }
+
+    private bool HasCategory(AtomRecord record, int categoryFlag)
+    {
+        return record != null && (record.categoryFlags & categoryFlag) != 0;
+    }
+
+    private bool IsAtomVisibleByFilter(AtomRecord record)
+    {
+        return IsAtomVisibleByFilter(record, ResolveAttachedAtomAnchorHost());
+    }
+
+    private bool IsAtomVisibleByFilter(AtomRecord record, Atom anchorHost)
+    {
+        Atom atom = record != null ? record.atom : null;
         if (atom == null)
         {
             return false;
@@ -3952,27 +4366,27 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        Atom anchorHost = ResolveAttachedAtomAnchorHost();
         if (ignoreContainingAtomField.val && anchorHost != null && atom == anchorHost)
         {
             return false;
         }
 
 #if FA_RADAR_PRO
-        bool light = IsLightAtom(atom);
-        bool cua = IsCustomUnityAssetAtom(atom);
-        bool person = IsPersonAtom(atom);
-        bool empty = IsEmptyAtom(atom);
-        bool subScene = IsSubSceneAtom(atom);
-        bool imagePanel = IsImagePanelAtom(atom);
-        bool animation = IsAnimationAtom(atom);
-        bool force = IsForceAtom(atom);
-        bool shape = IsShapeAtom(atom);
-        bool sound = IsSoundAtom(atom);
-        bool trigger = IsTriggerAtom(atom);
-        bool navigationPanel = IsNavigationPanelAtom(atom);
-        bool camera = IsCameraAtom(atom);
-        bool other = !light && !cua && !person && !empty && !subScene && !imagePanel && !animation && !force && !shape && !sound && !trigger && !navigationPanel && !camera;
+        bool light = HasCategory(record, AtomCategoryLight);
+        bool cua = HasCategory(record, AtomCategoryCua);
+        bool person = HasCategory(record, AtomCategoryPerson);
+        bool empty = HasCategory(record, AtomCategoryEmpty);
+        bool subScene = HasCategory(record, AtomCategorySubScene);
+        bool imagePanel = HasCategory(record, AtomCategoryImagePanel);
+        bool animation = HasCategory(record, AtomCategoryAnimation);
+        bool force = HasCategory(record, AtomCategoryForce);
+        bool shape = HasCategory(record, AtomCategoryShape);
+        bool sound = HasCategory(record, AtomCategorySound);
+        bool trigger = HasCategory(record, AtomCategoryTrigger);
+        bool navigationPanel = HasCategory(record, AtomCategoryNavigationPanel);
+        bool camera = HasCategory(record, AtomCategoryCamera);
+        int knownFlags = AtomCategoryLight | AtomCategoryCua | AtomCategoryPerson | AtomCategoryEmpty | AtomCategorySubScene | AtomCategoryImagePanel | AtomCategoryAnimation | AtomCategoryForce | AtomCategoryShape | AtomCategorySound | AtomCategoryTrigger | AtomCategoryNavigationPanel | AtomCategoryCamera;
+        bool other = (record.categoryFlags & knownFlags) == 0;
         return
             (light && showLightAtomsField.val) ||
             (cua && showCustomUnityAssetAtomsField.val) ||
@@ -4132,20 +4546,23 @@ public class FrameAngelRadar : MVRScript
     private void EnsureAvailableMarkerCapacity(int requiredCount)
     {
         int currentCount = availableMarkerObjects != null ? availableMarkerObjects.Length : 0;
-        if (currentCount >= requiredCount)
+        if (currentCount >= requiredCount && availableMarkerSlots != null && availableMarkerSlots.Length >= currentCount)
         {
             return;
         }
 
-        GameObject[] newMarkers = new GameObject[requiredCount];
-        GameObject[] newStems = new GameObject[requiredCount];
-        Material[] newMaterials = new Material[requiredCount];
+        int targetCount = Mathf.Max(requiredCount, currentCount + 1);
+        int pooledCount = Mathf.CeilToInt((float)targetCount / (float)AvailableMarkerPoolBlockSize) * AvailableMarkerPoolBlockSize;
+        GameObject[] newMarkers = new GameObject[pooledCount];
+        GameObject[] newStems = new GameObject[pooledCount];
+        Material[] newMaterials = new Material[pooledCount];
+        MarkerSlot[] newSlots = new MarkerSlot[pooledCount];
 #if FA_RADAR_PRO
-        GameObject[] newAxisObjects = new GameObject[requiredCount * 3];
-        GameObject[] newLightRanges = new GameObject[requiredCount];
-        GameObject[] newSpotlightCones = new GameObject[requiredCount];
-        Material[] newLightRangeMaterials = new Material[requiredCount];
-        Material[] newSpotlightConeMaterials = new Material[requiredCount];
+        GameObject[] newAxisObjects = new GameObject[pooledCount * 3];
+        GameObject[] newLightRanges = new GameObject[pooledCount];
+        GameObject[] newSpotlightCones = new GameObject[pooledCount];
+        Material[] newLightRangeMaterials = new Material[pooledCount];
+        Material[] newSpotlightConeMaterials = new Material[pooledCount];
 #endif
 
         for (int i = 0; i < currentCount; i++)
@@ -4153,44 +4570,64 @@ public class FrameAngelRadar : MVRScript
             newMarkers[i] = availableMarkerObjects[i];
             newStems[i] = availableStemObjects[i];
             newMaterials[i] = availableMarkerMaterials[i];
+            newSlots[i] = availableMarkerSlots != null && i < availableMarkerSlots.Length && availableMarkerSlots[i] != null
+                ? availableMarkerSlots[i]
+                : new MarkerSlot();
+            newSlots[i].markerObject = newMarkers[i];
+            newSlots[i].stemObject = newStems[i];
+            newSlots[i].markerMaterial = newMaterials[i];
+            newSlots[i].markerFilter = newMarkers[i] != null ? newMarkers[i].GetComponent<MeshFilter>() : null;
 #if FA_RADAR_PRO
             if (availableRotationAxisObjects != null)
             {
+                newSlots[i].rotationAxisObjects = new GameObject[3];
                 for (int axis = 0; axis < 3; axis++)
                 {
                     newAxisObjects[(i * 3) + axis] = availableRotationAxisObjects[(i * 3) + axis];
+                    newSlots[i].rotationAxisObjects[axis] = newAxisObjects[(i * 3) + axis];
                 }
             }
             if (availableLightRangeObjects != null)
             {
                 newLightRanges[i] = availableLightRangeObjects[i];
+                newSlots[i].lightRangeObject = newLightRanges[i];
             }
             if (availableSpotlightConeObjects != null)
             {
                 newSpotlightCones[i] = availableSpotlightConeObjects[i];
+                newSlots[i].spotlightConeObject = newSpotlightCones[i];
             }
             if (availableLightRangeMaterials != null)
             {
                 newLightRangeMaterials[i] = availableLightRangeMaterials[i];
+                newSlots[i].lightRangeMaterial = newLightRangeMaterials[i];
             }
             if (availableSpotlightConeMaterials != null)
             {
                 newSpotlightConeMaterials[i] = availableSpotlightConeMaterials[i];
+                newSlots[i].spotlightConeMaterial = newSpotlightConeMaterials[i];
             }
 #endif
         }
 
-        for (int i = currentCount; i < requiredCount; i++)
+        for (int i = currentCount; i < pooledCount; i++)
         {
+            MarkerSlot slot = new MarkerSlot();
             Material markerMaterial = CreateEmissiveOverlayMaterial("FA Radar Available Atom Material " + i, new Color(0.58f, 0.74f, 1.0f, 0.46f), MarkerRenderQueue);
             newMaterials[i] = markerMaterial;
             newMarkers[i] = CreateMeshObject("FA Radar Available Atom " + i, axisRoot.transform, targetBlipMesh, markerMaterial, MarkerRenderQueue, MarkerSortingOrder - 8);
             newStems[i] = CreateMeshObject("FA Radar Available Height Stem " + i, axisRoot.transform, heightStemMesh, availableHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 9);
+            slot.markerObject = newMarkers[i];
+            slot.stemObject = newStems[i];
+            slot.markerMaterial = markerMaterial;
+            slot.markerFilter = newMarkers[i] != null ? newMarkers[i].GetComponent<MeshFilter>() : null;
 #if FA_RADAR_PRO
+            slot.rotationAxisObjects = new GameObject[3];
             for (int axis = 0; axis < 3; axis++)
             {
                 Material axisMaterial = axis == 0 ? rotationAxisXMaterial : (axis == 1 ? rotationAxisYMaterial : rotationAxisZMaterial);
                 newAxisObjects[(i * 3) + axis] = CreateMeshObject("FA Radar Available Rotation Axis " + i + "." + axis, axisRoot.transform, rotationAxisLineMesh, axisMaterial, MarkerRenderQueue + 2, MarkerSortingOrder - 6);
+                slot.rotationAxisObjects[axis] = newAxisObjects[(i * 3) + axis];
                 SetActiveIfChanged(newAxisObjects[(i * 3) + axis], false);
             }
 
@@ -4198,16 +4635,22 @@ public class FrameAngelRadar : MVRScript
             newSpotlightConeMaterials[i] = CreateSphereShellMaterial("FA Radar Available Spotlight Cone Material " + i, new Color(1.0f, 0.86f, 0.42f, 0.16f), MarkerRenderQueue - 11);
             newLightRanges[i] = CreateMeshObject("FA Radar Available Light Range " + i, axisRoot.transform, lightVolumeSphereMesh, newLightRangeMaterials[i], MarkerRenderQueue - 12, MarkerSortingOrder - 12);
             newSpotlightCones[i] = CreateMeshObject("FA Radar Available Spotlight Cone " + i, axisRoot.transform, spotlightConeMesh, newSpotlightConeMaterials[i], MarkerRenderQueue - 11, MarkerSortingOrder - 11);
+            slot.lightRangeObject = newLightRanges[i];
+            slot.spotlightConeObject = newSpotlightCones[i];
+            slot.lightRangeMaterial = newLightRangeMaterials[i];
+            slot.spotlightConeMaterial = newSpotlightConeMaterials[i];
             SetActiveIfChanged(newLightRanges[i], false);
             SetActiveIfChanged(newSpotlightCones[i], false);
 #endif
             SetActiveIfChanged(newMarkers[i], false);
             SetActiveIfChanged(newStems[i], false);
+            newSlots[i] = slot;
         }
 
         availableMarkerObjects = newMarkers;
         availableStemObjects = newStems;
         availableMarkerMaterials = newMaterials;
+        availableMarkerSlots = newSlots;
 #if FA_RADAR_PRO
         availableRotationAxisObjects = newAxisObjects;
         availableLightRangeObjects = newLightRanges;
@@ -4217,22 +4660,45 @@ public class FrameAngelRadar : MVRScript
 #endif
     }
 
-    private void UpdateAvailableAtomMarkers(Transform viewer)
+    private void UpdateAvailableAtomMarkers(RadarFrame frame)
     {
-        int trackedCount = availableAtomMarkersEnabledField.val && trackedAvailableAtoms != null ? trackedAvailableAtoms.Count : 0;
+        int trackedCount = availableAtomMarkersEnabledField.val && availableAtomRecords != null ? availableAtomRecords.Count : 0;
+        bool atomTransformChanged = false;
+        for (int i = 0; i < trackedCount; i++)
+        {
+            AtomRecord record = availableAtomRecords[i];
+            if (RefreshAtomRecordTransform(record))
+            {
+                atomTransformChanged = true;
+            }
+        }
+
+        if (atomTransformChanged)
+        {
+            availableAtomRevision++;
+            frame.signature = BuildRadarFrameSignature(frame);
+        }
+
+        if (!availableMarkersDirty && frame.signature == lastAvailableMarkerFrameSignature)
+        {
+            return;
+        }
+
         int visibleMarkerCount = 0;
         int rangeHiddenCount = 0;
         int missingTargetCount = 0;
-        float visualRadius = ResolveVisualRadius();
-        for (int i = 0; availableMarkerObjects != null && i < availableMarkerObjects.Length; i++)
+        float visualRadius = frame.visualRadius;
+        for (int i = 0; availableMarkerSlots != null && i < availableMarkerSlots.Length; i++)
         {
+            MarkerSlot slot = availableMarkerSlots[i];
             bool show = i < trackedCount;
-            if (!show)
+            if (slot == null || !show)
             {
-                SetActiveIfChanged(availableMarkerObjects[i], false);
-                if (availableStemObjects != null && i < availableStemObjects.Length)
+                if (slot != null)
                 {
-                    SetActiveIfChanged(availableStemObjects[i], false);
+                    SetActiveIfChanged(slot.markerObject, false);
+                    SetActiveIfChanged(slot.stemObject, false);
+                    slot.recordId = -1;
                 }
 #if FA_RADAR_PRO
                 SetProAvailableAtomVisualsVisible(i, false);
@@ -4240,35 +4706,31 @@ public class FrameAngelRadar : MVRScript
                 continue;
             }
 
-            Atom atom = trackedAvailableAtoms[i];
-            Transform target = ResolveAtomRootTransform(atom);
-            if (target == null)
+            AtomRecord record = availableAtomRecords[i];
+            Transform target = record != null ? record.root : null;
+            if (record == null || record.atom == null || target == null || !record.atom.on || record.atom.hidden)
             {
                 missingTargetCount++;
-                SetActiveIfChanged(availableMarkerObjects[i], false);
-                if (availableStemObjects != null && i < availableStemObjects.Length)
-                {
-                    SetActiveIfChanged(availableStemObjects[i], false);
-                }
+                SetActiveIfChanged(slot.markerObject, false);
+                SetActiveIfChanged(slot.stemObject, false);
+                slot.recordId = -1;
 #if FA_RADAR_PRO
                 SetProAvailableAtomVisualsVisible(i, false);
 #endif
                 continue;
             }
 
-            Vector3 targetWorldPosition = ResolveAtomMarkerWorldPosition(atom, target);
-            Vector3 radarLocal = ResolveWorldPositionRadarLocal(viewer, targetWorldPosition);
-            Vector3 groundLocal = ResolveTargetGroundRadarLocal(viewer, targetWorldPosition);
-            float distanceMeters = ResolveWorldDistanceMeters(viewer, targetWorldPosition);
+            Vector3 targetWorldPosition = record.markerWorldPosition;
+            Vector3 radarLocal = ResolveWorldPositionRadarLocal(frame, targetWorldPosition);
+            Vector3 groundLocal = ResolveTargetGroundRadarLocal(frame, targetWorldPosition);
+            float distanceMeters = ResolveWorldDistanceMeters(frame, targetWorldPosition);
             float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
             if (fadeAlpha <= 0.01f)
             {
                 rangeHiddenCount++;
-                SetActiveIfChanged(availableMarkerObjects[i], false);
-                if (availableStemObjects != null && i < availableStemObjects.Length)
-                {
-                    SetActiveIfChanged(availableStemObjects[i], false);
-                }
+                SetActiveIfChanged(slot.markerObject, false);
+                SetActiveIfChanged(slot.stemObject, false);
+                slot.recordId = -1;
 #if FA_RADAR_PRO
                 SetProAvailableAtomVisualsVisible(i, false);
 #endif
@@ -4278,20 +4740,25 @@ public class FrameAngelRadar : MVRScript
             float depthScale = ResolveDepthScale(distanceMeters);
             float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * 0.58f * depthScale;
 #if FA_RADAR_PRO
-            if (IsLightAtom(atom))
+            if (HasCategory(record, AtomCategoryLight))
             {
                 markerScale *= Mathf.Clamp(ReadFloat(lightMarkerScaleField, 0.38f), 0.12f, 1.0f);
             }
 #endif
-            Color color = ResolveAvailableAtomColor(atom, Mathf.Clamp01(availableAtomAlphaField.val) * fadeAlpha);
-            ApplyMaterialColor(availableMarkerMaterials[i], color, Mathf.Max(0.0f, emissionStrengthField.val) * 0.85f);
-            SetActiveIfChanged(availableMarkerObjects[i], true);
+            Color color = ResolveAvailableAtomColor(record, Mathf.Clamp01(availableAtomAlphaField.val) * fadeAlpha);
+            ApplyMaterialColorIfChanged(slot.markerMaterial, color, Mathf.Max(0.0f, emissionStrengthField.val) * 0.85f);
+            if (slot.markerFilter != null && record.markerMesh != null && slot.markerMesh != record.markerMesh)
+            {
+                slot.markerFilter.sharedMesh = record.markerMesh;
+                slot.markerMesh = record.markerMesh;
+            }
+            slot.recordId = record.recordId;
+            SetActiveIfChanged(slot.markerObject, true);
             visibleMarkerCount++;
-            ApplyMarkerMeshForAtom(availableMarkerObjects[i], atom);
-            PositionTargetSphere(availableMarkerObjects[i], radarLocal, visualRadius, markerScale, 0.0f);
-            UpdateHeightStem(availableStemObjects[i], radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && fadeAlpha > 0.08f);
+            PositionTargetSphere(slot.markerObject, radarLocal, visualRadius, markerScale, 0.0f);
+            UpdateHeightStem(slot.stemObject, radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && fadeAlpha > 0.08f);
 #if FA_RADAR_PRO
-            UpdateProAvailableAtomVisuals(i, atom, target, radarLocal, markerScale, fadeAlpha);
+            UpdateProAvailableAtomVisuals(i, record, radarLocal, markerScale, fadeAlpha);
 #endif
         }
 
@@ -4299,10 +4766,18 @@ public class FrameAngelRadar : MVRScript
         lastAvailableAtomVisibleCount = visibleMarkerCount;
         lastAvailableAtomRangeHiddenCount = rangeHiddenCount;
         lastAvailableAtomMissingTargetCount = missingTargetCount;
+        lastAvailableMarkerFrameSignature = frame.signature;
+        availableMarkersDirty = false;
     }
 
     private void UpdateAvailableAtomMarkerStatus()
     {
+        if (Time.unscaledTime < nextAvailableMarkerStatusTime)
+        {
+            return;
+        }
+
+        nextAvailableMarkerStatusTime = Time.unscaledTime + AvailableMarkerStatusIntervalSeconds;
         if (selectedAtom != null || !availableAtomMarkersEnabledField.val)
         {
             return;
@@ -4381,7 +4856,7 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
-    private void UpdateProTargetVisuals(Transform viewer, Transform target, Vector3 radarLocal, float markerScale, float fadeAlpha)
+    private void UpdateProTargetVisuals(RadarFrame frame, Transform target, Vector3 radarLocal, float markerScale, float fadeAlpha)
     {
         if (target == null || fadeAlpha <= 0.01f)
         {
@@ -4394,13 +4869,15 @@ public class FrameAngelRadar : MVRScript
         UpdateRotationAxisSet(targetRotationAxisObjects, 0, target, radarLocal, markerScale, fadeAlpha);
 
         Light light = null;
-        bool hasLight = selectedAtom != null && TryResolveUnityLight(selectedAtom, out light);
+        bool hasLight = selectedAtomRecord != null && TryResolveUnityLight(selectedAtomRecord, out light);
         UpdateLightRangeVolume(targetLightRangeObject, targetLightRangeMaterial, selectedAtom, target, light, radarLocal, fadeAlpha, hasLight);
         UpdateSpotlightCone(targetSpotlightConeObject, targetSpotlightConeMaterial, selectedAtom, target, light, radarLocal, fadeAlpha, hasLight);
     }
 
-    private void UpdateProAvailableAtomVisuals(int markerIndex, Atom atom, Transform target, Vector3 radarLocal, float markerScale, float fadeAlpha)
+    private void UpdateProAvailableAtomVisuals(int markerIndex, AtomRecord record, Vector3 radarLocal, float markerScale, float fadeAlpha)
     {
+        Atom atom = record != null ? record.atom : null;
+        Transform target = record != null ? record.root : null;
         if (atom == null || target == null || fadeAlpha <= 0.01f)
         {
             SetProAvailableAtomVisualsVisible(markerIndex, false);
@@ -4410,7 +4887,7 @@ public class FrameAngelRadar : MVRScript
         UpdateRotationAxisSet(availableRotationAxisObjects, markerIndex * 3, target, radarLocal, markerScale, fadeAlpha);
 
         Light light = null;
-        bool hasLight = TryResolveUnityLight(atom, out light);
+        bool hasLight = TryResolveUnityLight(record, out light);
         Material rangeMaterial = availableLightRangeMaterials != null && markerIndex < availableLightRangeMaterials.Length
             ? availableLightRangeMaterials[markerIndex]
             : null;
@@ -4610,12 +5087,33 @@ public class FrameAngelRadar : MVRScript
 
     private bool TryResolveUnityLight(Atom atom, out Light light)
     {
+        AtomRecord record = new AtomRecord();
+        record.atom = atom;
+        record.root = ResolveAtomRootTransform(atom);
+        return TryResolveUnityLight(record, out light);
+    }
+
+    private bool TryResolveUnityLight(AtomRecord record, out Light light)
+    {
         light = null;
-        Transform root = atom != null && atom.transform != null
-            ? atom.transform
-            : ResolveAtomRootTransform(atom);
+        if (record == null)
+        {
+            return false;
+        }
+
+        if (record.lightResolved)
+        {
+            light = record.light;
+            return record.hasLight && light != null;
+        }
+
+        Transform root = record.atom != null && record.atom.transform != null
+            ? record.atom.transform
+            : record.root;
         if (root == null)
         {
+            record.lightResolved = true;
+            record.hasLight = false;
             return false;
         }
 
@@ -4624,6 +5122,8 @@ public class FrameAngelRadar : MVRScript
             Light[] lights = root.GetComponentsInChildren<Light>(true);
             if (lights == null || lights.Length <= 0)
             {
+                record.lightResolved = true;
+                record.hasLight = false;
                 return false;
             }
 
@@ -4632,15 +5132,23 @@ public class FrameAngelRadar : MVRScript
                 if (lights[i] != null && lights[i].enabled)
                 {
                     light = lights[i];
+                    record.light = light;
+                    record.hasLight = true;
+                    record.lightResolved = true;
                     return true;
                 }
             }
 
             light = lights[0];
-            return light != null;
+            record.light = light;
+            record.hasLight = light != null;
+            record.lightResolved = true;
+            return record.hasLight;
         }
         catch
         {
+            record.lightResolved = true;
+            record.hasLight = false;
             return false;
         }
     }
@@ -6429,9 +6937,83 @@ public class FrameAngelRadar : MVRScript
         SuperController.singleton.SelectController(atom.mainController, false, false, false, true);
         selectedAtom = atom;
         selectedUid = atom.uid;
+        selectedAtomRecord = null;
         nextSelectionPollTime = 0.0f;
         nextAtomPollTime = 0.0f;
+        availableMarkersDirty = true;
+        availableAtomRevision++;
         SetStatus("Radar selected: " + selectedUid);
+    }
+
+    private Color ResolveAvailableAtomColor(AtomRecord record, float alpha)
+    {
+#if FA_RADAR_PRO
+        if (HasCategory(record, AtomCategoryLight))
+        {
+            return new Color(1.0f, 0.88f, 0.30f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryCua))
+        {
+            return new Color(1.0f, 0.62f, 0.24f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryPerson))
+        {
+            if (HasCategory(record, AtomCategoryFemale))
+            {
+                return new Color(1.0f, 0.34f, 0.72f, alpha);
+            }
+            if (HasCategory(record, AtomCategoryMale))
+            {
+                return new Color(0.25f, 0.52f, 1.0f, alpha);
+            }
+
+            return new Color(0.78f, 0.54f, 1.0f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryEmpty))
+        {
+            return new Color(0.52f, 0.94f, 1.0f, alpha);
+        }
+        if (HasCategory(record, AtomCategorySubScene))
+        {
+            return new Color(0.70f, 0.52f, 1.0f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryImagePanel))
+        {
+            return new Color(0.78f, 0.88f, 1.0f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryAnimation))
+        {
+            return new Color(0.36f, 1.0f, 0.56f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryForce))
+        {
+            return new Color(1.0f, 0.30f, 0.26f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryShape))
+        {
+            return new Color(0.36f, 0.68f, 1.0f, alpha);
+        }
+        if (HasCategory(record, AtomCategorySound))
+        {
+            return new Color(0.94f, 0.72f, 1.0f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryTrigger))
+        {
+            return new Color(1.0f, 0.72f, 0.32f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryNavigationPanel))
+        {
+            return new Color(0.56f, 0.86f, 0.86f, alpha);
+        }
+        if (HasCategory(record, AtomCategoryCamera))
+        {
+            return new Color(0.84f, 0.84f, 0.92f, alpha);
+        }
+
+        return new Color(0.58f, 0.74f, 1.0f, alpha);
+#else
+        return WithAlpha(FreeAtomMarkerColor, alpha);
+#endif
     }
 
     private Color ResolveAvailableAtomColor(Atom atom, float alpha)
@@ -6505,16 +7087,16 @@ public class FrameAngelRadar : MVRScript
 #endif
     }
 
-    private void RefreshGridMeshIfNeeded(Transform viewer)
+    private void RefreshGridMeshIfNeeded(RadarFrame frame)
     {
         if (gridFilter == null)
         {
             return;
         }
 
-        float range = ResolveEffectiveRadarRangeMeters();
+        float range = frame.rangeMeters;
         float step = ResolveGridStepMeters();
-        Vector2 offset = ResolveViewerGridOffsetMeters(viewer, step);
+        Vector2 offset = ResolveViewerGridOffsetMeters(frame.viewer, step);
         bool clipCircle = gridClipCircleField.val;
         bool sameOffset = haveLastGridOffset && (offset - lastGridOffsetMeters).sqrMagnitude < 0.0001f;
         if (
@@ -6768,6 +7350,17 @@ public class FrameAngelRadar : MVRScript
 #endif
     }
 
+    private void UpdateMaterialsIfNeeded()
+    {
+        if (!materialsDirty)
+        {
+            return;
+        }
+
+        UpdateMaterials();
+        materialsDirty = false;
+    }
+
     private void SetMaterialAlphaMultiplier(float multiplier)
     {
         multiplier = Mathf.Clamp01(multiplier);
@@ -6777,9 +7370,11 @@ public class FrameAngelRadar : MVRScript
         }
 
         radarMaterialAlphaMultiplier = multiplier;
+        materialsDirty = true;
+        materialStateByMaterial.Clear();
         if (visualsReady)
         {
-            UpdateMaterials();
+            UpdateMaterialsIfNeeded();
         }
     }
 
@@ -6845,13 +7440,43 @@ public class FrameAngelRadar : MVRScript
 
     private void ApplyMaterialColor(Material material, Color color, float emissionStrength)
     {
+        ApplyMaterialColorIfChanged(material, color, emissionStrength);
+    }
+
+    private void ApplyMaterialColorIfChanged(Material material, Color color, float emissionStrength)
+    {
         if (material == null)
         {
             return;
         }
 
         color.a *= Mathf.Clamp01(radarMaterialAlphaMultiplier);
+        CachedMaterialState state;
+        if (materialStateByMaterial.TryGetValue(material, out state)
+            && state.known
+            && AreColorsClose(state.color, color)
+            && Mathf.Abs(state.emissionStrength - emissionStrength) <= 0.0001f)
+        {
+            return;
+        }
 
+        ApplyMaterialColorRaw(material, color, emissionStrength);
+        state.color = color;
+        state.emissionStrength = emissionStrength;
+        state.known = true;
+        materialStateByMaterial[material] = state;
+    }
+
+    private bool AreColorsClose(Color left, Color right)
+    {
+        return Mathf.Abs(left.r - right.r) <= 0.0001f
+            && Mathf.Abs(left.g - right.g) <= 0.0001f
+            && Mathf.Abs(left.b - right.b) <= 0.0001f
+            && Mathf.Abs(left.a - right.a) <= 0.0001f;
+    }
+
+    private void ApplyMaterialColorRaw(Material material, Color color, float emissionStrength)
+    {
         if (material.HasProperty("_Mode"))
         {
             material.SetFloat("_Mode", 3.0f);

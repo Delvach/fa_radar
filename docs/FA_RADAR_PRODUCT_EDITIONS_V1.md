@@ -7,11 +7,11 @@ Updated: 2026-06-10
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.37`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.38`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.37.dll`
-- `fa_radar.pro.0.1.37.dll`
+- `fa_radar.free.0.1.38.dll`
+- `fa_radar.pro.0.1.38.dll`
 
 The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
 branding remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.37 intentionally keeps Free sparse: desktop
+buttons, and text fields, but 0.1.38 intentionally keeps Free sparse: desktop
 placement, VR placement, scale, HUD offsets, and static desktop offsets.
 Free's grab/wrist behavior remains available through the default runtime path
 and saved preferences without exposing prototype tuning controls.
@@ -49,6 +49,9 @@ and persist it as a pinned world-static radar until it is grabbed again.
 The `0.1.37` visual fix keeps spotlight cones open-ended and clipped to the
 radar shell, and adds a no-visible-marker status diagnostic for range/filter
 debugging after scene reloads.
+The `0.1.38` performance pass keeps those product features but moves available
+atom rendering to cached atom records, block-grown marker pools, frame
+signatures, cached bounds/light metadata, and coalesced material writes.
 
 ## Free Edition
 
@@ -141,7 +144,7 @@ Rules:
 Current build helpers stage candidate `.var` packages:
 
 - `FrameAngelDev.Radar.1.var`
-- `fa_radar.pro.0.1.37.var`
+- `fa_radar.pro.0.1.38.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.

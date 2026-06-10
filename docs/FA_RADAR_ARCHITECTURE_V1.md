@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.37` on branch
-  `codex/0.1.37-spotlight-disc-world-pin-fix`.
+- Version: `0.1.38` on branch
+  `codex/0.1.38-performance-architecture`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.37.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.37.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.38.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.38.dll`.
 - Pro also ships a thin Empty atom preset:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
 - Intended plugin surface: scene or session plugin. Atom plugin loading still
@@ -27,7 +27,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.37` branch preserves the generated visual treatment, keeps the normal
+The `0.1.38` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, and
 keeps separate scene/session `Desktop Placement` and `VR Placement` prefs. It
 also keeps optional wrist compass projection modes that can reveal on an
@@ -336,9 +336,33 @@ offset sliders and reset button.
 
 ## Performance Posture
 
+Detailed 0.1.38 rewrite notes and the concrete improvement list live in
+`docs/FA_RADAR_PERFORMANCE_REWRITE_0.1.38.md`.
+
 - Meshes and materials are created once and destroyed with the plugin.
 - Selection is polled on `Selection Poll Seconds`; there is no per-frame atom
   scan.
+- Available atom discovery is polled on `Atom Poll Seconds` and builds cached
+  `AtomRecord` entries with root transform, category flags, marker mesh,
+  visual-center offset, optional Pro light handle, and cached distance.
+- `RadarFrame` captures the active reference position/rotation/range/height
+  scale/visual radius once per tick and produces a quantized signature. The
+  available marker loop skips when the frame signature and atom transforms have
+  not changed.
+- Marker pools grow in 16-slot blocks through `MarkerSlot` records, avoiding
+  resize churn as atoms or filters change.
+- Renderer bounds and Unity light hierarchy scans happen during atom polling,
+  not in the available marker render loop or sort comparer.
+- Available-atom sorting uses cached squared distances.
+- Material writes go through `ApplyMaterialColorIfChanged`, so unchanged color
+  and emission values do not reapply shader properties every frame.
+- Marker status text is throttled to avoid per-tick formatting.
+- `commonMarkerDefaultsVersion` migrates older saved prefs back to showing
+  target markers by default, preventing stale prototype prefs from making a
+  scene look empty until a toggle is clicked.
+- Headless Unity prefab generation remains intentionally unused: this repo's
+  runtime contract is self-contained C# under `payload/Custom/Scripts`, with no
+  Unity project, assetbundle, or repo-local runtime asset dependency.
 - Per-frame work is selected target transform, small vector math, world-axis
   yaw resolution, optional ring rotation, lightweight grid mesh refresh when
   viewer grid offset changes, and active-state diffs. In anchored mode the HUD
@@ -366,8 +390,8 @@ offset sliders and reset button.
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.37.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.37.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.38.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.38.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -383,11 +407,11 @@ package is `FrameAngelDev.Radar.1.var`. The Pro package additionally stages
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.37.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.37.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.38.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.38.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.37.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.37.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.38.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.38.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 Future public `.var` product naming is undecided. Current candidates are

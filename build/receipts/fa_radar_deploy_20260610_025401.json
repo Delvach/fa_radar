@@ -1,0 +1,99 @@
+﻿{
+    "schemaVersion":  "fa_radar_deploy_receipt_v1",
+    "createdAtUtc":  "2026-06-10T08:54:01.5312991Z",
+    "repoRoot":  "C:\\projects\\fa_radar",
+    "branch":  "codex/0.1.38-performance-architecture",
+    "commit":  "f9aa7a7de9990cc4ddb85c07998119c837491372",
+    "dirtyState":  [
+                       " M config/fa_radar.version.json",
+                       " M docs/FA_RADAR_ARCHITECTURE_V1.md",
+                       " M docs/FA_RADAR_PRODUCT_EDITIONS_V1.md",
+                       " M eng/Verify-FaRadarContract.ps1",
+                       " M payload/Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
+                       " M payload/Custom/Scripts/FrameAngel/Radar/FrameAngelRadar.cs",
+                       " M scripts/Build-FaRadar.ps1",
+                       " M scripts/Deploy-FaRadar.ps1",
+                       "?? build/receipts/fa_radar_build_20260610_023650.json",
+                       "?? build/receipts/fa_radar_build_20260610_025310.json",
+                       "?? build/receipts/fa_radar_build_20260610_025400.json",
+                       "?? docs/FA_RADAR_PERFORMANCE_REWRITE_0.1.38.md"
+                   ],
+    "version":  "0.1.38",
+    "editionRequest":  "All",
+    "expectedPluginFileNames":  [
+                                    "fa_radar.free.0.1.38.dll",
+                                    "fa_radar.pro.0.1.38.dll"
+                                ],
+    "anchorPresetFileName":  "Preset_FrameAngel_Radar_Empty.vap",
+    "configuration":  "Release",
+    "buildReceiptPath":  "C:\\projects\\fa_radar\\build\\receipts\\fa_radar_build_20260610_025400.json",
+    "vamManagedDir":  "F:\\sim\\vam\\VaM_Data\\Managed",
+    "skipBuild":  false,
+    "skipObfuscation":  false,
+    "skipPackage":  false,
+    "deployedDlls":  [
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.free.0.1.38.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.38.dll",
+                             "sha256":  "435765BD736CB306A473DEF23A2DB664233025721DABCE597349C22AC60E7CEE",
+                             "sourceSha256":  "435765BD736CB306A473DEF23A2DB664233025721DABCE597349C22AC60E7CEE",
+                             "bytes":  103424
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "F:\\sim\\vam",
+                             "pluginDirectory":  "F:\\sim\\vam\\Custom\\Plugins",
+                             "path":  "F:\\sim\\vam\\Custom\\Plugins\\fa_radar.pro.0.1.38.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.38.dll",
+                             "sha256":  "C9A663C499D070D9C3DF4BF906D47CE1BF6A5B2890D49E6CF84F104A93B1C705",
+                             "sourceSha256":  "C9A663C499D070D9C3DF4BF906D47CE1BF6A5B2890D49E6CF84F104A93B1C705",
+                             "bytes":  126976
+                         },
+                         {
+                             "edition":  "free",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.free.0.1.38.dll",
+                             "pluginFileName":  "fa_radar.free.0.1.38.dll",
+                             "sha256":  "435765BD736CB306A473DEF23A2DB664233025721DABCE597349C22AC60E7CEE",
+                             "sourceSha256":  "435765BD736CB306A473DEF23A2DB664233025721DABCE597349C22AC60E7CEE",
+                             "bytes":  103424
+                         },
+                         {
+                             "edition":  "pro",
+                             "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                             "pluginDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins",
+                             "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Plugins\\fa_radar.pro.0.1.38.dll",
+                             "pluginFileName":  "fa_radar.pro.0.1.38.dll",
+                             "sha256":  "C9A663C499D070D9C3DF4BF906D47CE1BF6A5B2890D49E6CF84F104A93B1C705",
+                             "sourceSha256":  "C9A663C499D070D9C3DF4BF906D47CE1BF6A5B2890D49E6CF84F104A93B1C705",
+                             "bytes":  126976
+                         }
+                     ],
+    "deployedPresets":  [
+                            {
+                                "vamRoot":  "F:\\sim\\vam",
+                                "presetDirectory":  "F:\\sim\\vam\\Custom\\Atom\\Empty",
+                                "path":  "F:\\sim\\vam\\Custom\\Atom\\Empty\\Preset_FrameAngel_Radar_Empty.vap",
+                                "presetFileName":  "Preset_FrameAngel_Radar_Empty.vap",
+                                "sha256":  "D892F37429999F3FA2AB88C615EDB2D8BA31D0B74E6F54BF72044F93B60FFCA7",
+                                "sourceSha256":  "D892F37429999F3FA2AB88C615EDB2D8BA31D0B74E6F54BF72044F93B60FFCA7",
+                                "bytes":  2010
+                            },
+                            {
+                                "vamRoot":  "C:\\vam\\virgin-recordable-02",
+                                "presetDirectory":  "C:\\vam\\virgin-recordable-02\\Custom\\Atom\\Empty",
+                                "path":  "C:\\vam\\virgin-recordable-02\\Custom\\Atom\\Empty\\Preset_FrameAngel_Radar_Empty.vap",
+                                "presetFileName":  "Preset_FrameAngel_Radar_Empty.vap",
+                                "sha256":  "D892F37429999F3FA2AB88C615EDB2D8BA31D0B74E6F54BF72044F93B60FFCA7",
+                                "sourceSha256":  "D892F37429999F3FA2AB88C615EDB2D8BA31D0B74E6F54BF72044F93B60FFCA7",
+                                "bytes":  2010
+                            }
+                        ],
+    "archivedLegacyScripts":  [
+
+                              ]
+}
