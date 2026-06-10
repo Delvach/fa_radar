@@ -1,4 +1,4 @@
-# FA Radar UI Controls 0.1.36
+# FA Radar UI Controls 0.1.37
 
 This inventory records the current plugin UI pruning decision. The runtime still
 registers the older controls and preferences for compatibility, but the normal
@@ -62,6 +62,11 @@ scene-map controls:
 Preferences save automatically after value changes and reload automatically
 from the shared preference files. There is no visible save button.
 
+When `Show Target Markers` is enabled but no available atom marker is visible,
+`Status` reports whether Radar found no scene atoms, tracked zero atoms after
+filters, or tracked atoms but hid them outside range or because their target
+transform was unavailable.
+
 ## Hidden Compatibility Controls
 
 These controls remain registered and preference-backed, but are no longer shown
@@ -82,7 +87,7 @@ anchoring surface:
   click selection radius, grab hit radius, selection poll interval, and atom
   poll interval, `Global Prefs Auto Save`, and manual save/load actions.
 - Legacy range modifiers: `Floor Area Scale` and `Grid Step Meters` remain
-  registered, but 0.1.36 makes the visible range and one-meter grid contract the
+  registered, but 0.1.37 makes the visible range and one-meter grid contract the
   runtime authority.
 
 ## Decision

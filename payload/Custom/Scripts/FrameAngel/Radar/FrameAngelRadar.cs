@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.36";
+    private const string Version = "0.1.37";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -304,6 +304,11 @@ public class FrameAngelRadar : MVRScript
     private Atom selectedAtom;
     private Atom lastSelectedAtom;
     private List<Atom> trackedAvailableAtoms = new List<Atom>();
+    private int lastAvailableAtomSceneCount;
+    private int lastAvailableAtomTrackedCount;
+    private int lastAvailableAtomVisibleCount;
+    private int lastAvailableAtomRangeHiddenCount;
+    private int lastAvailableAtomMissingTargetCount;
     private string selectedUid = "";
     private string lastSelectedUid = "";
     private float nextSelectionPollTime;
@@ -2623,6 +2628,7 @@ public class FrameAngelRadar : MVRScript
         SetActiveIfChanged(lastTargetBlipObject, false);
         SetActiveIfChanged(lastTargetGridDropObject, false);
         UpdateAvailableAtomMarkers(viewer);
+        UpdateAvailableAtomMarkerStatus();
 #if FA_RADAR_PRO
         UpdateProCameraFrustums(viewer);
 #endif
@@ -3879,6 +3885,11 @@ public class FrameAngelRadar : MVRScript
         float interval = Mathf.Max(0.15f, atomPollSecondsField.val);
         nextAtomPollTime = Time.time + interval;
         trackedAvailableAtoms.Clear();
+        lastAvailableAtomSceneCount = 0;
+        lastAvailableAtomTrackedCount = 0;
+        lastAvailableAtomVisibleCount = 0;
+        lastAvailableAtomRangeHiddenCount = 0;
+        lastAvailableAtomMissingTargetCount = 0;
 
         if (!availableAtomMarkersEnabledField.val || SuperController.singleton == null)
         {
@@ -3890,6 +3901,7 @@ public class FrameAngelRadar : MVRScript
         {
             return;
         }
+        lastAvailableAtomSceneCount = atoms.Count;
 
         for (int i = 0; i < atoms.Count; i++)
         {
@@ -3914,6 +3926,7 @@ public class FrameAngelRadar : MVRScript
             });
         }
 
+        lastAvailableAtomTrackedCount = trackedAvailableAtoms.Count;
         EnsureAvailableMarkerCapacity(trackedAvailableAtoms.Count);
     }
 
@@ -4206,11 +4219,14 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateAvailableAtomMarkers(Transform viewer)
     {
-        int visibleCount = availableAtomMarkersEnabledField.val && trackedAvailableAtoms != null ? trackedAvailableAtoms.Count : 0;
+        int trackedCount = availableAtomMarkersEnabledField.val && trackedAvailableAtoms != null ? trackedAvailableAtoms.Count : 0;
+        int visibleMarkerCount = 0;
+        int rangeHiddenCount = 0;
+        int missingTargetCount = 0;
         float visualRadius = ResolveVisualRadius();
         for (int i = 0; availableMarkerObjects != null && i < availableMarkerObjects.Length; i++)
         {
-            bool show = i < visibleCount;
+            bool show = i < trackedCount;
             if (!show)
             {
                 SetActiveIfChanged(availableMarkerObjects[i], false);
@@ -4228,7 +4244,12 @@ public class FrameAngelRadar : MVRScript
             Transform target = ResolveAtomRootTransform(atom);
             if (target == null)
             {
+                missingTargetCount++;
                 SetActiveIfChanged(availableMarkerObjects[i], false);
+                if (availableStemObjects != null && i < availableStemObjects.Length)
+                {
+                    SetActiveIfChanged(availableStemObjects[i], false);
+                }
 #if FA_RADAR_PRO
                 SetProAvailableAtomVisualsVisible(i, false);
 #endif
@@ -4242,6 +4263,7 @@ public class FrameAngelRadar : MVRScript
             float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
             if (fadeAlpha <= 0.01f)
             {
+                rangeHiddenCount++;
                 SetActiveIfChanged(availableMarkerObjects[i], false);
                 if (availableStemObjects != null && i < availableStemObjects.Length)
                 {
@@ -4264,12 +4286,49 @@ public class FrameAngelRadar : MVRScript
             Color color = ResolveAvailableAtomColor(atom, Mathf.Clamp01(availableAtomAlphaField.val) * fadeAlpha);
             ApplyMaterialColor(availableMarkerMaterials[i], color, Mathf.Max(0.0f, emissionStrengthField.val) * 0.85f);
             SetActiveIfChanged(availableMarkerObjects[i], true);
+            visibleMarkerCount++;
             ApplyMarkerMeshForAtom(availableMarkerObjects[i], atom);
             PositionTargetSphere(availableMarkerObjects[i], radarLocal, visualRadius, markerScale, 0.0f);
             UpdateHeightStem(availableStemObjects[i], radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && fadeAlpha > 0.08f);
 #if FA_RADAR_PRO
             UpdateProAvailableAtomVisuals(i, atom, target, radarLocal, markerScale, fadeAlpha);
 #endif
+        }
+
+        lastAvailableAtomTrackedCount = trackedCount;
+        lastAvailableAtomVisibleCount = visibleMarkerCount;
+        lastAvailableAtomRangeHiddenCount = rangeHiddenCount;
+        lastAvailableAtomMissingTargetCount = missingTargetCount;
+    }
+
+    private void UpdateAvailableAtomMarkerStatus()
+    {
+        if (selectedAtom != null || !availableAtomMarkersEnabledField.val)
+        {
+            return;
+        }
+
+        if (lastAvailableAtomSceneCount <= 0)
+        {
+            SetStatus("Markers: no scene atoms reported.");
+            return;
+        }
+
+        if (lastAvailableAtomTrackedCount <= 0)
+        {
+            SetStatus(string.Format(
+                "Markers: 0 tracked / {0} scene atoms after filters.",
+                lastAvailableAtomSceneCount));
+            return;
+        }
+
+        if (lastAvailableAtomVisibleCount <= 0)
+        {
+            SetStatus(string.Format(
+                "Markers: 0 visible / {0} tracked; {1} outside range, {2} missing target.",
+                lastAvailableAtomTrackedCount,
+                lastAvailableAtomRangeHiddenCount,
+                lastAvailableAtomMissingTargetCount));
         }
     }
 
@@ -4485,13 +4544,42 @@ public class FrameAngelRadar : MVRScript
         }
 
         float visualRadius = ResolveVisualRadius();
-        float rangeScale = Mathf.Max(0.001f, light.range) / ResolveEffectiveRadarRangeMeters() * visualRadius * ResolveLightVolumeScale();
+        float rawRangeScale = Mathf.Max(0.001f, light.range) / ResolveEffectiveRadarRangeMeters() * visualRadius * ResolveLightVolumeScale();
         float spotAngle = Mathf.Clamp(light.spotAngle, 0.0f, 179.0f);
-        float coneRadius = Mathf.Tan(spotAngle * 0.5f * Mathf.Deg2Rad) * rangeScale;
+        float coneAngleRadius = Mathf.Tan(spotAngle * 0.5f * Mathf.Deg2Rad);
+        float maxRangeScale = ResolveDistanceToRadarShell(radarLocal * visualRadius, ResolveAxisRadarRotation(light.transform) * Vector3.forward, visualRadius);
+        float rangeScale = ResolveClippedSpotlightConeScale(rawRangeScale, maxRangeScale);
+        float coneRadius = Mathf.Min(coneAngleRadius * rangeScale, visualRadius * 0.96f);
         coneObject.transform.localPosition = radarLocal * visualRadius;
         coneObject.transform.localRotation = ResolveAxisRadarRotation(light.transform);
         coneObject.transform.localScale = new Vector3(coneRadius, coneRadius, rangeScale);
         ApplyMaterialColor(coneMaterial, ResolveLightVolumeColor(atom, light, ResolveSpotlightConeAlpha() * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val) * 0.35f);
+    }
+
+    private float ResolveClippedSpotlightConeScale(float rawRangeScale, float maxRangeScale)
+    {
+        return Mathf.Clamp(
+            rawRangeScale,
+            0.001f,
+            Mathf.Max(0.001f, maxRangeScale));
+    }
+
+    private float ResolveDistanceToRadarShell(Vector3 localStart, Vector3 localDirection, float visualRadius)
+    {
+        Vector3 direction = localDirection.sqrMagnitude > 0.0001f
+            ? localDirection.normalized
+            : Vector3.forward;
+        float radius = Mathf.Max(0.001f, visualRadius);
+        float b = Vector3.Dot(localStart, direction);
+        float c = Vector3.Dot(localStart, localStart) - radius * radius;
+        float discriminant = b * b - c;
+        if (discriminant <= 0.0f)
+        {
+            return radius * 0.25f;
+        }
+
+        float distance = -b + Mathf.Sqrt(discriminant);
+        return Mathf.Clamp(distance, radius * 0.05f, radius * 1.96f);
     }
 
     private float ResolvePointLightRangeAlpha()
@@ -7171,7 +7259,7 @@ public class FrameAngelRadar : MVRScript
     {
         int safeSegments = Mathf.Max(12, segments);
         Mesh mesh = new Mesh();
-        mesh.name = "FA Radar Spotlight Cone Mesh";
+        mesh.name = "FA Radar Spotlight Cone Mesh Open End";
         Vector3[] vertices = new Vector3[safeSegments + 2];
         List<int> triangles = new List<int>();
         vertices[0] = Vector3.zero;
@@ -7193,13 +7281,6 @@ public class FrameAngelRadar : MVRScript
             triangles.Add(0);
             triangles.Add(next);
             triangles.Add(current);
-
-            triangles.Add(1);
-            triangles.Add(next);
-            triangles.Add(current);
-            triangles.Add(1);
-            triangles.Add(current);
-            triangles.Add(next);
         }
 
         mesh.vertices = vertices;

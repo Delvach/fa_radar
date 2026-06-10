@@ -1,17 +1,17 @@
 # FA Radar Product Editions V1
 
-Updated: 2026-06-09
+Updated: 2026-06-10
 
 ## Decision
 
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.36`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.37`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.36.dll`
-- `fa_radar.pro.0.1.36.dll`
+- `fa_radar.free.0.1.37.dll`
+- `fa_radar.pro.0.1.37.dll`
 
 The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
 branding remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.36 intentionally keeps Free sparse: desktop
+buttons, and text fields, but 0.1.37 intentionally keeps Free sparse: desktop
 placement, VR placement, scale, HUD offsets, and static desktop offsets.
 Free's grab/wrist behavior remains available through the default runtime path
 and saved preferences without exposing prototype tuning controls.
@@ -36,16 +36,19 @@ Prototype calibration controls remain registered but hidden. The first release
 should focus on core radar features: placement, scale up to a 1m rendered radar
 diameter, all-atom visibility in Free, Pro filters/colors, marker clarity,
 useful light discovery, package/deploy reliability, and stable performance.
-The `0.1.36` Pro filters keep navigation panel and camera/display-control atoms
+The `0.1.37` Pro filters keep navigation panel and camera/display-control atoms
 as separate default-hidden categories; this is distinct from optional POV and
 scene-camera frustum overlays.
-The `0.1.36` Pro tuning pass keeps split light alpha for point-light and
+The `0.1.37` Pro tuning pass keeps split light alpha for point-light and
 spotlight controls, adds a light volume scale control, and starts the
 non-sphere marker language with flat rectangles for panel/slate/screen-style
 atoms and wider rectangles for SubScene atoms.
-The `0.1.36` Pro grab pass also adds a default-off throw-pin option: releasing
+The 0.1.36 Pro grab pass also adds a default-off throw-pin option: releasing
 a direct-grabbed radar with velocity can launch it into world space, grow it,
 and persist it as a pinned world-static radar until it is grabbed again.
+The `0.1.37` visual fix keeps spotlight cones open-ended and clipped to the
+radar shell, and adds a no-visible-marker status diagnostic for range/filter
+debugging after scene reloads.
 
 ## Free Edition
 
@@ -138,7 +141,7 @@ Rules:
 Current build helpers stage candidate `.var` packages:
 
 - `FrameAngelDev.Radar.1.var`
-- `fa_radar.pro.0.1.36.var`
+- `fa_radar.pro.0.1.37.var`
 
 The Pro candidate package includes the Empty atom preset under
 `Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.

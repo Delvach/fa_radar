@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.36`.
+Current branch version: `0.1.37`.
 
-Current product contract version: `0.1.36`.
+Current product contract version: `0.1.37`.
 
 The current slice is compiled C# only:
 
@@ -75,6 +75,8 @@ The current slice is compiled C# only:
 - Pro-only rotation axes, light range spheres, spotlight cones, separate light
   alpha/size tuning, and optional user/desktop/scene-camera POV frustums as the
   first movie-studio scene-map layer
+- Pro spotlight cones are open-ended and clipped to the radar shell so wide
+  spotlights cannot become filled world-covering discs
 - click-to-select for visible available CUA/light/person/other atom markers
 - session-plugin-only direct grip movement with OVR haptics; grip near the
   radar, move the controller, and release to apply HUD/static/wrist-relative
@@ -86,6 +88,8 @@ The current slice is compiled C# only:
   `preferences_cua_common.json` and `preferences_cua_pro.json`
 - the plugin UI reports `Host Surface` and `Display Surface` so a saved session
   can distinguish scene/session Desktop, scene/session VR, and Empty anchors
+- the `Status` field reports marker visibility counts when target markers are
+  enabled but nothing is visible after a scene reload/filter/range change
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free exposes
   only desktop/VR placement, scale, HUD offsets, and static desktop offsets,
@@ -127,11 +131,11 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.36.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.36.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.37.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.37.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.36.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.36.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.37.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.37.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 
 The first Free test package output is
