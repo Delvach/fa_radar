@@ -42,6 +42,14 @@ function Write-FaRadarJson {
     $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $PathValue -Encoding UTF8
 }
 
+function Assert-FaRadarVamNotRunning {
+    $vamProcesses = @(Get-Process -Name "VaM" -ErrorAction SilentlyContinue)
+    if ($vamProcesses.Count -gt 0) {
+        $processIds = [string]::Join(", ", @($vamProcesses | ForEach-Object { [string]$_.Id }))
+        throw "VaM.exe is running (PID(s): $processIds). Radar deploy requires both target roots to remain stopped."
+    }
+}
+
 $resolvedRepoRoot = if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 } else {
@@ -66,6 +74,10 @@ foreach ($root in $effectiveVamRoots) {
     if (-not (Test-Path -LiteralPath $root -PathType Container)) {
         throw "VaM root does not exist: $root"
     }
+    $vamExecutable = Join-Path $root "VaM.exe"
+    if (-not (Test-Path -LiteralPath $vamExecutable -PathType Leaf)) {
+        throw "Exact VaM root is missing VaM.exe: $root"
+    }
     $resolvedVamRoots.Add((Resolve-Path $root).Path) | Out-Null
 }
 
@@ -76,15 +88,12 @@ if (-not (Test-Path -LiteralPath $VamManagedDir -PathType Container)) {
     throw "VaM managed directory does not exist: $VamManagedDir"
 }
 
-# Explicit 0.1.38 filenames keep this deploy helper auditable while version
-# metadata remains the source of truth consumed by Build-FaRadar.ps1.
-$expectedPluginFileNames = @(
-    "fa_radar.free.0.1.38.dll",
-    "fa_radar.pro.0.1.38.dll"
-)
 $anchorPresetFileName = "Preset_FrameAngel_Radar_Empty.vap"
 $anchorPresetRelativeDirectory = "Custom\Atom\Empty"
 $anchorPresetSource = Join-Path $resolvedRepoRoot "payload\$anchorPresetRelativeDirectory\$anchorPresetFileName"
+$cuaPresetFileName = "Preset_FrameAngel_Radar_CUA.vap"
+$cuaPresetRelativeDirectory = "Custom\Atom\CustomUnityAsset"
+$cuaPresetSource = Join-Path $resolvedRepoRoot "payload\$cuaPresetRelativeDirectory\$cuaPresetFileName"
 
 $buildScript = Join-Path $resolvedRepoRoot "scripts\Build-FaRadar.ps1"
 if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
@@ -122,6 +131,16 @@ $editionBuilds = @($buildResult.EditionBuilds)
 if ($editionBuilds.Count -le 0) {
     throw "FA Radar edition build produced no DLL outputs."
 }
+$expectedPluginFileNames = @($editionBuilds | ForEach-Object { [string]$_.pluginFileName })
+
+foreach ($editionBuild in $editionBuilds) {
+    $pluginPath = [string]$editionBuild.pluginPath
+    if (-not (Test-Path -LiteralPath $pluginPath -PathType Leaf)) {
+        throw "Built radar DLL not found for deploy: $pluginPath"
+    }
+}
+
+Assert-FaRadarVamNotRunning
 
 $deployedDlls = New-Object System.Collections.ArrayList
 $deployedPresets = New-Object System.Collections.ArrayList
@@ -130,11 +149,16 @@ $deployAnchorPreset = @($editionBuilds | Where-Object { [string]$_.edition -eq "
 if ($deployAnchorPreset -and -not (Test-Path -LiteralPath $anchorPresetSource -PathType Leaf)) {
     throw "Missing Pro Empty anchor preset for deploy: $anchorPresetSource"
 }
+if ($deployAnchorPreset -and -not (Test-Path -LiteralPath $cuaPresetSource -PathType Leaf)) {
+    throw "Missing Pro CUA anchor preset for deploy: $cuaPresetSource"
+}
 foreach ($root in $resolvedVamRoots) {
+    Assert-FaRadarVamNotRunning
     $destinationDirectory = Join-Path $root "Custom\Plugins"
     Ensure-FaRadarDirectory -PathValue $destinationDirectory
 
     foreach ($editionBuild in $editionBuilds) {
+        Assert-FaRadarVamNotRunning
         $pluginPath = [string]$editionBuild.pluginPath
         $pluginFileName = [string]$editionBuild.pluginFileName
         if (-not (Test-Path -LiteralPath $pluginPath -PathType Leaf)) {
@@ -143,31 +167,68 @@ foreach ($root in $resolvedVamRoots) {
 
         $destination = Join-Path $destinationDirectory $pluginFileName
         Copy-Item -LiteralPath $pluginPath -Destination $destination -Force
+        $sourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $pluginPath
+        $destinationSha256 = Get-FaRadarFileHashOrEmpty -PathValue $destination
+        $sourceBytes = (Get-Item -LiteralPath $pluginPath).Length
+        $destinationBytes = (Get-Item -LiteralPath $destination).Length
+        if ($destinationSha256 -ne $sourceSha256 -or $destinationBytes -ne $sourceBytes) {
+            throw "Radar DLL readback mismatch: $destination"
+        }
         [void]$deployedDlls.Add([ordered]@{
             edition = [string]$editionBuild.edition
             vamRoot = $root
             pluginDirectory = $destinationDirectory
             path = $destination
             pluginFileName = $pluginFileName
-            sha256 = Get-FaRadarFileHashOrEmpty -PathValue $destination
-            sourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $pluginPath
-            bytes = (Get-Item -LiteralPath $destination).Length
+            sha256 = $destinationSha256
+            sourceSha256 = $sourceSha256
+            bytes = $destinationBytes
         })
     }
 
     if ($deployAnchorPreset) {
+        Assert-FaRadarVamNotRunning
         $presetDestinationDirectory = Join-Path $root $anchorPresetRelativeDirectory
         Ensure-FaRadarDirectory -PathValue $presetDestinationDirectory
         $presetDestination = Join-Path $presetDestinationDirectory $anchorPresetFileName
         Copy-Item -LiteralPath $anchorPresetSource -Destination $presetDestination -Force
+        $presetSourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $anchorPresetSource
+        $presetDestinationSha256 = Get-FaRadarFileHashOrEmpty -PathValue $presetDestination
+        $presetSourceBytes = (Get-Item -LiteralPath $anchorPresetSource).Length
+        $presetDestinationBytes = (Get-Item -LiteralPath $presetDestination).Length
+        if ($presetDestinationSha256 -ne $presetSourceSha256 -or $presetDestinationBytes -ne $presetSourceBytes) {
+            throw "Empty preset readback mismatch: $presetDestination"
+        }
         [void]$deployedPresets.Add([ordered]@{
             vamRoot = $root
             presetDirectory = $presetDestinationDirectory
             path = $presetDestination
             presetFileName = $anchorPresetFileName
-            sha256 = Get-FaRadarFileHashOrEmpty -PathValue $presetDestination
-            sourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $anchorPresetSource
-            bytes = (Get-Item -LiteralPath $presetDestination).Length
+            sha256 = $presetDestinationSha256
+            sourceSha256 = $presetSourceSha256
+            bytes = $presetDestinationBytes
+        })
+
+        Assert-FaRadarVamNotRunning
+        $cuaPresetDestinationDirectory = Join-Path $root $cuaPresetRelativeDirectory
+        Ensure-FaRadarDirectory -PathValue $cuaPresetDestinationDirectory
+        $cuaPresetDestination = Join-Path $cuaPresetDestinationDirectory $cuaPresetFileName
+        Copy-Item -LiteralPath $cuaPresetSource -Destination $cuaPresetDestination -Force
+        $cuaPresetSourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $cuaPresetSource
+        $cuaPresetDestinationSha256 = Get-FaRadarFileHashOrEmpty -PathValue $cuaPresetDestination
+        $cuaPresetSourceBytes = (Get-Item -LiteralPath $cuaPresetSource).Length
+        $cuaPresetDestinationBytes = (Get-Item -LiteralPath $cuaPresetDestination).Length
+        if ($cuaPresetDestinationSha256 -ne $cuaPresetSourceSha256 -or $cuaPresetDestinationBytes -ne $cuaPresetSourceBytes) {
+            throw "CUA preset readback mismatch: $cuaPresetDestination"
+        }
+        [void]$deployedPresets.Add([ordered]@{
+            vamRoot = $root
+            presetDirectory = $cuaPresetDestinationDirectory
+            path = $cuaPresetDestination
+            presetFileName = $cuaPresetFileName
+            sha256 = $cuaPresetDestinationSha256
+            sourceSha256 = $cuaPresetSourceSha256
+            bytes = $cuaPresetDestinationBytes
         })
     }
 
@@ -184,6 +245,8 @@ foreach ($root in $resolvedVamRoots) {
         })
     }
 }
+
+Assert-FaRadarVamNotRunning
 
 $receiptDirectory = Join-Path $resolvedRepoRoot "build\receipts"
 Ensure-FaRadarDirectory -PathValue $receiptDirectory
@@ -204,8 +267,13 @@ $receipt = [ordered]@{
     editionRequest = $Edition
     expectedPluginFileNames = $expectedPluginFileNames
     anchorPresetFileName = $anchorPresetFileName
+    cuaPresetFileName = $cuaPresetFileName
     configuration = $Configuration
     buildReceiptPath = [string]$buildResult.ReceiptPath
+    sourceSha256 = [string]$buildResult.SourceSha256
+    versionAuthoritySha256 = [string]$buildResult.VersionAuthoritySha256
+    emptyPresetSha256 = [string]$buildResult.EmptyPresetSha256
+    cuaPresetSha256 = [string]$buildResult.CuaPresetSha256
     vamManagedDir = $VamManagedDir
     skipBuild = [bool]$SkipBuild
     skipObfuscation = [bool]$SkipObfuscation

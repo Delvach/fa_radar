@@ -15,7 +15,9 @@ This repo is the independent home for the Frame Angel Radar VaM plugin.
 - Runtime code must be self-contained C# under `payload/Custom/Scripts`.
 - Deployable runtime artifact is a compiled DLL under VaM `Custom\Plugins`,
   not a loose `.cs` file under VaM `Custom\Scripts`.
-- Runtime code must not read or write files.
+- Runtime code must not read or write arbitrary files. The only approved runtime
+  file access is VaM `FileManagerSecure` global preferences under
+  `Custom\PluginData\FrameAngel\Radar` and the FAAR radar visibility state read.
 - Runtime code must not use reflection.
 - Runtime code must not depend on repo-local JSON, Unity project assets, or
   absolute development-machine paths.

@@ -1,0 +1,31 @@
+{
+   "setUnlistedParamsToDefault" : "true",
+   "storables" : [
+      {
+         "id" : "PluginManager",
+         "plugins" : {
+            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.50.dll"
+         }
+      },
+      {
+         "id" : "plugin#0_FrameAngelRadar",
+         "enabled" : "true",
+         "pluginLabel" : "Frame Angel Radar CUA",
+         "CUA Anchor Preset" : "true",
+         "Global Prefs Auto Save" : "true",
+         "Radar Enabled" : "true",
+         "Room Compass" : "false",
+         "HUD Scale" : "0.75",
+         "Rings Enabled" : "true",
+         "Grid Enabled" : "true",
+         "Grid Follows User" : "true",
+         "Grid Clip Circle" : "true",
+         "World Axis Align" : "true",
+         "Ground Axis Lock" : "true",
+         "Height Stems" : "true",
+         "Depth Size Cue" : "true",
+         "Scene Atom Markers" : "true",
+         "Click Select Markers" : "true"
+      }
+   ]
+}

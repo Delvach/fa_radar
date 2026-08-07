@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.37`.
+Current branch version: `0.1.50`.
 
-Current product contract version: `0.1.37`.
+Current product contract version: `0.1.50`.
 
 The current slice is compiled C# only:
 
@@ -25,6 +25,8 @@ The current slice is compiled C# only:
 - faded generated meter grid
 - visible `Radar Range Meters` control that expands or contracts represented
   meters without changing the compass visual size
+- desktop hover-wheel range scaling when the pointer is over the radar; wheel-up
+  zooms into fewer represented meters and wheel-down expands range
 - HUD and wrist scale controls change overall rendered radar size only, with a
   1m displayed diameter cap at the default visual radius
 - user center marker
@@ -50,8 +52,17 @@ The current slice is compiled C# only:
   modes start hidden until the outward wrist-twist reveal is active
 - wrist modes use their own wrist-relative offset/scale prefs and can hand off
   to the opposing controller with a grip drag across the body
-- Pro Empty atom preset at
-  `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
+- Pro creator presets for both movable host types:
+  `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap` and
+  `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- the CUA preset exposes scale and normal Radar controls but no wrist, direct
+  grab, HUD/VR placement, local-offset, or anchor-rotation controls; placement
+  is owned by the CUA atom
+- atom-attached `Room Compass` is default-off on both Empty and CUA hosts; when
+  enabled it leaves the host atom untouched, places Radar content at scene origin, bypasses radar-edge
+  clamping/fading, and maps world positions and height at 1:1 while retaining
+  tunable Radar visual scale; its sphere, rings, and meter grid expand to the
+  configured `Radar Range Meters` in scene space
 - FAAR visibility handshake reads
   `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
   Radar visuals when `radarHudVisible` is false; the plugin status reports
@@ -62,11 +73,23 @@ The current slice is compiled C# only:
 - circular-clipped one-meter grid centered with the sphere and always panned
   from user world X/Z movement
 - selected-atom marker without an extra outer outline
+- selected navigation/crosshair utility markers use the active viewer height
+  rather than VaM's floor-anchored utility atom root
+- HUD scale uses a smaller daily adjustment range for finer small-size control
+- in HUD/view mode the redundant user center/stem marker is hidden; it remains
+  available for world-static and atom-anchored radar modes
+- far selected and available markers fade and project just outside the radar
+  shell instead of disappearing at the range edge
+- the grid uses one-meter cells at room scale and switches to 10-meter cells
+  for large represented areas
+- Pro person atoms use a generated polygon person marker mesh while preserving
+  pink/blue/neutral gender colors
 - non-sphere marker meshes for panel/slate/screen-style atoms and SubScene
   atoms, while point-like atoms stay spherical
 - selected ground-drop projection is opt-in so a current selection does not
   read as a duplicate highlight by default
-- height stems for user, selected atom, and visible available atoms
+- thinner height stems for user, selected atom, and visible available atoms;
+  their X/Z half-width is `0.010` instead of `0.018`
 - range-edge fade and depth size cues for selected/available markers
 - edition-gated available atom markers: Free shows every eligible atom as the
   same yellow dot, while Pro exposes Light, Person, CUA, Empty, SubScene,
@@ -86,10 +109,33 @@ The current slice is compiled C# only:
   `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
 - Empty/atom-anchor preset instances use separate global preference files:
   `preferences_cua_common.json` and `preferences_cua_pro.json`
-- the plugin UI reports `Host Surface` and `Display Surface` so a saved session
-  can distinguish scene/session Desktop, scene/session VR, and Empty anchors
+- the runtime tracks host/display surface internally so saved sessions can
+  distinguish scene/session Desktop, scene/session VR, and Empty anchors
 - the `Status` field reports marker visibility counts when target markers are
   enabled but nothing is visible after a scene reload/filter/range change
+- available markers are capped by `Max Visible Markers`, kept nearest-first, and
+  report over-budget counts in status diagnostics
+- Pro detail overlays use a plain `Detail Overlay Limit` and lazy-create
+  per-marker axes/light/cone renderers only when enabled and near enough
+- dense-scene context uses depth-weighted alpha/scale so unselected markers and
+  Pro overlays recede instead of stacking at the same visual weight
+- the selected target uses a small 3-ring marker plus an edge cue when it is
+  outside the active desktop/VR camera view, instead of a large opaque ball
+- Director readability defaults cap background Pro detail overlays and reduce
+  camera/light/axis visual weight so busy movie-studio scenes stay readable
+- Pro rotation axes use a generated four-renderer/seven-piece glyph: three
+  colored half-axis pairs plus a small center cube, avoiding center overdraw
+  fights without allocating seven renderers per marker
+- Pro scene labels use capped procedural glyph meshes with `Scene Labels`,
+  `Label Orientation`, `Label Limit`, `Label Scale`, and `Label Alpha`;
+  selected labels stay outside the available-label budget
+- Pro scene labels default to selected-only, use a smaller glyph scale, and
+  place labels as outside-shell callouts with thin pooled leader lines instead
+  of piling text inside the radar sphere
+- procedural label facing includes the 180-degree mesh-front correction so
+  viewer/world/object orientation modes read forward instead of mirrored
+- Pro native plugin UI shows the daily atom/category checkboxes and high-value
+  overlay toggles before placement/debug-style tuning sliders
 - previous-selection rendering parked for now
 - Free/Pro editions compile from one codebase with static symbols; Free exposes
   only desktop/VR placement, scale, HUD offsets, and static desktop offsets,
@@ -131,12 +177,14 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.37.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.37.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.50.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.50.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.37.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.37.dll`
+- `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.50.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.50.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
+- `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 The first Free test package output is
 `build/packages/FrameAngelDev.Radar.1.var`; public release `.var` branding

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$RepoRoot = "",
     [string]$VamRoot = "F:\sim\vam",
     [switch]$ValidateLiveDeploy
@@ -18,6 +18,7 @@ $docPath = Join-Path $RepoRoot "docs\FA_RADAR_ARCHITECTURE_V1.md"
 $versionPath = Join-Path $RepoRoot "config\fa_radar.version.json"
 $obfuscationConfigPath = Join-Path $RepoRoot "config\obfuscation.defaults.json"
 $anchorPresetPath = Join-Path $RepoRoot "payload\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
+$cuaPresetPath = Join-Path $RepoRoot "payload\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
 
 $failures = New-Object System.Collections.Generic.List[string]
 
@@ -32,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.38"',
+        'private const string Version = "0.1.50"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -47,6 +48,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "CreateGridMesh",
         "CreateRingMesh",
         "CreateTargetBlipMesh",
+        "CreatePersonMarkerMesh",
         "CreateCenterMarkerMesh",
         "UpdateRadarDish",
         "ResolveTargetRadarLocal",
@@ -64,12 +66,18 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         'new JSONStorableFloat("HUD Offset X", -0.59f',
         'new JSONStorableFloat("HUD Offset Y", 0.22f',
         'new JSONStorableFloat("HUD Offset Z", 0.78f',
-        'new JSONStorableFloat("HUD Scale", 0.49f',
+        "MinHudPlacementScale = 0.05f",
+        "MaxHudPlacementScale = 1.25f",
+        "ResolveMaxHudPlacementScale",
+        'new JSONStorableFloat("HUD Scale", 0.49f, MinHudPlacementScale, MaxHudPlacementScale',
+        "Mathf.Clamp(scale, MinHudPlacementScale, ResolveMaxHudPlacementScale())",
+        "ReadFloat(hudScaleField, 0.49f), MinHudPlacementScale, ResolveMaxHudPlacementScale()",
         "DefaultRadarVisualRadiusMeters",
         "MaxRadarVisualDiameterMeters = 1.0f",
         "MaxRadarPlacementScale",
         "DefaultAtomAnchorOffsetZ",
         "DefaultAtomAnchorScale",
+        "HeightStemHalfWidth = 0.010f",
         "ResolveMaxPlacementScale",
         "ResolveHudScale",
         "ResolveWristScale",
@@ -118,6 +126,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Load Global Prefs",
         "Reset Global Prefs",
         "ShouldUseCreatorAnchorUi",
+        "BuildCuaAnchorUi",
         "BuildEmptyAnchorUi",
         "BuildEmptyAnchorPlacementUi",
         "BuildSceneSessionUi",
@@ -128,6 +137,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "BuildSceneSessionPlacementUi",
         "ResetCreatorAnchorPlacement",
         "IsAttachedAtomAnchorHostActive",
+        "IsCustomUnityAssetAnchorHostActive",
+        "IsRoomCompassModeActive",
         "ResolveAttachedAtomAnchorHost",
         "IsPluginManagerHostAtom",
         "IsEmptyAnchorHostActive",
@@ -178,6 +189,12 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "AnchorModeAtomUid",
         'new JSONStorableBool("CUA Anchor Preset", false)',
         "RegisterBool(cuaAnchorPresetField)",
+        'new JSONStorableBool("Room Compass", false)',
+        "RegisterBool(roomCompassField)",
+        'ApplyBoolPreference(preferencesJson, "roomCompass", roomCompassField)',
+        'AppendJsonBoolProperty(sb, ref wroteProperty, "roomCompass", ReadBool(roomCompassField, false))',
+        "ApplyRoomCompassAnchor",
+        'return "Room Compass 1:1"',
         "anchorModeField = new JSONStorableStringChooser",
         'new JSONStorableString("Anchor Atom UID"',
         "RegisterStringChooser(anchorModeField)",
@@ -220,28 +237,41 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Height Stem Alpha",
         "Range Fade Meters",
         "Depth Size Cue",
-        "Depth Size Strength",
-        "Show Target Markers",
-        "Show Lights",
-        "Show Custom Unity Assets",
-        "Show People",
-        "Show Empty",
-        "Show SubScene",
-        "Show ImagePanel",
-        "Show Animation",
-        "Show Force",
-        "Show Shapes",
-        "Show Sounds",
-        "Show Triggers",
-        "Show Navigation Panels",
-        "Show Camera Atoms",
-        "Show Uncategorized Atoms",
+        "Depth Cue Strength",
+        "VisualDepthDefaultsVersion",
+        "ApplyVisualDepthDefaultsIfNeeded(preferencesJson)",
+        "DirectorReadabilityDefaultsVersion",
+        "ApplyDirectorReadabilityDefaultsIfNeeded(preferencesJson)",
+        '"directorReadabilityDefaultsVersion"',
+        "MaxDirectorBackgroundOverlayBudget",
+        "DirectorBackgroundOverlayAlphaCeiling",
+        "ResolveDirectorBackgroundOverlayBudget",
+        "ResolveDirectorOverlayAlpha",
+        "ResolveDirectorOverlayScale",
+        '"visualDepthDefaultsVersion"',
+        'CommonMarkerDefaultsVersion = "target_markers_visible_fade_v2"',
+        "Scene Atom Markers",
+        "Lights",
+        "Custom Unity Assets",
+        "People",
+        "Empty",
+        "SubScene",
+        "ImagePanel",
+        "Animation",
+        "Force",
+        "Shapes",
+        "Sounds",
+        "Triggers",
+        "Player Navigation Panel",
+        "Cameras",
+        "Uncategorized Atoms",
         "proFilterDefaultsVersion",
         "SetAllProAtomFiltersNoCallback",
         "Click Select Markers",
         "Marker Click Radius Pixels",
         "Atom Poll Seconds",
         "Available Atom Alpha",
+        "Max Visible Markers",
         "Previous Selection Disabled",
         'new JSONStorableBool("Last Selected Enabled", false)',
         "axisRoot",
@@ -275,6 +305,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "ResolveHeightRadarY",
         "ResolveRangeFadeAlpha",
         "ResolveDepthScale",
+        "ResolveDepthVisibilityAlpha",
+        "ResolveAvailableOverlayAlpha",
+        "ResolveAvailableOverlayScale",
         "HandleRadarMarkerClick",
         "ResolveViewerCamera",
         "ResolveClickedAvailableAtom",
@@ -290,6 +323,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "IsPersonAtom",
         "IsFemalePersonAtom",
         "IsMalePersonAtom",
+        "personMarkerMesh",
         "IsEmptyAtom",
         "IsSubSceneAtom",
         "IsImagePanelAtom",
@@ -307,6 +341,13 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "FreeAtomMarkerColor",
         "return WithAlpha(FreeAtomMarkerColor, alpha)",
         "EnsureAvailableMarkerCapacity",
+        "ResolveMaxVisibleMarkerCount",
+        "InsertAvailableAtomRecordByDistance",
+        "EnsureAvailableProOverlayCapacity",
+        "ConfigureRichOverlayPreferenceCallback",
+        "ResolveRichOverlayBudget",
+        "HideAvailableProOverlaysOutsideBudget",
+        "CanRenderRichAvailableOverlay",
         "availableMarkerObjects",
         "availableStemObjects",
         "availableMarkerMaterials",
@@ -318,16 +359,32 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Quaternion.Inverse(radarRoot.transform.rotation)",
         "ResolveTargetGroundRadarLocal",
         "worldPosition - ResolveRadarReferencePosition(viewer)",
+        "FarMarkerOuterRadius",
+        "FarMarkerMinimumAlpha",
+        "ClampRadarLocalToOuterRadius",
+        "Mathf.Max(FarMarkerMinimumAlpha",
         "IsStaticRadarReferenceActive",
         "ResolveRadarReferencePosition",
         "ResolveRadarReferenceRotation",
         "ResolveWorldPositionRadarLocal",
+        "FineGridStepMeters",
+        "CoarseGridStepMeters",
+        "CoarseGridRangeThresholdMeters",
+        "ResolveGridStepMeters(float rangeMeters)",
+        "return rangeMeters >= CoarseGridRangeThresholdMeters ? CoarseGridStepMeters : FineGridStepMeters;",
         "ShouldFlattenRadarY",
         "!IsVrDisplayActive()",
         "ResolveAtomMarkerWorldPosition",
         "ResolveAtomVisualBoundsCenter",
+        "TryResolveViewerAnchoredAtomMarkerWorldPosition",
+        "HasCategory(record, AtomCategoryNavigationPanel)",
+        "worldPosition = frame.viewer.position",
+        "RefreshAtomRecordTransform(selectedAtomRecord, frame)",
+        "RefreshAtomRecordTransform(record, frame)",
         "ResolveRadarReferenceDistanceMeters",
         "UpdateUserMarker",
+        "bool showUserMarker = IsStaticRadarReferenceActive();",
+        "SetActiveIfChanged(centerMarkerObject, showUserMarker);",
         "ResolveGridReferencePosition",
         'targetGridDropObject = CreateMeshObject(BuildFilmSubjectName("Target Grid Drop"), axisRoot.transform',
         'lastTargetGridDropObject = CreateMeshObject(BuildFilmSubjectName("Last Target Grid Drop"), axisRoot.transform',
@@ -340,6 +397,14 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "ResolveStableViewerTransform",
         "return lastGoodViewerTransform",
         "Radar Range Meters",
+        "HandleDesktopRadarRangeScroll",
+        "ScaleRadarRangeMetersFromScroll",
+        "IsMouseOverRadarVisual",
+        "ResolveRadarScreenRadiusPixels",
+        "Input.mouseScrollDelta.y",
+        "SetFloatNoCallback(radarRangeMetersField, nextRangeMeters)",
+        "MarkGlobalPreferencesDirty()",
+        "Radar range {0:0.0}m",
         "Grid Step Meters",
         "Ring Rotation Speed",
         "Placement Mode",
@@ -455,22 +520,76 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         'new JSONStorableBool("Rotation Axes", true)',
         'new JSONStorableBool("Light Range Volumes", true)',
         'new JSONStorableBool("Spotlight Cones", true)',
-        'new JSONStorableBool("User POV Frustum", false)',
-        'new JSONStorableBool("Desktop POV Frustum", false)',
-        'new JSONStorableBool("Scene Camera Frustums", false)',
-        'new JSONStorableFloat("Rotation Axis Length", 0.18f',
-        'new JSONStorableFloat("Rotation Axis Width", 0.012f',
-        'new JSONStorableFloat("Light Volume Alpha", 0.16f',
-        'new JSONStorableFloat("Light Marker Scale", 0.38f',
-        'new JSONStorableFloat("POV Frustum Length", 2.0f',
-        'new JSONStorableFloat("POV Frustum Alpha", 0.12f',
+        'new JSONStorableBool("User POV Frustum", true)',
+        'new JSONStorableBool("Desktop POV Frustum", true)',
+        'new JSONStorableBool("Scene Camera Frustums", true)',
+        'new JSONStorableFloat("Sphere Alpha", 0.055f',
+        'new JSONStorableFloat("Ring Alpha", 0.30f',
+        'new JSONStorableFloat("Grid Alpha", 0.11f',
+        'new JSONStorableFloat("Height Stem Alpha", 0.26f',
+        'new JSONStorableFloat("Depth Cue Strength", 0.55f',
+        'new JSONStorableFloat("Available Atom Alpha", 0.34f',
+        'new JSONStorableFloat("Detail Overlay Limit", 10.0f',
+        'new JSONStorableFloat("Rotation Axis Length", 0.085f',
+        'new JSONStorableFloat("Rotation Axis Width", 0.0045f',
+        'new JSONStorableFloat("Light Volume Alpha", 0.045f',
+        'new JSONStorableFloat("Point Light Alpha", 0.022f',
+        'new JSONStorableFloat("Spotlight Cone Alpha", 0.024f',
+        'new JSONStorableFloat("Light Volume Scale", 0.62f',
+        'new JSONStorableFloat("Light Marker Scale", 0.28f',
+        'new JSONStorableFloat("POV Frustum Length", 0.9f',
+        'new JSONStorableFloat("POV Frustum Alpha", 0.035f',
+        "SetFloatNoCallback(shellAlphaField, 0.055f);",
+        "SetFloatNoCallback(depthSizeStrengthField, 0.55f);",
+        "float depthAlpha = ResolveDepthVisibilityAlpha(distanceMeters);",
+        "Mathf.Clamp01(availableAtomAlphaField.val) * fadeAlpha * depthAlpha",
+        "ResolveDirectorOverlayAlpha(fadeAlpha, depthAlpha)",
+        "ResolveDirectorOverlayScale(markerScale, depthAlpha)",
         "showRotationAxesField",
         "showLightRangeVolumesField",
         "showSpotlightConesField",
         "showUserPovFrustumField",
         "showDesktopPovFrustumField",
         "showSceneCameraFrustumsField",
-        "CreateAxisLineMesh",
+        "SelectedTargetOuterRadius",
+        "selectedTargetRingObjects",
+        "CreateTargetSelectionRingSet",
+        "UpdateTargetSelectionRingSet",
+        "ResolveSelectedWorldPositionRadarLocal",
+        "IsSelectedTargetInsideViewerFrustum",
+        "IsRadarUtilityAtom",
+        "CreateAxisHalfPairMesh",
+        "CreateAxisCenterCubeMesh",
+        "RotationAxisObjectCount = 4",
+        "RotationAxisVisualPieceCount = 7",
+        "rotationAxisHalfPairMesh",
+        "rotationAxisCenterCubeMesh",
+        "rotationAxisCenterMaterial",
+        "pooledCount * RotationAxisObjectCount",
+        "markerIndex * RotationAxisObjectCount",
+        "Scene Labels",
+        "Label Orientation",
+        "Label Limit",
+        "Label Scale",
+        "Label Alpha",
+        "LabelsSelectedAndNearest",
+        "LabelOrientationFaceViewer",
+        "LabelReadabilityDefaultsVersion",
+        "MaxRadarLabelLimit",
+        "ResolveLabelLimit",
+        "ResolveEffectiveLabelScale",
+        "ResolveLabelItemLocal",
+        "ResolveLabelCalloutLocal",
+        "UpdateLabelLeaderLine",
+        "CreateLabelLeaderMesh",
+        "UpdateSelectedAtomLabel(frame, selectedAtomRecord, target, radarLocal, markerScale, fadeAlpha);",
+        "UpdateAvailableAtomLabel(i, slot, record, frame, radarLocal, markerScale, fadeAlpha * depthAlpha);",
+        "RefreshActiveLabelOrientations(frame);",
+        "PopulateLabelGlyphMesh",
+        "ResolveLabelRadarRotation",
+        "BuildProPrimaryFilterUi",
+        "BuildProDisplayUi",
+        "BuildProAdvancedTuningUi",
         "CreateSpotlightConeMesh",
         "Spotlight Cone Mesh Open End",
         "ResolveClippedSpotlightConeScale",
@@ -501,9 +620,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "UpdateProCameraFrustums",
         "ResolveLightVolumeColor",
         "LightAlphaDefaultsVersion",
-        'new JSONStorableFloat("Point Light Alpha", 0.07f',
-        'new JSONStorableFloat("Spotlight Cone Alpha", 0.08f',
-        'new JSONStorableFloat("Light Volume Scale", 1.0f',
         'new JSONStorableBool("Throw Pin On Release", false)',
         'new JSONStorableBool("Throw Surface Stop", true)',
         'new JSONStorableFloat("Throw Grow Scale", 1.0f',
@@ -525,7 +641,10 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "ResolveMarkerMeshForAtom",
         "IsPanelLikeAtom",
         "ResolveAxisRadarRotation",
-        "ConfigureGlobalPreferenceCallback(showRotationAxesField)",
+        "ConfigureRichOverlayPreferenceCallback(showRotationAxesField)",
+        "ConfigureRichOverlayPreferenceCallback(showLightRangeVolumesField)",
+        "ConfigureRichOverlayPreferenceCallback(showSpotlightConesField)",
+        "ConfigureRichOverlayPreferenceCallback(richOverlayBudgetField)",
         'AppendJsonBoolProperty(sb, ref wroteProperty, "showRotationAxes"',
         'ApplyBoolPreference(preferencesJson, "showRotationAxes", showRotationAxesField)',
         "#if FA_RADAR_PRO"
@@ -537,7 +656,51 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         }
     }
 
+    $buildCuaAnchorUiIndex = $plugin.IndexOf("private void BuildCuaAnchorUi()")
     $buildSceneSessionUiIndex = $plugin.IndexOf("private void BuildSceneSessionUi()")
+    if ($buildCuaAnchorUiIndex -lt 0 -or $buildSceneSessionUiIndex -le $buildCuaAnchorUiIndex) {
+        Add-Failure "CUA-hosted UI block must remain inspectable before scene/session UI."
+    } else {
+        $cuaUiBlock = $plugin.Substring($buildCuaAnchorUiIndex, $buildSceneSessionUiIndex - $buildCuaAnchorUiIndex)
+        foreach ($requiredCuaUiSnippet in @(
+            "CreateToggle(radarEnabledField, false);",
+            "CreateToggle(roomCompassField, true);",
+            "CreateSlider(hudScaleField, true);",
+            "BuildProPrimaryFilterUi();",
+            "BuildProDisplayUi();",
+            "BuildProAdvancedTuningUi();"
+        )) {
+            if (-not $cuaUiBlock.Contains($requiredCuaUiSnippet)) {
+                Add-Failure "CUA-hosted UI missing required control snippet: $requiredCuaUiSnippet"
+            }
+        }
+
+        foreach ($forbiddenCuaUiSnippet in @(
+            "BuildSceneSessionPlacementUi();",
+            "BuildPlacementUi();",
+            "BuildEmptyAnchorPlacementUi();",
+            "BuildWristCompassUi();",
+            "hudOffsetXField",
+            "hudOffsetYField",
+            "hudOffsetZField",
+            "anchorRotationXField",
+            "anchorRotationYField",
+            "anchorRotationZField",
+            "wristOffsetXField",
+            "wristOffsetYField",
+            "wristOffsetZField",
+            "wristScaleField",
+            "desktopPlacementField",
+            "vrPlacementField",
+            "grabHandlesEnabledField",
+            "grabHapticsEnabledField"
+        )) {
+            if ($cuaUiBlock.Contains($forbiddenCuaUiSnippet)) {
+                Add-Failure "CUA-hosted UI must rely on CUA movement and hide wrist/placement control snippet: $forbiddenCuaUiSnippet"
+            }
+        }
+    }
+
     $shouldUseCreatorAnchorUiIndex = $plugin.IndexOf("private bool ShouldUseCreatorAnchorUi()")
     if ($buildSceneSessionUiIndex -ge 0 -and $shouldUseCreatorAnchorUiIndex -gt $buildSceneSessionUiIndex) {
         $sceneSessionUiBlock = $plugin.Substring($buildSceneSessionUiIndex, $shouldUseCreatorAnchorUiIndex - $buildSceneSessionUiIndex)
@@ -641,12 +804,13 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $markerMeshFieldSnippet = @"
 #if FA_RADAR_PRO
+    private Mesh personMarkerMesh;
     private Mesh panelMarkerMesh;
     private Mesh subSceneMarkerMesh;
 #endif
 "@
     if (-not $plugin.Contains($markerMeshFieldSnippet.Trim())) {
-        Add-Failure "Panel/SubScene marker meshes must be compiled only for Pro."
+        Add-Failure "Person/Panel/SubScene marker meshes must be compiled only for Pro."
     }
 
     $resolveMarkerMeshIndex = $plugin.IndexOf("private Mesh ResolveMarkerMeshForAtom(Atom atom)")
@@ -658,6 +822,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         }
         if (-not $resolveMarkerMeshBlock.Contains("return targetBlipMesh;")) {
             Add-Failure "Marker mesh resolver must fall back to the plain dot mesh."
+        }
+        if (-not $resolveMarkerMeshBlock.Contains("IsPersonAtom(atom)") -or
+            -not $resolveMarkerMeshBlock.Contains("personMarkerMesh != null ? personMarkerMesh : targetBlipMesh") -or
+            -not $resolveMarkerMeshBlock.Contains("HasCategory(record, AtomCategoryPerson)")) {
+            Add-Failure "Pro marker mesh resolver must route Person atoms through the generated person marker mesh."
         }
     }
 
@@ -732,9 +901,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
     }
 
     $isEmptyIndex = $plugin.IndexOf("private bool IsEmptyAnchorHostActive()")
-    $isSceneIndex = $plugin.IndexOf("private bool IsSceneSessionPluginHostActive()")
-    if ($isEmptyIndex -ge 0 -and $isSceneIndex -gt $isEmptyIndex) {
-        $isEmptyBlock = $plugin.Substring($isEmptyIndex, $isSceneIndex - $isEmptyIndex)
+    $isCustomUnityAssetIndex = $plugin.IndexOf("private bool IsCustomUnityAssetAnchorHostActive()")
+    if ($isEmptyIndex -ge 0 -and $isCustomUnityAssetIndex -gt $isEmptyIndex) {
+        $isEmptyBlock = $plugin.Substring($isEmptyIndex, $isCustomUnityAssetIndex - $isEmptyIndex)
         if ($isEmptyBlock.Contains("cuaAnchorPresetField") -or $isEmptyBlock.Contains(".val")) {
             Add-Failure "Scene/session UI selection must not depend on restored legacy CUA Anchor Preset values."
         }
@@ -752,6 +921,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         }
         if (-not $emptyUiBlock.Contains("BuildEmptyAnchorPlacementUi();")) {
             Add-Failure "Empty/atom-anchor UI must use the Empty placement block."
+        }
+        if (-not $emptyUiBlock.Contains("CreateToggle(roomCompassField, true);")) {
+            Add-Failure "Empty/atom-anchor UI must expose the default-off Room Compass toggle."
         }
     }
 
@@ -779,6 +951,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "\bJSONClass\b",
         "\bJSONNode\b",
         "\bSimpleJSON\b",
+        "\bCanvas\b",
+        "\bTextMesh\b",
         "\btargetOutlineObject\b",
         "\btargetOutlineMaterial\b",
         "\bmotionControllerLeft\b",
@@ -804,12 +978,14 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.38.dll",
-        "fa_radar.pro.0.1.38.dll",
+        "fa_radar.free.0.1.50.dll",
+        "fa_radar.pro.0.1.50.dll",
         "UnityEngine.PhysicsModule.dll",
         "FrameAngelDev.Radar.1.var",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
+        "Preset_FrameAngel_Radar_CUA.vap",
+        "Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap",
         "Obfuscate-FaRadarPlugin.ps1",
         "Custom\Plugins",
         "meta.json",
@@ -853,10 +1029,12 @@ if (-not (Test-Path -LiteralPath $deployPath)) {
     $deploy = Get-Content -Raw -LiteralPath $deployPath
     $requiredDeploySnippets = @(
         "Build-FaRadar.ps1",
-        "fa_radar.free.0.1.38.dll",
-        "fa_radar.pro.0.1.38.dll",
+        'expectedPluginFileNames = @($editionBuilds',
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom\Atom\Empty",
+        "Preset_FrameAngel_Radar_CUA.vap",
+        "Custom\Atom\CustomUnityAsset",
+        "Assert-FaRadarVamNotRunning",
         "F:\sim\vam",
         "C:\vam\virgin-recordable-02",
         "Custom\Plugins",
@@ -892,12 +1070,13 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.38.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.50.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
         '"Desktop Placement" : "Pinned In World"',
         '"CUA Anchor Preset" : "true"',
+        '"Room Compass" : "false"',
         '"HUD Offset X"',
         '"HUD Offset Y"',
         '"HUD Offset Z"',
@@ -911,6 +1090,45 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     foreach ($snippet in $requiredAnchorPresetSnippets) {
         if (-not $anchorPreset.Contains($snippet)) {
             Add-Failure "Empty anchor preset missing required snippet: $snippet"
+        }
+    }
+}
+
+if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
+    Add-Failure "Missing CustomUnityAsset Radar preset: $cuaPresetPath"
+} else {
+    $cuaPreset = Get-Content -Raw -LiteralPath $cuaPresetPath
+    $requiredCuaPresetSnippets = @(
+        '"setUnlistedParamsToDefault" : "true"',
+        '"id" : "PluginManager"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.50.dll"',
+        '"id" : "plugin#0_FrameAngelRadar"',
+        '"pluginLabel" : "Frame Angel Radar CUA"',
+        '"CUA Anchor Preset" : "true"',
+        '"Radar Enabled" : "true"',
+        '"Room Compass" : "false"',
+        '"HUD Scale" : "0.75"'
+    )
+    foreach ($snippet in $requiredCuaPresetSnippets) {
+        if (-not $cuaPreset.Contains($snippet)) {
+            Add-Failure "CustomUnityAsset Radar preset missing required snippet: $snippet"
+        }
+    }
+    foreach ($forbiddenCuaPresetSnippet in @(
+        '"Radar Mode"',
+        '"Anchor Mode"',
+        '"Anchor Atom UID"',
+        '"HUD Offset',
+        '"Anchor Rot',
+        '"Wrist Offset',
+        '"Wrist Scale"',
+        '"Desktop Placement"',
+        '"VR Placement"',
+        '"Grab Handles Enabled"',
+        '"Grab Haptics"'
+    )) {
+        if ($cuaPreset.Contains($forbiddenCuaPresetSnippet)) {
+            Add-Failure "CustomUnityAsset Radar preset must not carry wrist/session-placement state: $forbiddenCuaPresetSnippet"
         }
     }
 }
@@ -941,11 +1159,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.38") {
-        Add-Failure "Version config must declare version 0.1.38."
+    if ($version.version -ne "0.1.50") {
+        Add-Failure "Version config must declare version 0.1.50."
     }
-    if ($version.branch -ne "codex/0.1.38-performance-architecture") {
-        Add-Failure "Version config branch must match codex/0.1.38-performance-architecture."
+    if ($version.branch -ne "codex/0.1.50-cua-room-compass") {
+        Add-Failure "Version config branch must match codex/0.1.50-cua-room-compass."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -954,8 +1172,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.38.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.38.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.50.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.50.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -966,8 +1184,14 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.38.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.38.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.50.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.50.dll."
+    }
+    if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
+        Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
+    }
+    if ([bool]$version.editions.pro.creatorResources.roomCompassDefault) {
+        Add-Failure "Room Compass must remain default-off in version authority."
     }
     $targets = @($version.deployment.vamRoots)
     if ($targets -notcontains "F:\sim\vam") {
@@ -1061,10 +1285,11 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.38.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.38.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.50.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.50.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
+        $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
         $legacyLooseScript = Join-Path $root "Custom\Scripts\FrameAngel\Radar\FrameAngelRadar.cs"
 
         foreach ($deployedDll in $expectedDlls) {
@@ -1085,16 +1310,33 @@ if ($ValidateLiveDeploy.IsPresent) {
         if (-not (Test-Path -LiteralPath $expectedAnchorPreset -PathType Leaf)) {
             Add-Failure "Live Empty anchor preset was not deployed: $expectedAnchorPreset"
         }
+        if (-not (Test-Path -LiteralPath $expectedCuaPreset -PathType Leaf)) {
+            Add-Failure "Live CustomUnityAsset Radar preset was not deployed: $expectedCuaPreset"
+        }
     }
 }
 
 if (Test-Path -LiteralPath $pluginPath) {
     $plugin = Get-Content -Raw -LiteralPath $pluginPath
     if ($plugin.Contains("UpdateLastSelectedBlip(viewer);")) {
-            Add-Failure "Previous-selection rendering must stay disabled in 0.1.38."
+            Add-Failure "Previous-selection rendering must stay disabled in 0.1.48."
     }
     if ($plugin.Contains("CreateToggle(lastSelectedEnabledField")) {
         Add-Failure "Last-selected toggle should not be exposed while the paradigm is parked."
+    }
+    if ($plugin.Contains('new JSONStorableFloat("HUD Scale", 0.49f, 0.25f') -or
+        $plugin.Contains('new JSONStorableFloat("HUD Scale", 0.49f, MinHudPlacementScale, MaxRadarPlacementScale') -or
+        $plugin.Contains("Mathf.Clamp(scale, 0.25f, ResolveMaxPlacementScale())") -or
+        $plugin.Contains("Mathf.Clamp(scale, MinHudPlacementScale, ResolveMaxPlacementScale())") -or
+        $plugin.Contains("ReadFloat(hudScaleField, 0.49f), 0.25f") -or
+        $plugin.Contains("ReadFloat(hudScaleField, 0.49f), MinHudPlacementScale, ResolveMaxPlacementScale()")) {
+        Add-Failure "HUD scale fine range regressed to the old broad placement slider range."
+    }
+    if ($plugin.Contains('BuildFilmSubjectName("User Ground') -or
+        $plugin.Contains('BuildFilmSubjectName("Self Ground') -or
+        $plugin.Contains("userGridDropObject") -or
+        $plugin.Contains("selfGridDropObject")) {
+        Add-Failure "User/self ground-drop marker must stay removed; self uses User Center plus optional height stem only."
     }
 
     $availableUpdateIndex = $plugin.IndexOf("private void UpdateAvailableAtomMarkers(RadarFrame frame)")
@@ -1115,6 +1357,273 @@ if (Test-Path -LiteralPath $pluginPath) {
         if ($availableUpdateBlock.Contains("ApplyMaterialColor(availableMarkerMaterials")) {
             Add-Failure "Available marker render loop must use cached material-state writes."
         }
+        if ($availableUpdateBlock.Contains("fadeAlpha <= 0.01f") -or $availableUpdateBlock.Contains("rangeHiddenCount++")) {
+            Add-Failure "Available markers must fade outside range instead of disappearing at a low-alpha cutoff."
+        }
+    }
+
+    $gridStepIndex = $plugin.IndexOf("private float ResolveGridStepMeters()")
+    $effectiveRangeIndex = $plugin.IndexOf("private float ResolveEffectiveRadarRangeMeters()", [Math]::Max(0, $gridStepIndex))
+    if ($gridStepIndex -lt 0 -or $effectiveRangeIndex -le $gridStepIndex) {
+        Add-Failure "Grid step resolver must remain inspectable before effective range resolution."
+    } else {
+        $gridStepBlock = $plugin.Substring($gridStepIndex, $effectiveRangeIndex - $gridStepIndex)
+        if ($gridStepBlock.Contains("return 1.0f;") -or -not $gridStepBlock.Contains("ResolveEffectiveRadarRangeMeters()")) {
+            Add-Failure "Grid step must use range-aware LOD, not the old fixed one-meter resolver."
+        }
+    }
+    if (-not $plugin.Contains("int stepCount = Mathf.Clamp(Mathf.CeilToInt(safeRange / safeStep) + 2, 1, 32);")) {
+        Add-Failure "Grid mesh must keep a capped step count for large ranges."
+    }
+
+    foreach ($oldAxisSnippet in @(
+        "new GameObject[pooledCount * 3]",
+        "newAxisObjects[(i * 3) + axis]",
+        "axisObjects[(index * 3) + axis]",
+        "markerIndex * 3",
+        "CreateAxisLineMesh"
+    )) {
+        if ($plugin.Contains($oldAxisSnippet)) {
+            Add-Failure "Rotation axis glyph must use the 0.1.48 four-renderer/seven-piece contract, not old full-bar axis snippet: $oldAxisSnippet"
+        }
+    }
+
+    $labelLimitIndex = $plugin.IndexOf("private int ResolveLabelLimit()")
+    $selectedLabelIndex = $plugin.IndexOf("private void UpdateSelectedAtomLabel")
+    if ($labelLimitIndex -lt 0 -or $selectedLabelIndex -le $labelLimitIndex) {
+        Add-Failure "Scene labels must expose a capped ResolveLabelLimit helper before selected/available label rendering."
+    } else {
+        $labelLimitBlock = $plugin.Substring($labelLimitIndex, $selectedLabelIndex - $labelLimitIndex)
+        if (-not $labelLimitBlock.Contains("Mathf.Clamp(Mathf.RoundToInt(ReadFloat(labelLimitField, DefaultLabelLimit)), 0, MaxRadarLabelLimit)")) {
+            Add-Failure "Scene labels must cap available labels through Label Limit, not Max Visible Markers."
+        }
+        if ($labelLimitBlock.Contains("maxVisibleMarkersField")) {
+            Add-Failure "Scene label limit must not inherit Max Visible Markers."
+        }
+    }
+
+    $selectedLabelBlockEnd = $plugin.IndexOf("private void UpdateAvailableAtomLabel", [Math]::Max(0, $selectedLabelIndex))
+    if ($selectedLabelIndex -ge 0 -and $selectedLabelBlockEnd -gt $selectedLabelIndex) {
+        $selectedLabelBlock = $plugin.Substring($selectedLabelIndex, $selectedLabelBlockEnd - $selectedLabelIndex)
+        if ($selectedLabelBlock.Contains("ResolveLabelLimit()") -or $selectedLabelBlock.Contains("CanRenderRichAvailableOverlay") -or $selectedLabelBlock.Contains("ResolveRichOverlayBudget")) {
+            Add-Failure "Selected target label must stay outside available label/detail overlay budgets."
+        }
+        if (-not $selectedLabelBlock.Contains("UpdateLabelLeaderLine(targetLabelLeaderObject, itemLocal, labelLocal,")) {
+            Add-Failure "Selected target label must draw a pooled leader line from item to outside-shell callout."
+        }
+    }
+
+    if ($plugin -notmatch 'sceneLabelsField\s*=\s*new JSONStorableStringChooser\(\s*"Scene Labels",[\s\S]*?new List<string> \{ LabelsOff, LabelsSelected, LabelsSelectedAndNearest \},\s*LabelsSelected,\s*"Scene Labels"\);') {
+        Add-Failure "Scene labels must default to Selected, not Selected + Nearest."
+    }
+    foreach ($labelDefaultSnippet in @(
+        'private const float DefaultLabelLimit = 4.0f;',
+        'private const float DefaultLabelScale = 0.045f;',
+        'new JSONStorableFloat("Label Limit", DefaultLabelLimit',
+        'new JSONStorableFloat("Label Scale", DefaultLabelScale',
+        'ReadFloat(labelScaleField, DefaultLabelScale)',
+        'SetSceneLabelsNoCallback(LabelsSelected)',
+        'SetFloatNoCallback(labelLimitField, DefaultLabelLimit)',
+        'SetFloatNoCallback(labelScaleField, DefaultLabelScale)',
+        'AppendJsonStringProperty(sb, ref wroteProperty, "labelReadabilityDefaultsVersion", LabelReadabilityDefaultsVersion)'
+    )) {
+        if (-not $plugin.Contains($labelDefaultSnippet)) {
+            Add-Failure "Scene label readability defaults missing snippet: $labelDefaultSnippet"
+        }
+    }
+    foreach ($oldLabelSnippet in @(
+        'new JSONStorableFloat("Label Limit", 12.0f',
+        'new JSONStorableFloat("Label Scale", 0.085f',
+        "ReadFloat(labelLimitField, 12.0f)",
+        "ReadFloat(labelScaleField, 0.085f)",
+        "(radarLocal * visualRadius) + new Vector3(offsetScale * 0.72f"
+    )) {
+        if ($plugin.Contains($oldLabelSnippet)) {
+            Add-Failure "Scene labels regressed to loud/inside-sphere 0.1.48 behavior: $oldLabelSnippet"
+        }
+    }
+
+    $availableLabelIndex = $plugin.IndexOf("private void UpdateAvailableAtomLabel")
+    $refreshLabelIndex = $plugin.IndexOf("private void RefreshActiveLabelOrientations", [Math]::Max(0, $availableLabelIndex))
+    if ($availableLabelIndex -lt 0 -or $refreshLabelIndex -le $availableLabelIndex) {
+        Add-Failure "Available scene label rendering block must remain inspectable."
+    } else {
+        $availableLabelBlock = $plugin.Substring($availableLabelIndex, $refreshLabelIndex - $availableLabelIndex)
+        if (-not $availableLabelBlock.Contains("UpdateLabelLeaderLine(slot.labelLeaderObject, itemLocal, labelLocal,")) {
+            Add-Failure "Available labels must draw pooled leader lines from item to outside-shell callouts."
+        }
+    }
+
+    $ensureLabelIndex = $plugin.IndexOf("private void EnsureAvailableLabelSlot")
+    $setAvailableLabelIndex = $plugin.IndexOf("private void SetAvailableLabelVisible", [Math]::Max(0, $ensureLabelIndex))
+    if ($ensureLabelIndex -lt 0 -or $setAvailableLabelIndex -le $ensureLabelIndex) {
+        Add-Failure "Available scene label pool creation block must remain inspectable."
+    } else {
+        $ensureLabelBlock = $plugin.Substring($ensureLabelIndex, $setAvailableLabelIndex - $ensureLabelIndex)
+        if (-not $ensureLabelBlock.Contains("slot.labelLeaderObject = CreateMeshObject")) {
+            Add-Failure "Available label slots must create their pooled leader object once."
+        }
+    }
+
+    $sceneUiIndex = $plugin.IndexOf("private void BuildSceneSessionUi()")
+    $freeSceneUiIndex = $plugin.IndexOf("private void BuildFreeSceneSessionUi()", [Math]::Max(0, $sceneUiIndex))
+    if ($sceneUiIndex -lt 0 -or $freeSceneUiIndex -le $sceneUiIndex) {
+        Add-Failure "Scene/session UI builder block must remain inspectable."
+    } else {
+        $sceneUiBlock = $plugin.Substring($sceneUiIndex, $freeSceneUiIndex - $sceneUiIndex)
+        $primaryCall = $sceneUiBlock.IndexOf("BuildProPrimaryFilterUi();")
+        $displayCall = $sceneUiBlock.IndexOf("BuildProDisplayUi();")
+        $advancedCall = $sceneUiBlock.IndexOf("BuildProAdvancedTuningUi();")
+        if ($primaryCall -lt 0 -or $displayCall -le $primaryCall -or $advancedCall -le $displayCall) {
+            Add-Failure "Scene/session UI must show primary filters first, then display toggles, then advanced tuning."
+        }
+        if ($sceneUiBlock.Contains("CreateTextField(hostSurfaceField") -or $sceneUiBlock.Contains("CreateTextField(displaySurfaceField")) {
+            Add-Failure "Scene/session UI must not spend the top screen on host/display debug text fields."
+        }
+    }
+
+    $emptyUiIndex = $plugin.IndexOf("private void BuildEmptyAnchorUi()")
+    $freeEmptyUiIndex = $plugin.IndexOf("private void BuildFreeEmptyAnchorUi()", [Math]::Max(0, $emptyUiIndex))
+    if ($emptyUiIndex -lt 0 -or $freeEmptyUiIndex -le $emptyUiIndex) {
+        Add-Failure "Empty-anchor UI builder block must remain inspectable."
+    } else {
+        $emptyUiBlock = $plugin.Substring($emptyUiIndex, $freeEmptyUiIndex - $emptyUiIndex)
+        $primaryCall = $emptyUiBlock.IndexOf("BuildProPrimaryFilterUi();")
+        $displayCall = $emptyUiBlock.IndexOf("BuildProDisplayUi();")
+        $advancedCall = $emptyUiBlock.IndexOf("BuildProAdvancedTuningUi();")
+        if ($primaryCall -lt 0 -or $displayCall -le $primaryCall -or $advancedCall -le $displayCall) {
+            Add-Failure "Empty-anchor UI must show primary filters first, then display toggles, then advanced tuning."
+        }
+        if ($emptyUiBlock.Contains("CreateTextField(hostSurfaceField") -or $emptyUiBlock.Contains("CreateTextField(displaySurfaceField")) {
+            Add-Failure "Empty-anchor UI must not expose host/display debug text fields at the top."
+        }
+        if (-not $emptyUiBlock.Contains("CreateToggle(roomCompassField, true);")) {
+            Add-Failure "Empty-anchor UI must expose Room Compass beside the primary enable control."
+        }
+    }
+
+    $roomCompassHelperIndex = $plugin.IndexOf("private bool IsRoomCompassModeActive()")
+    $sceneHostHelperIndex = $plugin.IndexOf("private bool IsSceneSessionPluginHostActive()", [Math]::Max(0, $roomCompassHelperIndex))
+    if ($roomCompassHelperIndex -lt 0 -or $sceneHostHelperIndex -le $roomCompassHelperIndex) {
+        Add-Failure "Room Compass activation helper must remain inspectable."
+    } else {
+        $roomCompassHelperBlock = $plugin.Substring($roomCompassHelperIndex, $sceneHostHelperIndex - $roomCompassHelperIndex)
+        if (-not $roomCompassHelperBlock.Contains("IsAttachedAtomAnchorHostActive()") -or
+            -not $roomCompassHelperBlock.Contains("roomCompassField.val")) {
+            Add-Failure "Room Compass must be available to every atom-attached Radar host and controlled by its default-off storable."
+        }
+    }
+
+    $roomCompassAnchorIndex = $plugin.IndexOf("private void ApplyRoomCompassAnchor()")
+    $viewAnchorIndex = $plugin.IndexOf("private void ApplyViewAnchor", [Math]::Max(0, $roomCompassAnchorIndex))
+    if ($roomCompassAnchorIndex -lt 0 -or $viewAnchorIndex -le $roomCompassAnchorIndex) {
+        Add-Failure "Room Compass scene-origin anchor block must remain inspectable."
+    } else {
+        $roomCompassAnchorBlock = $plugin.Substring($roomCompassAnchorIndex, $viewAnchorIndex - $roomCompassAnchorIndex)
+        foreach ($requiredRoomAnchorSnippet in @(
+            "hudRoot.transform.SetParent(null, false);",
+            "hudRoot.transform.position = Vector3.zero;",
+            "hudRoot.transform.rotation = Quaternion.identity;",
+            "hudRoot.transform.localScale = Vector3.one * ResolveHudScale();"
+        )) {
+            if (-not $roomCompassAnchorBlock.Contains($requiredRoomAnchorSnippet)) {
+                Add-Failure "Room Compass must leave its host atom untouched and place only Radar content at scene origin: $requiredRoomAnchorSnippet"
+            }
+        }
+        if ($roomCompassAnchorBlock.Contains("containingAtom") -or $roomCompassAnchorBlock.Contains("mainController")) {
+            Add-Failure "Room Compass anchor code must not mutate or reposition the containing host atom."
+        }
+    }
+
+    $effectiveRangeIndex = $plugin.IndexOf("private float ResolveEffectiveRadarRangeMeters()")
+    $smoothPositionIndex = $plugin.IndexOf("private Vector3 SmoothPosition", [Math]::Max(0, $effectiveRangeIndex))
+    if ($effectiveRangeIndex -lt 0 -or $smoothPositionIndex -le $effectiveRangeIndex) {
+        Add-Failure "Room Compass 1:1 scale helpers must remain inspectable."
+    } else {
+        $effectiveScaleBlock = $plugin.Substring($effectiveRangeIndex, $smoothPositionIndex - $effectiveRangeIndex)
+        if (([regex]::Matches($effectiveScaleBlock, 'ResolveHudScale\(\) \* ResolveVisualRadius\(\)')).Count -lt 2) {
+            Add-Failure "Room Compass horizontal and vertical map scales must both cancel the visual root scale for 1:1 world placement."
+        }
+        if (-not $effectiveScaleBlock.Contains("return ResolveConfiguredRadarRangeMeters() / Mathf.Max(0.001f, ResolveHudScale());")) {
+            Add-Failure "Room Compass surface radius must cancel HUD Scale so its sphere, rings, and grid use the configured world-space range."
+        }
+    }
+
+    $dishIndex = $plugin.IndexOf("private void UpdateRadarDish(Transform viewer)")
+    $dishEndIndex = $plugin.IndexOf("private bool IsFlatDesktopCircleActive()", [Math]::Max(0, $dishIndex))
+    if ($dishIndex -lt 0 -or $dishEndIndex -le $dishIndex) {
+        Add-Failure "Radar dish surface scale block must remain inspectable."
+    } else {
+        $dishBlock = $plugin.Substring($dishIndex, $dishEndIndex - $dishIndex)
+        foreach ($surfaceSnippet in @(
+            "float surfaceLocalRadius = ResolveRadarSurfaceLocalRadius();",
+            "flatCircleObject.transform.localScale = Vector3.one * surfaceLocalRadius;",
+            "sphereObject.transform.localScale = Vector3.one * surfaceLocalRadius;",
+            "gridObject.transform.localScale = Vector3.one * surfaceLocalRadius;",
+            "ring.transform.localScale = Vector3.one * (surfaceLocalRadius * 1.015f);"
+        )) {
+            if (-not $dishBlock.Contains($surfaceSnippet)) {
+                Add-Failure "Room Compass world-range surface scaling is incomplete: $surfaceSnippet"
+            }
+        }
+    }
+
+    $clampIndex = $plugin.IndexOf("private Vector3 ClampRadarLocalToRadius")
+    $worldMetersIndex = $plugin.IndexOf("private Vector3 ResolveWorldMetersFromReference", [Math]::Max(0, $clampIndex))
+    if ($clampIndex -lt 0 -or $worldMetersIndex -le $clampIndex -or
+        -not $plugin.Substring($clampIndex, $worldMetersIndex - $clampIndex).Contains("if (IsRoomCompassModeActive())")) {
+        Add-Failure "Room Compass must bypass radar-shell position clamping so world overlays stay on their subjects."
+    }
+
+    $labelRotationIndex = $plugin.IndexOf("private Quaternion ResolveLabelRadarRotation")
+    $sanitizeLabelIndex = $plugin.IndexOf("private string SanitizeRadarLabelText", [Math]::Max(0, $labelRotationIndex))
+    if ($labelRotationIndex -lt 0 -or $sanitizeLabelIndex -le $labelRotationIndex) {
+        Add-Failure "Label facing correction block must remain inspectable."
+    } else {
+        $labelRotationBlock = $plugin.Substring($labelRotationIndex, $sanitizeLabelIndex - $labelRotationIndex)
+        if (-not $labelRotationBlock.Contains("Quaternion.Euler(0.0f, 180.0f, 0.0f)") -or
+            ([regex]::Matches($labelRotationBlock, 'readableFacingCorrection')).Count -lt 4) {
+            Add-Failure "Procedural labels must apply the readable 180-degree facing correction in viewer, world-axis, and object-rotation modes."
+        }
+    }
+
+    if (-not $plugin.Contains("float width = HeightStemHalfWidth;")) {
+        Add-Failure "Height stems must use the reduced X/Z cross-section constant."
+    }
+
+    $primaryUiIndex = $plugin.IndexOf("private void BuildProPrimaryFilterUi()")
+    $displayUiIndex = $plugin.IndexOf("private void BuildProDisplayUi()", [Math]::Max(0, $primaryUiIndex))
+    if ($primaryUiIndex -lt 0 -or $displayUiIndex -le $primaryUiIndex) {
+        Add-Failure "Pro UI must split primary filters into BuildProPrimaryFilterUi before display controls."
+    } else {
+        $primaryUiBlock = $plugin.Substring($primaryUiIndex, $displayUiIndex - $primaryUiIndex)
+        foreach ($primarySnippet in @(
+            "showLightAtomsField",
+            "showPersonAtomsField",
+            "showCameraAtomsField",
+            "showCustomUnityAssetAtomsField",
+            "showEmptyAtomsField",
+            "showSubSceneAtomsField",
+            "showImagePanelAtomsField",
+            "showNavigationPanelAtomsField",
+            "showOtherAtomsField"
+        )) {
+            if (-not $primaryUiBlock.Contains($primarySnippet)) {
+                Add-Failure "Primary Pro filter UI missing top checkbox field: $primarySnippet"
+            }
+        }
+        foreach ($advancedSnippet in @(
+            "labelScaleField",
+            "richOverlayBudgetField",
+            "rotationAxisLengthField",
+            "pointLightRangeAlphaField",
+            "povFrustumLengthField",
+            "grabThrowGrowScaleField"
+        )) {
+            if ($primaryUiBlock.Contains($advancedSnippet)) {
+                Add-Failure "Primary Pro filter UI must not include advanced tuning field: $advancedSnippet"
+            }
+        }
     }
 
     $pollIndex = $plugin.IndexOf("private void PollAvailableAtomsIfDue(RadarFrame frame)")
@@ -1125,6 +1634,67 @@ if (Test-Path -LiteralPath $pluginPath) {
         $pollBlock = $plugin.Substring($pollIndex, $filterIndex - $pollIndex)
         if ($pollBlock.Contains("ResolveAtomMarkerWorldPosition(left") -or $pollBlock.Contains("ResolveAtomMarkerWorldPosition(right")) {
             Add-Failure "Available atom polling sort must use cached distance values, not hierarchy-bound scans in comparer."
+        }
+        if ($pollBlock.Contains("availableAtomRecords.Sort")) {
+            Add-Failure "Available atom polling must use bounded insertion instead of full-list O(n log n) sort."
+        }
+        if ($pollBlock.Contains("BuildAtomRecord(atom, frame, availableAtomRecords.Count)") -or $pollBlock.Contains("BuildAtomRecord(atom, frame, availableAtomRecords.Count);")) {
+            Add-Failure "Available atom polling must run cheap filtering before renderer/light metadata hydration."
+        }
+    }
+
+    if (-not $plugin.Contains("record.markerLocalOffset = record.root.InverseTransformPoint(center);")) {
+        Add-Failure "Cached atom visual offsets must use Transform.InverseTransformPoint so scaled atom roots stay correct."
+    }
+    if (-not $plugin.Contains("public Vector3 lastRootScale;")) {
+        Add-Failure "AtomRecord must cache root scale so scaled atom changes invalidate marker positions."
+    }
+    if (-not $plugin.Contains("record.lastRootScale")) {
+        Add-Failure "AtomRecord transform refresh must compare and update cached root scale."
+    }
+    if (-not $plugin.Contains("availableMarkersDirty = true;") -or -not $plugin.Contains("materialStateByMaterial.Clear();")) {
+        Add-Failure "Material alpha changes must invalidate pooled available marker material state."
+    }
+
+    $capacityIndex = $plugin.IndexOf("private void EnsureAvailableMarkerCapacity(int requiredCount)")
+    $availableUpdateIndexForCapacity = $plugin.IndexOf("private void EnsureAvailableProOverlayCapacity(int requiredCount)", [Math]::Max(0, $capacityIndex))
+    if ($availableUpdateIndexForCapacity -lt 0) {
+        $availableUpdateIndexForCapacity = $plugin.IndexOf("private void UpdateAvailableAtomMarkers(RadarFrame frame)", [Math]::Max(0, $capacityIndex))
+    }
+    if ($capacityIndex -lt 0 -or $availableUpdateIndexForCapacity -le $capacityIndex) {
+        Add-Failure "Available marker capacity function must remain inspectable before marker update."
+    } else {
+        $capacityBlock = $plugin.Substring($capacityIndex, $availableUpdateIndexForCapacity - $capacityIndex)
+        if (($capacityBlock.Contains("FA Radar Available Rotation Axis")) -or
+            ($capacityBlock.Contains("FA Radar Available Light Range")) -or
+            ($capacityBlock.Contains("FA Radar Available Spotlight Cone"))) {
+            Add-Failure "Available marker pool growth must not eagerly allocate Pro rich overlay renderers for every slot."
+        }
+    }
+
+    $rangeScrollCallIndex = $plugin.IndexOf("HandleDesktopRadarRangeScroll(viewer);")
+    $clickCallIndex = $plugin.IndexOf("HandleRadarMarkerClick();", [Math]::Max(0, $rangeScrollCallIndex))
+    if ($rangeScrollCallIndex -lt 0 -or $clickCallIndex -le $rangeScrollCallIndex) {
+        Add-Failure "Desktop hover-scroll range handling must run before radar marker click handling in TickRadar."
+    }
+
+    $rangeScrollHelperIndex = $plugin.IndexOf("private void HandleDesktopRadarRangeScroll")
+    $rangeScrollNextHelperIndex = $plugin.IndexOf("private void HandleRadarMarkerClick", [Math]::Max(0, $rangeScrollHelperIndex))
+    if ($rangeScrollHelperIndex -lt 0 -or $rangeScrollNextHelperIndex -le $rangeScrollHelperIndex) {
+        Add-Failure "Desktop hover-scroll range helper must stay inspectable next to mouse click handling."
+    } else {
+        $rangeScrollBlock = $plugin.Substring($rangeScrollHelperIndex, $rangeScrollNextHelperIndex - $rangeScrollHelperIndex)
+        foreach ($forbiddenRangeScrollSnippet in @(
+            "hudScaleField",
+            "SetHudScaleNoCallback",
+            "SetActivePlacementScaleNoCallback",
+            "wristScaleField",
+            "Event.current.Use",
+            "OnGUI"
+        )) {
+            if ($rangeScrollBlock.Contains($forbiddenRangeScrollSnippet)) {
+                Add-Failure "Desktop hover-scroll range helper must not touch HUD or wrist scale snippet: $forbiddenRangeScrollSnippet"
+            }
         }
     }
 }

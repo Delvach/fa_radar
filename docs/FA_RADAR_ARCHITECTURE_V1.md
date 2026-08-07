@@ -1,6 +1,6 @@
 # FA Radar Architecture V1
 
-Updated: 2026-06-10
+Updated: 2026-08-03
 
 ## Goal
 
@@ -10,16 +10,18 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.38` on branch
-  `codex/0.1.38-performance-architecture`.
+- Version: `0.1.50` on branch
+  `codex/0.1.50-cua-room-compass`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.38.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.38.dll`.
-- Pro also ships a thin Empty atom preset:
-  `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
-- Intended plugin surface: scene or session plugin. Atom plugin loading still
-  works for placement capture, but the operator target is scene/session.
+  `Custom/Plugins/fa_radar.free.0.1.50.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.50.dll`.
+- Pro ships thin Empty and CustomUnityAsset host presets:
+  `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap` and
+  `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
+- Supported plugin surfaces are scene/session, Empty, and CustomUnityAsset.
+  CUA-hosted Radar is moved with the CUA atom and does not expose a second
+  wrist/grab/placement system.
 - No Unity project, asset bundles, raw runtime file IO, reflection, broad JSON
   object serializers, repo-local runtime dependencies, or absolute dev paths.
   Global user prefs are the only runtime file access and use VaM
@@ -27,9 +29,26 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.38` branch preserves the generated visual treatment, keeps the normal
+The `0.1.50` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, and
 keeps separate scene/session `Desktop Placement` and `VR Placement` prefs. It
+also keeps the 0.1.39 performance budget pass and fixes player
+navigation/crosshair utility markers so they resolve to the active viewer
+height instead of VaM's floor-anchored utility atom root. The 0.1.41 polish
+adds a smaller HUD scale floor, hides the redundant HUD-mode self marker,
+keeps far markers visible by fading/projecting them outside the shell, and
+switches large-area grids from 1m cells to 10m cells. It
+also narrows the HUD scale slider to the daily-use span so small HUD sizing is
+not compressed by the full placement cap. The 0.1.43 marker pass adds a
+generated Pro-only polygon person mesh while keeping person gender color as
+pink for female metadata, blue for male metadata, and neutral when unknown. It
+also adds selected-target 3-ring/cue rendering, turns useful marker/filter
+overlays on by default except the Player Navigation Panel utility marker,
+extends the default outside-range fade, and renames the overlay cap to
+`Detail Overlay Limit`. The 0.1.45 depth-clarity pass then lowers the default
+visual weight of context shells, stems, light volumes, axes, and camera
+frustums; applies depth-weighted alpha/scale to available markers and Pro
+details; and migrates saved prefs once with `visualDepthDefaultsVersion`. It
 also keeps optional wrist compass projection modes that can reveal on an
 outward twist or stay always-on per hand. The Pro/default-off throw-pin mechanic
 from 0.1.36 remains available for direct grabs: a velocity release can launch
@@ -38,6 +57,24 @@ larger world-static radar, and let the next grab shrink it back into the normal
 placement rules. Free remains the simplified radar surface: desktop placement,
 VR placement, scale, HUD offsets, and static desktop offsets; all item markers
 are plain yellow dots.
+The 0.1.47 director-readability pass then adds a Pro-only
+`directorReadabilityDefaultsVersion` migration, lowers camera/light/axis detail
+defaults, caps background rich overlays at 10, and applies stronger alpha/scale
+attenuation to non-selected overlays so selected targets remain readable in
+dense movie-studio scenes.
+The 0.1.48 label/axis pass keeps that budget posture while replacing full
+rotation-axis bars with a generated four-renderer/seven-piece glyph and adding
+capped procedural scene labels. Labels default to facing the active viewer, can
+instead use world-axis or object rotation, and selected labels stay outside the
+available-label budget.
+The 0.1.49 label-callout/UI pass then changes the default label posture to
+selected-only, reduces glyph scale, moves labels to outside-shell callout
+anchors with pooled leader lines, and reorders the native Pro plugin UI so
+primary atom/category checkboxes and display toggles appear before advanced
+tuning sliders.
+The 0.1.50 CUA pass corrects the generated label mesh-facing basis, reduces
+height-stem X/Z half-width from `0.018` to `0.010`, adds the CUA preset, and
+adds default-off `Room Compass` to both Empty- and CUA-hosted instances.
 
 The previous behavior change was VR
 readability tuning: point-light range spheres and spotlight cones get separate
@@ -58,6 +95,9 @@ polygons so targeting can be tested before any art polish:
 - `Radar Range Meters` expands or contracts the represented meter range for the
   grid, marker mapping, and height mapping without changing the compass visual
   radius
+- on desktop, mouse wheel over the visible radar adjusts `Radar Range Meters`
+  directly; wheel-up zooms into fewer represented meters and wheel-down expands
+  range
 - `HUD Scale` and `Wrist Scale` change overall rendered size only; at the
   default visual radius their max maps to a 1m radar diameter
 - grid lines clipped to the radar circle
@@ -109,6 +149,17 @@ modes use the viewer as the reference origin. Static world and Empty/atom-anchor
 modes use the radar's own world pose as the reference origin, so moving the user
 does not slide scene items around the static radar.
 
+Atom-attached `Room Compass` is the exception. It leaves the containing Empty or
+CUA atom at its VaM pose, detaches only the generated Radar visual root, and places that root
+at scene origin with identity world rotation. Horizontal and vertical mapping
+both use `HUD Scale * Radar Visual Radius`, cancelling the visual-root scale so
+world positions land at 1:1. Shell-edge clamping, range fading, and depth
+attenuation are bypassed in this mode; spotlight geometry is not clipped to the
+Radar shell. The sphere, rings, and meter grid use the configured Radar range as
+their world-space radius, independent of `HUD Scale`; marker and label scale
+remain tunable. Labels use small item-local callouts instead of returning to the
+shell. Rotation continues through the existing world/object rotation path.
+
 By default the selected marker uses all three world-axis display dimensions.
 `Flatten Target Y` remains available as a test toggle when a stricter X/Z
 desktop read is more useful than height/depth representation.
@@ -137,7 +188,7 @@ controls only the current atom's optional ground projection dot.
 The creator-anchor preference profile and atom-host path skip this system so
 Empty/CUA creator-anchor behavior remains separate.
 
-The active 0.1.37 session path is direct grip only: when a controller grip press
+The session path remains direct grip only: when a controller grip press
 starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
 that controller position plus the radar world center. During the grab, the
 controller owns the radar's world-space center; HUD, static, atom-anchor, and
@@ -209,7 +260,7 @@ and the runtime stores the value as true. `Load Global Prefs` remains registered
 as an action for compatibility. Loaded values are applied with `valNoCallback`,
 and a small shared in-process cache keeps multiple Radar instances from
 repeatedly reading the same files.
-An atom-attached Radar instance, including the shipped Empty preset, selects
+An atom-attached Radar instance, including the shipped Empty and CUA presets, selects
 the creator-anchor preference profile by default. The legacy `CUA Anchor
 Preset` storable remains registered so older CUA presets still load, but it is
 not exposed in the reduced Empty-host UI.
@@ -258,7 +309,7 @@ placement:
 
 - `Attached To UI` maps to the existing HUD/view anchor.
 - `Pinned In World` maps to world static anchoring for session/scene plugins.
-- Empty/atom-hosted instances ignore the scene/session placement chooser and
+- Empty/CUA-hosted instances ignore the scene/session placement chooser and
   always use containing-atom anchoring, with separate creator-anchor prefs.
 - The legacy `CUA Anchor Preset` flag is compatibility-only and does not select
   the Empty/atom-anchor UI for scene/session plugins.
@@ -269,7 +320,7 @@ placement. It does not fork the radar core:
 
 - `HUD / View` keeps the existing camera-relative behavior.
 - `World Static` freezes the generated radar root at a captured world pose.
-- `Containing Atom` parents the radar root under the atom/Empty host the plugin is
+- `Containing Atom` parents the radar root under the atom/Empty/CUA host the plugin is
   loaded on, so creators can move or parent that host with normal VaM tools.
 - `Anchor Atom UID` parents the radar root under any explicit atom UID,
   including a camera/CUA/control atom if the scene provides one.
@@ -281,24 +332,25 @@ static scene pose. The Pro Empty resource path should therefore stay thin:
 creator-facing atom resources can host or identify an anchor, while Free/Pro
 feature behavior remains in one plugin codebase.
 
-The Pro Empty preset loads the same plugin on an Empty atom, sets the legacy
-`CUA Anchor Preset` compatibility flag, and uses `Containing Atom` anchoring.
+The Pro Empty and CUA presets load the same plugin, set the legacy `CUA Anchor
+Preset` compatibility flag, and use `Containing Atom` anchoring.
 Any atom-attached Radar instance is treated as a creator anchor by default, so
 the Empty preset appears on and anchored without extra binding steps. When
 active, it uses the separate creator-anchor preference files listed above.
 
-The creator-anchor UI intentionally omits session/HUD-only controls: no wrist
+Creator-anchor UIs intentionally omit session/HUD-only controls: no wrist
 mode selector, wrist offset/scale sliders, grab/haptic controls, global reset,
 VR placement selector, manual anchor-mode controls, or static-world capture
-controls. The kept controls
-are atom-local X/Y/Z offset, scale, local rotation, represented range, available
-atom markers, Pro category filters, grid visibility, reset anchor placement,
-and status.
+controls. Empty keeps atom-local X/Y/Z offset, scale, local rotation, represented
+range, reset anchor placement, filters, display/tuning, grid, and status. CUA
+keeps Radar scale, represented range, filters, display/tuning, grid, status, and
+the default-off `Room Compass` toggle; it exposes no local offset or rotation
+controls because the CUA atom itself owns placement.
 
 The normal plugin UI exposes the daily placement and operation controls:
 
-- `Host Surface`
-- `Display Surface`
+- Pro primary atom/category checkboxes
+- Pro display toggles and label mode/orientation
 - `Desktop Placement`
 - `VR Placement`
 - `HUD Offset X`
@@ -311,19 +363,20 @@ The normal plugin UI exposes the daily placement and operation controls:
 - `Wrist Offset Y`
 - `Wrist Offset Z`
 - `Radar Range Meters`
-- `Show Target Markers`
-- `Show Lights`
-- `Show People`
-- `Show Custom Unity Assets`
-- `Show Empty`
-- `Show SubScene`
-- `Show ImagePanel`
-- `Show Animation`
-- `Show Force`
-- `Show Shapes`
-- `Show Sounds`
-- `Show Triggers`
-- `Show Uncategorized Atoms`
+- `Scene Atom Markers`
+- `Lights`
+- `People`
+- `Custom Unity Assets`
+- `Empty`
+- `SubScene`
+- `ImagePanel`
+- `Animation`
+- `Force`
+- `Shapes`
+- `Sounds`
+- `Triggers`
+- `Cameras`
+- `Uncategorized Atoms`
 - `Grid Enabled`
 - `Grab Handles Enabled`
 - `Grab Haptics`
@@ -344,13 +397,27 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
   scan.
 - Available atom discovery is polled on `Atom Poll Seconds` and builds cached
   `AtomRecord` entries with root transform, category flags, marker mesh,
-  visual-center offset, optional Pro light handle, and cached distance.
+  scale-safe visual-center offset, optional Pro light handle, and cached
+  distance. Cheap category/visibility filtering happens before renderer bounds
+  or Unity light hierarchy scans.
 - `RadarFrame` captures the active reference position/rotation/range/height
   scale/visual radius once per tick and produces a quantized signature. The
   available marker loop skips when the frame signature and atom transforms have
   not changed.
-- Marker pools grow in 16-slot blocks through `MarkerSlot` records, avoiding
+- Marker pools grow in 8-slot blocks through `MarkerSlot` records, avoiding
   resize churn as atoms or filters change.
+- Available atom records are kept nearest-first with bounded insertion and
+  capped by `Max Visible Markers`, avoiding full-list sort and unlimited
+  "everything visible" growth.
+- Pro available-marker axes, light range spheres, and spotlight cones use a
+  separate lazy overlay pool capped by `Detail Overlay Limit`; selected targets
+  retain full Pro detail outside that budget.
+- Pro labels are generated glyph meshes, capped by `Label Limit`, and only
+  rebuild per slot when the cached atom label changes. Viewer-facing labels get
+  a small capped orientation refresh even when marker transforms skip.
+- Available markers and context-only Pro overlays use depth-weighted alpha/scale
+  so dense scenes read as layers while selected-target markers keep their
+  stronger selected fade floor and camera-edge cue.
 - Renderer bounds and Unity light hierarchy scans happen during atom polling,
   not in the available marker render loop or sort comparer.
 - Available-atom sorting uses cached squared distances.
@@ -390,8 +457,8 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.38.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.38.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.50.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.50.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -401,18 +468,20 @@ DLL.
 
 The build helper also stages candidate `.var` packages under `build\packages`
 with DLLs under `Custom/Plugins` and a root `meta.json`. The first Free test
-package is `FrameAngelDev.Radar.1.var`. The Pro package additionally stages
-`Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap`.
+package is `FrameAngelDev.Radar.1.var`. The Pro package additionally stages the
+Empty and CustomUnityAsset Radar presets.
 
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.38.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.38.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.50.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.50.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.38.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.38.dll`
+- `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.50.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.50.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
+- `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 
 Future public `.var` product naming is undecided. Current candidates are
 `FrameAngel.DaFuqIzzit.1.var` and `FrameAngel.Radar.1.var`; the first Free

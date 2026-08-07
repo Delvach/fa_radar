@@ -14,10 +14,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 0.1.38 audit anchors. The live values are read from config/fa_radar.version.json.
-# Free: FA_RADAR_FREE -> fa_radar.free.0.1.38.dll, FrameAngelDev.Radar.1.var
-# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.38.dll
+# 0.1.50 audit anchors. The live values are read from config/fa_radar.version.json.
+# Free: FA_RADAR_FREE -> fa_radar.free.0.1.50.dll, FrameAngelDev.Radar.1.var
+# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.50.dll
 # Pro Empty preset: Preset_FrameAngel_Radar_Empty.vap
+# Pro CUA preset: Preset_FrameAngel_Radar_CUA.vap
 
 function Ensure-FaRadarDirectory {
     param([string]$PathValue)
@@ -122,6 +123,8 @@ if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
 }
 $anchorPresetRelativePath = "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
 $anchorPresetSource = Join-Path $resolvedRepoRoot ("payload\" + $anchorPresetRelativePath)
+$cuaPresetRelativePath = "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
+$cuaPresetSource = Join-Path $resolvedRepoRoot ("payload\" + $cuaPresetRelativePath)
 
 if ([string]::IsNullOrWhiteSpace($VamManagedDir)) {
     $VamManagedDir = Join-Path $VamRoot "VaM_Data\Managed"
@@ -252,6 +255,7 @@ foreach ($editionId in $requestedEditions) {
     $packageSha256 = ""
     $stageRoot = ""
     $anchorPresetPackagePath = ""
+    $cuaPresetPackagePath = ""
     if (-not $SkipPackage.IsPresent) {
         $packageWorkRoot = Join-Path (Join-Path $buildRoot "package_work") $editionId
         $stageRoot = Join-Path $packageWorkRoot "stage"
@@ -267,12 +271,21 @@ foreach ($editionId in $requestedEditions) {
             if (-not (Test-Path -LiteralPath $anchorPresetSource -PathType Leaf)) {
                 throw "Missing Pro Empty anchor preset: $anchorPresetSource"
             }
+            if (-not (Test-Path -LiteralPath $cuaPresetSource -PathType Leaf)) {
+                throw "Missing Pro CUA anchor preset: $cuaPresetSource"
+            }
 
             $anchorPresetStageDirectory = Join-Path $stageRoot "Custom\Atom\Empty"
             Ensure-FaRadarDirectory -PathValue $anchorPresetStageDirectory
             $anchorPresetPackagePath = Join-Path $anchorPresetStageDirectory "Preset_FrameAngel_Radar_Empty.vap"
             Copy-Item -LiteralPath $anchorPresetSource -Destination $anchorPresetPackagePath -Force
             [void]$contentList.Add("Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap")
+
+            $cuaPresetStageDirectory = Join-Path $stageRoot "Custom\Atom\CustomUnityAsset"
+            Ensure-FaRadarDirectory -PathValue $cuaPresetStageDirectory
+            $cuaPresetPackagePath = Join-Path $cuaPresetStageDirectory "Preset_FrameAngel_Radar_CUA.vap"
+            Copy-Item -LiteralPath $cuaPresetSource -Destination $cuaPresetPackagePath -Force
+            [void]$contentList.Add("Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap")
         }
 
         $meta = [ordered]@{
@@ -280,7 +293,7 @@ foreach ($editionId in $requestedEditions) {
             creatorName = $packageCreator
             packageName = $packageName
             description = "Frame Angel Radar $displayName $version plugin build."
-            instructions = "Install this package in VaM AddonPackages. The plugin DLL is staged under Custom/Plugins. Pro also includes an Empty atom preset for scene anchoring."
+            instructions = "Install this package in VaM AddonPackages. The plugin DLL is staged under Custom/Plugins. Pro also includes Empty and CustomUnityAsset atom presets for scene anchoring."
             contentList = @($contentList)
             dependencies = @{}
         }
@@ -318,6 +331,7 @@ foreach ($editionId in $requestedEditions) {
         packagePath = $packagePath
         packageSha256 = $packageSha256
         anchorPresetPackagePath = $anchorPresetPackagePath
+        cuaPresetPackagePath = $cuaPresetPackagePath
         stageRoot = $stageRoot
     })
 }
@@ -341,6 +355,10 @@ $receipt = [ordered]@{
     skipObfuscation = [bool]$SkipObfuscation
     skipPackage = [bool]$SkipPackage
     source = $source
+    sourceSha256 = Get-FaRadarFileHashOrEmpty -PathValue $source
+    versionAuthoritySha256 = Get-FaRadarFileHashOrEmpty -PathValue $versionPath
+    emptyPresetSha256 = Get-FaRadarFileHashOrEmpty -PathValue $anchorPresetSource
+    cuaPresetSha256 = Get-FaRadarFileHashOrEmpty -PathValue $cuaPresetSource
     csharpCompiler = $csc
     vamManagedDir = $resolvedVamManagedDir
     editionBuilds = @($builds)
@@ -352,6 +370,10 @@ Write-FaRadarJson -PathValue $receiptPath -Value $receipt
     Version = $version
     EditionRequest = $Edition
     ReceiptPath = $receiptPath
+    SourceSha256 = [string]$receipt.sourceSha256
+    VersionAuthoritySha256 = [string]$receipt.versionAuthoritySha256
+    EmptyPresetSha256 = [string]$receipt.emptyPresetSha256
+    CuaPresetSha256 = [string]$receipt.cuaPresetSha256
     EditionBuilds = @($builds)
     Built = $true
 }

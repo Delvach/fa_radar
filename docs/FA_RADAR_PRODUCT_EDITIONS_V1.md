@@ -1,17 +1,17 @@
 # FA Radar Product Editions V1
 
-Updated: 2026-06-10
+Updated: 2026-08-03
 
 ## Decision
 
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.38`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.50`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.38.dll`
-- `fa_radar.pro.0.1.38.dll`
+- `fa_radar.free.0.1.50.dll`
+- `fa_radar.pro.0.1.50.dll`
 
 The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
 branding remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.38 intentionally keeps Free sparse: desktop
+buttons, and text fields, but 0.1.50 intentionally keeps Free sparse: desktop
 placement, VR placement, scale, HUD offsets, and static desktop offsets.
 Free's grab/wrist behavior remains available through the default runtime path
 and saved preferences without exposing prototype tuning controls.
@@ -52,6 +52,47 @@ debugging after scene reloads.
 The `0.1.38` performance pass keeps those product features but moves available
 atom rendering to cached atom records, block-grown marker pools, frame
 signatures, cached bounds/light metadata, and coalesced material writes.
+The `0.1.39` budget pass adds nearest-first marker caps, scale-safe visual
+center caching, lazy Pro rich overlay renderers, and default-off noisy Pro
+overlays so wild scenes do not allocate axes/light volumes for every marker.
+The `0.1.40` hotfix keeps those budgets and maps player navigation/crosshair
+utility atoms to the active viewer height instead of their floor-rooted atom
+transform.
+The `0.1.41` polish pass keeps HUD-scale adjustment usable at small sizes,
+prevents the redundant HUD-mode self marker from reading as a stray floor dot,
+keeps far markers visible with fade/projection outside the range shell, and
+switches large-area grid density to 10-meter cells.
+The `0.1.42` HUD correction narrows the HUD scale slider's maximum daily range
+so small adjustments are not compressed by the full 1m placement cap.
+The `0.1.43` marker pass gives Pro person atoms generated polygon person
+markers while preserving the existing pink/blue/neutral gender color language.
+The `0.1.44` visibility polish replaces the large selected-target ball with a
+small 3-ring/cue treatment, turns useful Pro marker overlays on by default
+except Player Navigation Panel utility atoms, and renames the overlay cap to
+`Detail Overlay Limit`.
+The `0.1.45` depth-clarity pass keeps those useful overlays enabled while
+making unselected dense-scene context quieter: available markers, axes, light
+volumes, and camera frustums get lower defaults plus depth-weighted visual
+alpha/scale. Selected targets remain prioritized outside the detail-overlay
+budget.
+The `0.1.46` desktop interaction pass lets mouse wheel over the visible radar
+adjust `Radar Range Meters` directly, zooming represented meters without
+changing HUD or wrist placement scale.
+The `0.1.47` director-readability pass quiets background Pro detail for dense
+movie-studio scenes: non-selected axes/light volumes/frustums get lower
+defaults, stronger context attenuation, and a capped background overlay budget
+while selected-target detail remains outside that budget.
+The `0.1.48` label/axis pass adds capped Pro procedural scene labels with
+viewer/world/object orientation choices and changes rotation axes to a
+four-renderer/seven-piece glyph so the center cube stays readable without
+seven renderers per marker.
+The `0.1.49` label-callout/UI pass keeps those generated label meshes but makes
+labels selected-only by default, lowers default scale/limit, moves tags to
+outside-shell callouts with pooled leader lines, and moves primary category
+checkboxes above advanced label/overlay tuning in the native VaM panel.
+The `0.1.50` creator-host pass fixes mirrored procedural label facing, thins
+height-stem cross sections, ships both Empty and `CustomUnityAsset` host presets,
+and adds a default-off atom-attached `Room Compass` 1:1 world-overlay mode.
 
 ## Free Edition
 
@@ -100,15 +141,22 @@ Pro is the operational radar.
   atoms
 - optional user, desktop, and scene-camera frustum helpers for creator filming
 - color customization is a Pro feature
-- creator-facing Empty/atom resources should be thin anchor hosts around the shared
+- creator-facing Empty/CUA resources should be thin anchor hosts around the shared
   runtime, not duplicate radar logic
 - Pro ships `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap` as a
   scene-anchor starter
-- Empty/atom-anchor instances use `preferences_cua_common.json` and
+- Pro also ships
+  `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`; its UI keeps
+  scale, range, filters, display/tuning, grid, status, and `Room Compass`, but
+  excludes wrist, grab, local-offset, anchor-rotation, and session-placement
+  controls because the CUA atom owns movement
+- Empty/CUA `Room Compass` is off by default; when enabled, the host remains at
+  its VaM pose while Radar content is scene-origin/world-aligned and positions map 1:1
+- Empty/CUA anchor instances use `preferences_cua_common.json` and
   `preferences_cua_pro.json` so creator-anchor tuning does not pollute normal
   HUD/session Radar preferences. The legacy filenames are kept for older CUA
   compatibility.
-- The first grab-handle implementation is session/scene-plugin only; Empty
+- The first grab-handle implementation is session/scene-plugin only; Empty/CUA
   anchoring uses VaM's normal atom movement/parenting instead.
 
 Pro should make scene diagnosis and targeting faster without turning every
@@ -144,10 +192,11 @@ Rules:
 Current build helpers stage candidate `.var` packages:
 
 - `FrameAngelDev.Radar.1.var`
-- `fa_radar.pro.0.1.38.var`
+- `fa_radar.pro.0.1.50.var`
 
-The Pro candidate package includes the Empty atom preset under
-`Custom/Atom/Empty`; Free does not ship creator-facing anchor resources.
+The Pro candidate package includes both creator presets under
+`Custom/Atom/Empty` and `Custom/Atom/CustomUnityAsset`; Free does not ship
+creator-facing anchor resources.
 
 Human-facing release `.var` product naming remains undecided. Current
 candidates:
