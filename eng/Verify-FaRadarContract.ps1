@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.50"',
+        'private const string Version = "0.1.51"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -451,11 +451,17 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "ResolveRadarRuntimeVisible",
         "IsWristCompassModeActive",
         "ResolveWristCompassAnchorTransform",
+        "TryResolveOpticalWristTransform",
+        "SteamVR_Input.GetAction<SteamVR_Action_Skeleton>",
+        "GetSkeletalActionData",
+        "!actionData.bActive",
+        "OpticalSkeletonWristBoneIndex",
+        "ResolveMotionControllerTransform(hand)",
         "TryResolveHandTransform",
         "ResolveControllerOutwardTwistDegrees",
         "SuperController.singleton.leftHand",
         "SuperController.singleton.rightHand",
-        "PulseGrabHandleHaptics(ResolveWristCompassHand()",
+        "if (!IsOpticalWristTransform(wristAnchor, hand))",
         'new JSONStorableBool("Show Grab Handle Debug", false)',
         'new JSONStorableBool("Grab Haptics", true)',
         "UpdateSessionGrabHandles",
@@ -463,6 +469,14 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "directGripGrabDefaulted",
         "hasDirectGripDefaultMarker",
         "UpdateDirectGripGrab",
+        "EnsurePrimaryGrabHandleAtom(radarCenter);",
+        "ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);",
+        "LeftFullGrabbedController",
+        "RightFullGrabbedController",
+        "atom.hidden = true",
+        "controller.hidden = true",
+        "controller.drawMeshWhenDeselected = false",
+        "controller.canGrabPosition = true",
         "leftControllerCamera",
         "rightControllerCamera",
         "StartMoveGrab",
@@ -928,8 +942,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
     }
 
     $forbiddenActiveGrabSnippets = @(
-        "EnsurePrimaryGrabHandleAtom(radarCenter);",
-        "ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);",
         "UpdateResizeGrabHandle(viewer, primaryController);",
         "controller.drawMeshWhenDeselected = true",
         "controller.hidden = false"
@@ -978,9 +990,10 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.50.dll",
-        "fa_radar.pro.0.1.50.dll",
+        "fa_radar.free.0.1.51.dll",
+        "fa_radar.pro.0.1.51.dll",
         "UnityEngine.PhysicsModule.dll",
+        "SteamVR.dll",
         "FrameAngelDev.Radar.1.var",
         "Preset_FrameAngel_Radar_Empty.vap",
         "Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap",
@@ -1070,7 +1083,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.50.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.51.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -1101,7 +1114,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.50.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.51.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"pluginLabel" : "Frame Angel Radar CUA"',
         '"CUA Anchor Preset" : "true"',
@@ -1159,11 +1172,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.50") {
-        Add-Failure "Version config must declare version 0.1.50."
+    if ($version.version -ne "0.1.51") {
+        Add-Failure "Version config must declare version 0.1.51."
     }
-    if ($version.branch -ne "codex/0.1.50-cua-room-compass") {
-        Add-Failure "Version config branch must match codex/0.1.50-cua-room-compass."
+    if ($version.branch -ne "codex/0.1.51-hand-wrist-grab") {
+        Add-Failure "Version config branch must match codex/0.1.51-hand-wrist-grab."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -1172,8 +1185,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.50.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.50.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.51.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.51.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -1184,8 +1197,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.50.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.50.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.51.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.51.dll."
     }
     if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
         Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
@@ -1285,8 +1298,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.50.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.50.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.51.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.51.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"

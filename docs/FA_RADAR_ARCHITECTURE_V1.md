@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.50` on branch
-  `codex/0.1.50-cua-room-compass`.
+- Version: `0.1.51` on branch
+  `codex/0.1.51-hand-wrist-grab`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.50.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.50.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.51.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.51.dll`.
 - Pro ships thin Empty and CustomUnityAsset host presets:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap` and
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
@@ -29,7 +29,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.50` branch preserves the generated visual treatment, keeps the normal
+The `0.1.51` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, and
 keeps separate scene/session `Desktop Placement` and `VR Placement` prefs. It
 also keeps the 0.1.39 performance budget pass and fixes player
@@ -72,7 +72,7 @@ selected-only, reduces glyph scale, moves labels to outside-shell callout
 anchors with pooled leader lines, and reorders the native Pro plugin UI so
 primary atom/category checkboxes and display toggles appear before advanced
 tuning sliders.
-The 0.1.50 CUA pass corrects the generated label mesh-facing basis, reduces
+The 0.1.51 pass preserves the corrected generated label mesh-facing basis, reduces
 height-stem X/Z half-width from `0.018` to `0.010`, adds the CUA preset, and
 adds default-off `Room Compass` to both Empty- and CUA-hosted instances.
 
@@ -132,9 +132,10 @@ polygons so targeting can be tested before any art polish:
 - Pro-only user, desktop, and scene-camera POV/frustum helpers are generated as
   translucent radar-local projections for filming setup
 - click-to-select for visible available CUA/light/person/other atom markers
-- session-plugin-only direct grip movement with OVR haptics: grip near the
-  radar, move the controller, and release to apply placement; the active
-  controller owns world-space movement until release or wrist hand-off
+- session-plugin-only movement accepts the existing controller-grip proximity
+  path or an optical pinch/HoldGrab lease of an invisible Radar-owned VaM
+  `FreeControllerV3`; VaM's side-specific full-grab ownership is only observed,
+  and Radar never synthesizes a hand/controller action
 - two-hand outward-twist accordion scaling for HUD and wrist modes, using the
   current hand distance as the scale ratio
 - generated HUD objects and materials carry the `favr.hud.radar` filming
@@ -188,21 +189,21 @@ controls only the current atom's optional ground projection dot.
 The creator-anchor preference profile and atom-host path skip this system so
 Empty/CUA creator-anchor behavior remains separate.
 
-The session path remains direct grip only: when a controller grip press
-starts inside `Grab Hit Radius Meters` from the radar center, the plugin records
-that controller position plus the radar world center. During the grab, the
-controller owns the radar's world-space center; HUD, static, atom-anchor, and
-wrist-relative preferences are updated only when the grip is released. In wrist
-mode, dragging past the hand-off threshold switches to the opposing hand and
-restores the pre-grab wrist offset instead of continuing to solve against both
-hands.
+For optical hands, Radar keeps one active but visual-free Empty atom controller
+at its current center. The existing hand plugin can discover that normal VaM
+`FreeControllerV3` within its 0.1 m pinch radius and acquire it through VaM's
+stock full-grab operation. Radar only compares that target with
+`LeftFullGrabbedController` / `RightFullGrabbedController` and follows its
+position until VaM releases it. No reflection, private arm object, or optical
+input emulation is used.
 
-No visible VaM grab atom is drawn, no resize handle is spawned, and no dynamic
-handle displacement is consumed. `Grab Haptics` uses guarded OVR haptic pulses
-on move start, hand-off, and apply/release. When both hands perform the outward
-twist pose, their current distance starts an accordion scale gesture; changing
-that distance scales the active HUD or wrist mode until either hand leaves the
-pose.
+The prior controller path remains a graceful fallback: a controller grip press
+inside `Grab Hit Radius Meters` records that controller position and moves the
+same Radar world center. No visible VaM handle or resize handle is drawn.
+`Grab Haptics` applies only to the controller fallback; optical grabs and wrist
+reveal do not synthesize controller haptics. HUD, static, and wrist-relative
+preferences are committed on release. When both available hands perform the
+twist pose, their current distance still drives accordion scaling.
 
 ## Wrist Compass
 
@@ -213,19 +214,25 @@ and wrist modes are ignored while the creator-anchor preference profile is
 active.
 
 In `HUD`, the existing HUD/static/atom anchor behavior is unchanged. In wrist
-modes, the HUD root position is anchored to the selected hand/controller
-transform plus the wrist-relative `Wrist Offset X/Y/Z` and `Wrist Scale`
-preferences. Wrist mode does not inherit the live wrist rotation for display;
-rotation stays view-facing while the wrist transform only supplies the position
-anchor and twist reveal signal.
+modes, Radar first performs a read-only lookup of VaM's shared SteamVR skeleton
+action and requires the current `InputSkeletalActionData_t.bActive` bit. It
+reconstructs only wrist joint 1 into a Radar-owned transform. Any missing action,
+inactive source, unsupported transform space, invalid pose, or unavailable
+OpenVR frame fails closed to the existing motion-controller transform; the
+hand/arm plugin is optional and no hand state is written.
 
-`wrist-left` and `wrist-right` start hidden and reveal only when the selected
-hand's up vector rolls outward far enough to pass `Wrist Twist Degrees`; the
-reveal uses a small hysteresis band and pulses haptics once when it begins. The
-two `always-on` wrist modes stay visible whenever the selected hand/controller
-transform exists. Show/hide is a short alpha fade, and hand-off placement uses a
-short reveal grace so the radar can pop to the destination wrist before fading
-again if that wrist is not in the reveal pose.
+The HUD root position uses that selected optical/controller transform plus the
+wrist-relative `Wrist Offset X/Y/Z` and `Wrist Scale` preferences. Wrist mode
+does not inherit the live wrist rotation for display; rotation stays view-facing
+while the wrist transform supplies only position and reveal orientation.
+
+`wrist-left` and `wrist-right` start hidden. An optical wrist reveals from its
+handed palm-facing axis as the palm turns upward past `Wrist Twist Degrees`; a
+controller retains the prior outward-roll calculation. Both use the existing
+hysteresis band. Optical reveal is read-only and does not pulse controller
+haptics. The two `always-on` wrist modes stay visible whenever the selected
+optical/controller transform exists. Show/hide is a short alpha fade, and
+hand-off placement uses a short reveal grace.
 
 While in wrist mode, the opposing controller can grip the visible radar and
 adjust the current wrist-relative offset. If the drag carries the radar closer
@@ -457,8 +464,8 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.50.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.50.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.51.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.51.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -474,12 +481,12 @@ Empty and CustomUnityAsset Radar presets.
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.50.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.50.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.51.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.51.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.50.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.50.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.51.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.51.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

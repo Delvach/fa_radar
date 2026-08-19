@@ -14,9 +14,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 0.1.50 audit anchors. The live values are read from config/fa_radar.version.json.
-# Free: FA_RADAR_FREE -> fa_radar.free.0.1.50.dll, FrameAngelDev.Radar.1.var
-# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.50.dll
+# 0.1.51 audit anchors. The live values are read from config/fa_radar.version.json.
+# Free: FA_RADAR_FREE -> fa_radar.free.0.1.51.dll, FrameAngelDev.Radar.1.var
+# Pro: FA_RADAR_PRO -> fa_radar.pro.0.1.51.dll
 # Pro Empty preset: Preset_FrameAngel_Radar_Empty.vap
 # Pro CUA preset: Preset_FrameAngel_Radar_CUA.vap
 
@@ -150,7 +150,8 @@ if (-not $SkipCompile.IsPresent) {
         (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.CoreModule.dll"),
         (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.PhysicsModule.dll"),
         (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.UI.dll"),
-        (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.UIModule.dll")
+        (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.UIModule.dll"),
+        (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "SteamVR.dll")
     )
 }
 

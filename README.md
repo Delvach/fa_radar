@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.50`.
+Current branch version: `0.1.51`.
 
-Current product contract version: `0.1.50`.
+Current product contract version: `0.1.51`.
 
 The current slice is compiled C# only:
 
@@ -45,11 +45,15 @@ The current slice is compiled C# only:
   make Radar appear lost; Empty/atom-anchor prefs are not migrated
 - scene/session placement controls stay visible even if older saved plugin
   state contains the legacy `CUA Anchor Preset` compatibility flag
-- session grab movement is default-on and direct: grip near the radar, move the
-  controller, release to apply placement; no visible grab handles are drawn
+- session grab movement is default-on and direct: controller grip keeps its
+  existing proximity path, while optical pinch/HoldGrab can lease Radar's
+  invisible VaM `FreeControllerV3` target through VaM's normal full-grab
+  ownership; no visible grab handles are drawn
 - optional `Radar Mode` values: `HUD`, `wrist-left`, `wrist-right`,
   `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
-  modes start hidden until the outward wrist-twist reveal is active
+  modes start hidden until the wrist-twist reveal is active; a current active
+  SteamVR skeleton wrist is read without changing hand/input state, and any
+  missing/inactive/invalid optical source falls back to the normal controller
 - wrist modes use their own wrist-relative offset/scale prefs and can hand off
   to the opposing controller with a grip drag across the body
 - Pro creator presets for both movable host types:
@@ -101,9 +105,9 @@ The current slice is compiled C# only:
 - Pro spotlight cones are open-ended and clipped to the radar shell so wide
   spotlights cannot become filled world-covering discs
 - click-to-select for visible available CUA/light/person/other atom markers
-- session-plugin-only direct grip movement with OVR haptics; grip near the
-  radar, move the controller, and release to apply HUD/static/wrist-relative
-  offsets
+- session-plugin-only direct grip movement; controller grip retains OVR
+  haptics, while optical HoldGrab observes VaM full-grab ownership without
+  synthesizing actions or controller haptics
 - two-hand outward-twist accordion scaling for HUD and wrist modes
 - global non-scene-stored preferences under
   `Custom\PluginData\FrameAngel\Radar`, split into common and Pro files
@@ -177,12 +181,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.50.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.50.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.51.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.51.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.50.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.50.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.51.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.51.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

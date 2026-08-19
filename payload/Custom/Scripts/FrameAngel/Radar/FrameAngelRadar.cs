@@ -2,15 +2,17 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using MVR.FileManagementSecure;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
+using Valve.VR;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.50";
+    private const string Version = "0.1.51";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -63,6 +65,11 @@ public class FrameAngelRadar : MVRScript
     private const string RadarModeWristRight = "wrist-right";
     private const string RadarModeWristLeftAlwaysOn = "wrist-left-always-on";
     private const string RadarModeWristRightAlwaysOn = "wrist-right-always-on";
+    private const string OpticalSkeletonActionSetName = "default";
+    private const string OpticalSkeletonLeftActionName = "SkeletonLeftHand";
+    private const string OpticalSkeletonRightActionName = "SkeletonRightHand";
+    private const int OpticalSkeletonRootBoneIndex = 0;
+    private const int OpticalSkeletonWristBoneIndex = 1;
     private const string GrabHandlePrimarySuffix = "primary";
     private const string GrabHandleResizeSuffix = "resize";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
@@ -70,6 +77,7 @@ public class FrameAngelRadar : MVRScript
     private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
     private const float RadarVisibilityFadeSeconds = 0.18f;
     private const float WristRevealGraceSeconds = 0.55f;
+    private const float OpticalSkeletonResolveIntervalSeconds = 0.5f;
     private const float WristHandOffDistanceMeters = 0.61f;
     private const float WristHandOffMinimumTravelMeters = 0.30f;
     private const float HudHandOffDistanceMeters = 0.38f;
@@ -79,6 +87,8 @@ public class FrameAngelRadar : MVRScript
     private const float GrabHapticCooldownSeconds = 0.08f;
     private const float GripGrabPressThreshold = 0.62f;
     private const float GripGrabReleaseThreshold = 0.34f;
+    private static readonly uint OpticalSkeletalActionDataSize =
+        (uint)Marshal.SizeOf(typeof(InputSkeletalActionData_t));
 #if FA_RADAR_PRO
     private const float GrabThrowMinimumReleaseVelocity = 0.18f;
     private const float GrabThrowStopVelocity = 0.04f;
@@ -488,7 +498,6 @@ public class FrameAngelRadar : MVRScript
     private bool wristCompassRevealed;
     private bool radarVisibilityAlphaInitialized;
     private bool primaryGrabHandleCreatePending;
-    private bool primaryGrabHandleFollowArmed;
     private bool resizeGrabHandleCreatePending;
     private bool moveGrabActive;
     private bool resizeGrabActive;
@@ -499,6 +508,7 @@ public class FrameAngelRadar : MVRScript
     private bool ovrRightGrabHapticActive;
 #if FA_RADAR_PRO
     private bool grabThrowActive;
+    private bool grabThrowUsesControllerHaptics;
 #endif
     private Vector3 smoothedHudPosition;
     private Vector3 moveStartHandlePosition;
@@ -519,6 +529,7 @@ public class FrameAngelRadar : MVRScript
     private float nextGlobalPreferencesFlushTime;
     private float nextGlobalPreferencesPollTime;
     private float nextRecorderVisibilityPollTime;
+    private float nextOpticalSkeletonResolveTime;
     private float radarVisibilityAlpha = 1.0f;
     private float radarVisibilityTargetAlpha = 1.0f;
     private float resizeStartScale;
@@ -544,12 +555,24 @@ public class FrameAngelRadar : MVRScript
     private int resizeGrabHand = GrabHandUnknown;
     private bool moveGrabWorldOverrideActive;
     private bool accordionResizeActive;
+    private bool accordionResizeUsesOpticalHands;
     private string lastAppliedCommonPreferencesJson = "";
     private string lastAppliedProPreferencesJson = "";
     private string primaryGrabHandleUid = "";
     private string resizeGrabHandleUid = "";
     private Transform currentHudAnchor;
     private Transform lastGoodViewerTransform;
+    private Transform opticalWristPoseLeft;
+    private Transform opticalWristPoseRight;
+    private GameObject opticalWristPoseLeftObject;
+    private GameObject opticalWristPoseRightObject;
+    private SteamVR_Action_Skeleton opticalSkeletonLeftAction;
+    private SteamVR_Action_Skeleton opticalSkeletonRightAction;
+    private InputSkeletalActionData_t opticalSkeletonLeftActionData;
+    private InputSkeletalActionData_t opticalSkeletonRightActionData;
+    private int opticalWristPoseSampleFrame = -1;
+    private bool opticalWristPoseLeftValid;
+    private bool opticalWristPoseRightValid;
     private int availableAtomRevision;
     private int lastAvailableMarkerFrameSignature = int.MinValue;
 
@@ -579,6 +602,12 @@ public class FrameAngelRadar : MVRScript
     {
         FlushGlobalPreferencesIfDue(true);
         DestroySessionGrabHandles();
+        DestroyOwnedObject(opticalWristPoseLeftObject);
+        DestroyOwnedObject(opticalWristPoseRightObject);
+        opticalWristPoseLeftObject = null;
+        opticalWristPoseRightObject = null;
+        opticalWristPoseLeft = null;
+        opticalWristPoseRight = null;
         DestroyRuntimeVisuals();
     }
 
@@ -3771,7 +3800,10 @@ public class FrameAngelRadar : MVRScript
         if (!wristCompassRevealed && twistDegrees >= threshold)
         {
             wristCompassRevealed = true;
-            PulseGrabHandleHaptics(ResolveWristCompassHand(), 0.22f, 0.22f, 0.035f);
+            if (!IsOpticalWristTransform(wristAnchor, hand))
+            {
+                PulseGrabHandleHaptics(hand, 0.22f, 0.22f, 0.035f);
+            }
             SetStatus("Wrist compass revealed.");
         }
         else if (wristCompassRevealed && twistDegrees < releaseThreshold)
@@ -3787,13 +3819,253 @@ public class FrameAngelRadar : MVRScript
 
     private Transform ResolveHandOrControllerTransform(int hand)
     {
+        Transform opticalWristTransform;
+        if (TryResolveOpticalWristTransform(hand, out opticalWristTransform))
+        {
+            return opticalWristTransform;
+        }
+
+        Transform controllerTransform = ResolveMotionControllerTransform(hand);
+        if (controllerTransform != null)
+        {
+            return controllerTransform;
+        }
+
         Transform handTransform;
         if (TryResolveHandTransform(hand, out handTransform))
         {
             return handTransform;
         }
 
-        return ResolveMotionControllerTransform(hand);
+        return null;
+    }
+
+    private bool TryResolveOpticalWristTransform(int hand, out Transform wristTransform)
+    {
+        wristTransform = null;
+        SampleOpticalWristPosesIfNeeded();
+
+        Transform candidate = hand == GrabHandLeft
+            ? opticalWristPoseLeft
+            : opticalWristPoseRight;
+        bool valid = hand == GrabHandLeft
+            ? opticalWristPoseLeftValid
+            : opticalWristPoseRightValid;
+        if (!valid || candidate == null)
+        {
+            return false;
+        }
+
+        wristTransform = candidate;
+        return true;
+    }
+
+    private void SampleOpticalWristPosesIfNeeded()
+    {
+        int frame = Time.frameCount;
+        if (opticalWristPoseSampleFrame == frame)
+        {
+            return;
+        }
+
+        opticalWristPoseSampleFrame = frame;
+        opticalWristPoseLeftValid = false;
+        opticalWristPoseRightValid = false;
+
+        ResolveOpticalSkeletonActionsIfNeeded();
+        if (opticalSkeletonLeftAction != null)
+        {
+            opticalWristPoseLeftValid = TrySampleOpticalWristPose(
+                opticalSkeletonLeftAction,
+                GrabHandLeft,
+                ref opticalSkeletonLeftActionData,
+                ref opticalWristPoseLeftObject,
+                ref opticalWristPoseLeft);
+        }
+        if (opticalSkeletonRightAction != null)
+        {
+            opticalWristPoseRightValid = TrySampleOpticalWristPose(
+                opticalSkeletonRightAction,
+                GrabHandRight,
+                ref opticalSkeletonRightActionData,
+                ref opticalWristPoseRightObject,
+                ref opticalWristPoseRight);
+        }
+    }
+
+    private void ResolveOpticalSkeletonActionsIfNeeded()
+    {
+        if (opticalSkeletonLeftAction != null && opticalSkeletonRightAction != null)
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (now < nextOpticalSkeletonResolveTime)
+        {
+            return;
+        }
+
+        nextOpticalSkeletonResolveTime = now + OpticalSkeletonResolveIntervalSeconds;
+
+        try
+        {
+            opticalSkeletonLeftAction = SteamVR_Input.GetAction<SteamVR_Action_Skeleton>(
+                OpticalSkeletonActionSetName,
+                OpticalSkeletonLeftActionName,
+                false,
+                true);
+            opticalSkeletonRightAction = SteamVR_Input.GetAction<SteamVR_Action_Skeleton>(
+                OpticalSkeletonActionSetName,
+                OpticalSkeletonRightActionName,
+                false,
+                true);
+        }
+        catch
+        {
+            opticalSkeletonLeftAction = null;
+            opticalSkeletonRightAction = null;
+        }
+    }
+
+    private bool TrySampleOpticalWristPose(
+        SteamVR_Action_Skeleton action,
+        int hand,
+        ref InputSkeletalActionData_t actionData,
+        ref GameObject poseObject,
+        ref Transform poseTransform)
+    {
+        try
+        {
+            CVRInput input = OpenVR.Input;
+            if (input == null || action == null)
+            {
+                return false;
+            }
+
+            EVRInputError inputError = input.GetSkeletalActionData(
+                action.handle,
+                ref actionData,
+                OpticalSkeletalActionDataSize);
+            if (inputError != EVRInputError.None || !actionData.bActive)
+            {
+                return false;
+            }
+
+            SuperController sc = SuperController.singleton;
+            Camera centerCamera = sc != null ? sc.ViveCenterCamera : null;
+            Transform standingOrigin = centerCamera != null ? centerCamera.transform.parent : null;
+            if (standingOrigin == null)
+            {
+                return false;
+            }
+
+            Vector3[] bonePositions = action.GetBonePositions(false);
+            Quaternion[] boneRotations = action.GetBoneRotations(false);
+            if (bonePositions == null
+                || boneRotations == null
+                || bonePositions.Length <= OpticalSkeletonWristBoneIndex
+                || boneRotations.Length <= OpticalSkeletonWristBoneIndex)
+            {
+                return false;
+            }
+
+            Vector3 wristModelPosition;
+            Quaternion wristModelRotation;
+            if (action.skeletalTransformSpace == EVRSkeletalTransformSpace.Parent)
+            {
+                Vector3 rootPosition = bonePositions[OpticalSkeletonRootBoneIndex];
+                Quaternion rootRotation = boneRotations[OpticalSkeletonRootBoneIndex];
+                wristModelPosition = rootPosition
+                    + (rootRotation * bonePositions[OpticalSkeletonWristBoneIndex]);
+                wristModelRotation = rootRotation
+                    * boneRotations[OpticalSkeletonWristBoneIndex];
+            }
+            else if (action.skeletalTransformSpace == EVRSkeletalTransformSpace.Model)
+            {
+                wristModelPosition = bonePositions[OpticalSkeletonWristBoneIndex];
+                wristModelRotation = boneRotations[OpticalSkeletonWristBoneIndex];
+            }
+            else
+            {
+                return false;
+            }
+
+            Vector3 carrierLocalPosition = action.GetLocalPosition();
+            Quaternion carrierLocalRotation = action.GetLocalRotation();
+            if (!IsFiniteVector(carrierLocalPosition)
+                || !IsFiniteQuaternion(carrierLocalRotation)
+                || !IsFiniteVector(wristModelPosition)
+                || !IsFiniteQuaternion(wristModelRotation))
+            {
+                return false;
+            }
+
+            Vector3 carrierWorldPosition = standingOrigin.TransformPoint(carrierLocalPosition);
+            Quaternion carrierWorldRotation = standingOrigin.rotation * carrierLocalRotation;
+            Vector3 wristWorldPosition = carrierWorldPosition
+                + (carrierWorldRotation * wristModelPosition);
+            Quaternion wristWorldRotation = carrierWorldRotation * wristModelRotation;
+            if (!IsFiniteVector(wristWorldPosition) || !IsFiniteQuaternion(wristWorldRotation))
+            {
+                return false;
+            }
+
+            EnsureOpticalWristPoseTransform(hand, ref poseObject, ref poseTransform);
+            if (poseTransform == null)
+            {
+                return false;
+            }
+
+            poseTransform.position = wristWorldPosition;
+            poseTransform.rotation = wristWorldRotation;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void EnsureOpticalWristPoseTransform(
+        int hand,
+        ref GameObject poseObject,
+        ref Transform poseTransform)
+    {
+        if (poseObject != null && poseTransform != null)
+        {
+            return;
+        }
+
+        poseObject = new GameObject(
+            hand == GrabHandLeft
+                ? "FA Radar Optical Wrist Left"
+                : "FA Radar Optical Wrist Right");
+        poseObject.hideFlags = HideFlags.DontSave;
+        poseTransform = poseObject.transform;
+        poseTransform.SetParent(transform, false);
+    }
+
+    private static bool IsFiniteVector(Vector3 value)
+    {
+        return IsFiniteFloat(value.x) && IsFiniteFloat(value.y) && IsFiniteFloat(value.z);
+    }
+
+    private static bool IsFiniteQuaternion(Quaternion value)
+    {
+        return IsFiniteFloat(value.x)
+            && IsFiniteFloat(value.y)
+            && IsFiniteFloat(value.z)
+            && IsFiniteFloat(value.w)
+            && ((value.x * value.x)
+                + (value.y * value.y)
+                + (value.z * value.z)
+                + (value.w * value.w)) > 0.000001f;
+    }
+
+    private static bool IsFiniteFloat(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private bool TryResolveHandTransform(int hand, out Transform handTransform)
@@ -3808,13 +4080,13 @@ public class FrameAngelRadar : MVRScript
         {
             if (hand == GrabHandLeft)
             {
-                if (SuperController.singleton.leftHand != null)
+                if (IsActiveTransform(SuperController.singleton.leftHand))
                 {
                     handTransform = SuperController.singleton.leftHand;
                     return true;
                 }
 
-                if (SuperController.singleton.leftHandAlternate != null)
+                if (IsActiveTransform(SuperController.singleton.leftHandAlternate))
                 {
                     handTransform = SuperController.singleton.leftHandAlternate;
                     return true;
@@ -3823,13 +4095,13 @@ public class FrameAngelRadar : MVRScript
                 return false;
             }
 
-            if (SuperController.singleton.rightHand != null)
+            if (IsActiveTransform(SuperController.singleton.rightHand))
             {
                 handTransform = SuperController.singleton.rightHand;
                 return true;
             }
 
-            if (SuperController.singleton.rightHandAlternate != null)
+            if (IsActiveTransform(SuperController.singleton.rightHandAlternate))
             {
                 handTransform = SuperController.singleton.rightHandAlternate;
                 return true;
@@ -3840,6 +4112,11 @@ public class FrameAngelRadar : MVRScript
         }
 
         return false;
+    }
+
+    private static bool IsActiveTransform(Transform candidate)
+    {
+        return candidate != null && candidate.gameObject.activeInHierarchy;
     }
 
     private int ResolveWristCompassHand()
@@ -3903,6 +4180,14 @@ public class FrameAngelRadar : MVRScript
             return 0.0f;
         }
 
+        if (IsOpticalWristTransform(controller, hand))
+        {
+            Vector3 palmFacing = controller.rotation
+                * (hand == GrabHandLeft ? Vector3.right : Vector3.left);
+            float palmUpAmount = Mathf.Clamp(Vector3.Dot(palmFacing.normalized, Vector3.up), 0.0f, 1.0f);
+            return Mathf.Asin(palmUpAmount) * Mathf.Rad2Deg;
+        }
+
         Vector3 outward = viewer != null
             ? (hand == GrabHandLeft ? -viewer.right : viewer.right)
             : (hand == GrabHandLeft ? Vector3.left : Vector3.right);
@@ -3911,6 +4196,12 @@ public class FrameAngelRadar : MVRScript
         float outwardAmount = Mathf.Max(0.0f, Vector3.Dot(controllerUp, outward));
         float upAmount = Mathf.Max(0.0f, Vector3.Dot(controllerUp, Vector3.up));
         return Mathf.Atan2(outwardAmount, upAmount) * Mathf.Rad2Deg;
+    }
+
+    private bool IsOpticalWristTransform(Transform candidate, int hand)
+    {
+        return candidate != null
+            && candidate == (hand == GrabHandLeft ? opticalWristPoseLeft : opticalWristPoseRight);
     }
 
     private string ResolveAnchorMode()
@@ -6773,19 +7064,39 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateDirectGripGrab(Transform viewer, Vector3 radarCenter)
     {
-        DestroySessionGrabHandleAtoms();
-
         if (!moveGrabActive)
         {
             if (radarVisibilityAlpha <= 0.08f)
             {
+                DestroySessionGrabHandleAtoms();
                 EndDirectGripAccordionResize(false);
                 SetResizeGuideLineVisible(false);
                 return;
             }
 
+            EnsurePrimaryGrabHandleAtom(radarCenter);
+            if (primaryGrabHandleAtom != null && primaryGrabHandleAtom.mainController != null)
+            {
+                FreeControllerV3 primaryController = primaryGrabHandleAtom.mainController;
+                int grabbedHand;
+                if (TryResolveGrabbedHand(primaryController, out grabbedHand))
+                {
+                    StartMoveGrab(primaryController, grabbedHand);
+                }
+                else
+                {
+                    ConfigureGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+                    MoveGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
+                    TryStartFauxPrimaryGrab(radarCenter);
+                }
+            }
+            else
+            {
+                // Controller grip remains the graceful path while VaM creates the optional stock grab target.
+                TryStartFauxPrimaryGrab(radarCenter);
+            }
+
             bool accordionResizeVisible = UpdateDirectGripAccordionResize(viewer);
-            TryStartFauxPrimaryGrab(radarCenter);
             if (!accordionResizeVisible)
             {
                 SetResizeGuideLineVisible(false);
@@ -6795,7 +7106,23 @@ public class FrameAngelRadar : MVRScript
 
         if (!moveGrabUsesGripFallback)
         {
-            EndMoveGrab();
+            FreeControllerV3 primaryController = primaryGrabHandleAtom != null
+                ? primaryGrabHandleAtom.mainController
+                : null;
+            int grabbedHand;
+            bool primaryGrabbed = TryResolveGrabbedHand(primaryController, out grabbedHand);
+            if (!primaryGrabbed || grabbedHand != moveGrabHand)
+            {
+                EndMoveGrab();
+                return;
+            }
+
+            UpdateMoveGrab(viewer, primaryController);
+            bool stockMoveAccordionResizeVisible = UpdateDirectGripAccordionResize(viewer);
+            if (!stockMoveAccordionResizeVisible)
+            {
+                SetResizeGuideLineVisible(false);
+            }
             return;
         }
 
@@ -6828,10 +7155,17 @@ public class FrameAngelRadar : MVRScript
             Vector3.Distance(leftPosition, rightPosition));
         if (!accordionResizeActive)
         {
+            Transform leftSource = ResolveHandOrControllerTransform(GrabHandLeft);
+            Transform rightSource = ResolveHandOrControllerTransform(GrabHandRight);
             accordionResizeActive = true;
+            accordionResizeUsesOpticalHands = IsOpticalWristTransform(leftSource, GrabHandLeft)
+                || IsOpticalWristTransform(rightSource, GrabHandRight);
             accordionResizeStartScale = ResolveActivePlacementScale();
             accordionResizeStartDistance = currentDistance;
-            PulseGrabHandleHaptics(GrabHandUnknown, 0.30f, 0.22f, 0.035f);
+            if (!accordionResizeUsesOpticalHands)
+            {
+                PulseGrabHandleHaptics(GrabHandUnknown, 0.30f, 0.22f, 0.035f);
+            }
             SetStatus("Radar accordion scale active.");
         }
 
@@ -6878,11 +7212,15 @@ public class FrameAngelRadar : MVRScript
         {
             MarkGlobalPreferencesDirty();
             FlushGlobalPreferencesIfDue(true);
-            PulseGrabHandleHaptics(GrabHandUnknown, 0.24f, 0.18f, 0.03f);
+            if (!accordionResizeUsesOpticalHands)
+            {
+                PulseGrabHandleHaptics(GrabHandUnknown, 0.24f, 0.18f, 0.03f);
+            }
             SetStatus("Radar accordion scale applied.");
         }
 
         accordionResizeActive = false;
+        accordionResizeUsesOpticalHands = false;
         accordionResizeStartDistance = 0.0f;
         accordionResizeStartScale = 0.0f;
         SetResizeGuideLineVisible(false);
@@ -6913,18 +7251,12 @@ public class FrameAngelRadar : MVRScript
     {
         primaryGrabHandleUid = BuildGrabHandleUid(GrabHandlePrimarySuffix);
         Atom resolvedAtom = ResolveGrabHandleAtom(primaryGrabHandleUid, primaryGrabHandleAtom);
-        if (resolvedAtom != primaryGrabHandleAtom)
-        {
-            primaryGrabHandleFollowArmed = false;
-        }
-
         primaryGrabHandleAtom = resolvedAtom;
         if (primaryGrabHandleAtom != null || primaryGrabHandleCreatePending)
         {
             return;
         }
 
-        primaryGrabHandleFollowArmed = false;
         primaryGrabHandleCreatePending = true;
         StartCoroutine(CreateGrabHandleAtomCoroutine(primaryGrabHandleUid, true, worldPosition));
     }
@@ -6963,7 +7295,6 @@ public class FrameAngelRadar : MVRScript
             MoveGrabHandleAtom(atom, worldPosition);
             if (primary)
             {
-                primaryGrabHandleFollowArmed = false;
                 primaryGrabHandleAtom = atom;
             }
             else
@@ -7058,12 +7389,6 @@ public class FrameAngelRadar : MVRScript
 
         int unusedHand;
         TryResolveGrabbedHand(controller, out unusedHand);
-    }
-
-    private void ArmPrimaryGrabHandleFollow(Vector3 radarCenter)
-    {
-        MoveGrabHandleAtom(primaryGrabHandleAtom, radarCenter);
-        primaryGrabHandleFollowArmed = true;
     }
 
     private void MoveGrabHandleAtom(Atom atom, Vector3 worldPosition)
@@ -7161,7 +7486,10 @@ public class FrameAngelRadar : MVRScript
         moveStartWristOffset = GetWristOffset();
         moveStartStaticPosition = GetStaticWorldPosition();
         haveSmoothedHudPosition = false;
-        PulseGrabHandleHaptics(hand, 0.35f, 0.28f, 0.045f);
+        if (gripFallback)
+        {
+            PulseGrabHandleHaptics(hand, 0.35f, 0.28f, 0.045f);
+        }
         SetStatus("Radar grab move active.");
     }
 
@@ -7202,6 +7530,7 @@ public class FrameAngelRadar : MVRScript
     private void EndMoveGrab()
     {
         bool startedThrowPin = false;
+        bool useControllerHaptics = moveGrabUsesGripFallback;
         if (moveGrabActive)
         {
 #if FA_RADAR_PRO
@@ -7212,7 +7541,10 @@ public class FrameAngelRadar : MVRScript
             ApplyMoveGrabWorldCenterToPreferences(ResolveViewerTransform());
             MarkGlobalPreferencesDirty();
             FlushGlobalPreferencesIfDue(true);
-            PulseGrabHandleHaptics(moveGrabHand, 0.22f, 0.20f, 0.035f);
+            if (useControllerHaptics)
+            {
+                PulseGrabHandleHaptics(moveGrabHand, 0.22f, 0.20f, 0.035f);
+            }
 #if FA_RADAR_PRO
             }
 #endif
@@ -7284,6 +7616,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         grabThrowActive = true;
+        grabThrowUsesControllerHaptics = moveGrabUsesGripFallback;
         grabThrowPosition = moveGrabCurrentRadarWorldCenter;
         grabThrowStartPosition = grabThrowPosition;
         grabThrowVelocity = launchVelocity;
@@ -7307,7 +7640,10 @@ public class FrameAngelRadar : MVRScript
         moveGrabWorldOverrideActive = true;
         haveSmoothedHudPosition = false;
         MarkGlobalPreferencesDirty();
-        PulseGrabHandleHaptics(moveGrabHand, 0.38f, 0.26f, 0.05f);
+        if (grabThrowUsesControllerHaptics)
+        {
+            PulseGrabHandleHaptics(moveGrabHand, 0.38f, 0.26f, 0.05f);
+        }
         SetStatus("Radar throw pin launched.");
         return true;
     }
@@ -7381,7 +7717,11 @@ public class FrameAngelRadar : MVRScript
         SetBoolNoCallback(grabThrowPinnedField, true);
         MarkGlobalPreferencesDirty();
         FlushGlobalPreferencesIfDue(true);
-        PulseGrabHandleHaptics(GrabHandUnknown, hitSurface ? 0.35f : 0.22f, 0.18f, 0.04f);
+        if (grabThrowUsesControllerHaptics)
+        {
+            PulseGrabHandleHaptics(GrabHandUnknown, hitSurface ? 0.35f : 0.22f, 0.18f, 0.04f);
+        }
+        grabThrowUsesControllerHaptics = false;
         SetStatus(hitSurface ? "Radar throw pinned to surface." : "Radar throw pinned in world.");
     }
 
@@ -7397,6 +7737,7 @@ public class FrameAngelRadar : MVRScript
             0.05f,
             ResolveMaxPlacementScale());
         grabThrowActive = false;
+        grabThrowUsesControllerHaptics = false;
         SetBoolNoCallback(grabThrowPinnedField, false);
         SetActiveDisplayPlacementNoCallback(DesktopPlacementAttachedToUi);
         SetRadarModeNoCallback(RadarModeHud);
@@ -7596,7 +7937,10 @@ public class FrameAngelRadar : MVRScript
     {
         MarkGlobalPreferencesDirty();
         FlushGlobalPreferencesIfDue(true);
-        PulseGrabHandleHaptics(hand, 0.42f, 0.32f, 0.05f);
+        if (moveGrabUsesGripFallback)
+        {
+            PulseGrabHandleHaptics(hand, 0.42f, 0.32f, 0.05f);
+        }
         moveGrabActive = false;
         resizeGrabActive = false;
         moveGrabUsesGripFallback = false;
@@ -7614,7 +7958,10 @@ public class FrameAngelRadar : MVRScript
     {
         MarkGlobalPreferencesDirty();
         FlushGlobalPreferencesIfDue(true);
-        PulseGrabHandleHaptics(moveGrabHand, 0.42f, 0.32f, 0.05f);
+        if (moveGrabUsesGripFallback)
+        {
+            PulseGrabHandleHaptics(moveGrabHand, 0.42f, 0.32f, 0.05f);
+        }
         moveGrabActive = false;
         resizeGrabActive = false;
         moveGrabUsesGripFallback = false;
@@ -7626,66 +7973,6 @@ public class FrameAngelRadar : MVRScript
         DestroyResizeGrabHandleAtom();
         EndDirectGripAccordionResize(false);
         SetStatus("Radar moved to HUD.");
-    }
-
-    private bool TryApplyPrimaryHandleDisplacement(Transform viewer, Vector3 radarCenter, FreeControllerV3 primaryController)
-    {
-        if (primaryController == null || moveGrabActive)
-        {
-            return false;
-        }
-
-        Vector3 handlePosition = GetControllerWorldPosition(primaryController);
-        Vector3 handleDelta = handlePosition - radarCenter;
-        float epsilon = ResolveGrabHandleMovementEpsilonMeters();
-        if (handleDelta.sqrMagnitude <= epsilon * epsilon)
-        {
-            return false;
-        }
-
-        // Handle Displacement Follow: VaM may move the grab handle without exposing a plugin-visible grab state.
-        ApplyHandleWorldDisplacement(viewer, handleDelta);
-        MarkGlobalPreferencesDirty();
-        return true;
-    }
-
-    private void ApplyHandleWorldDisplacement(Transform viewer, Vector3 worldDelta)
-    {
-        if (IsWristCompassModeActive())
-        {
-            Transform wristAnchor = ResolveWristCompassAnchorTransform();
-            Vector3 wristLocalDelta = wristAnchor != null ? wristAnchor.InverseTransformVector(worldDelta) : worldDelta;
-            SetWristOffsetNoCallback(GetWristOffset() + wristLocalDelta);
-            haveSmoothedHudPosition = false;
-            return;
-        }
-
-        string anchorMode = ResolveAnchorMode();
-        if (string.Equals(anchorMode, AnchorModeWorldStatic, StringComparison.Ordinal))
-        {
-            SetStaticWorldPositionNoCallback(GetStaticWorldPosition() + worldDelta);
-            haveSmoothedHudPosition = false;
-            return;
-        }
-
-        Transform reference = viewer;
-        if (!string.Equals(anchorMode, AnchorModeHud, StringComparison.Ordinal))
-        {
-            Transform anchor = ResolveRadarAnchorTransform(anchorMode);
-            if (anchor != null)
-            {
-                reference = anchor;
-            }
-        }
-
-        Vector3 localDelta = reference != null ? reference.InverseTransformVector(worldDelta) : worldDelta;
-        SetHudOffsetNoCallback(GetHudOffset() + localDelta);
-        haveSmoothedHudPosition = false;
-    }
-
-    private float ResolveGrabHandleMovementEpsilonMeters()
-    {
-        return 0.002f;
     }
 
     private void UpdateResizeGrabHandle(Transform viewer, FreeControllerV3 primaryController)
@@ -8013,7 +8300,8 @@ public class FrameAngelRadar : MVRScript
         try
         {
             Camera controllerCamera = hand == GrabHandLeft ? sc.leftControllerCamera : sc.rightControllerCamera;
-            return controllerCamera != null ? controllerCamera.transform : null;
+            Transform controllerTransform = controllerCamera != null ? controllerCamera.transform : null;
+            return IsActiveTransform(controllerTransform) ? controllerTransform : null;
         }
         catch
         {
@@ -8251,6 +8539,7 @@ public class FrameAngelRadar : MVRScript
         moveGrabActive = false;
         resizeGrabActive = false;
         accordionResizeActive = false;
+        accordionResizeUsesOpticalHands = false;
         resizeHandleDismissedUntilMoveRelease = false;
         moveGrabWorldOverrideActive = false;
         moveGrabHand = GrabHandUnknown;
@@ -8266,7 +8555,6 @@ public class FrameAngelRadar : MVRScript
         DestroyGrabHandleAtom(ref primaryGrabHandleAtom, primaryGrabHandleUid);
         primaryGrabHandleUid = "";
         primaryGrabHandleCreatePending = false;
-        primaryGrabHandleFollowArmed = false;
         DestroyResizeGrabHandleAtom();
     }
 

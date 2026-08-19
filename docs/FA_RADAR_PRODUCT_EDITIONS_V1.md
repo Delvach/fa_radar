@@ -7,11 +7,11 @@ Updated: 2026-08-03
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.50`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.51`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.50.dll`
-- `fa_radar.pro.0.1.50.dll`
+- `fa_radar.free.0.1.51.dll`
+- `fa_radar.pro.0.1.51.dll`
 
 The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
 branding remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.50 intentionally keeps Free sparse: desktop
+buttons, and text fields, but 0.1.51 intentionally keeps Free sparse: desktop
 placement, VR placement, scale, HUD offsets, and static desktop offsets.
 Free's grab/wrist behavior remains available through the default runtime path
 and saved preferences without exposing prototype tuning controls.
@@ -90,9 +90,10 @@ The `0.1.49` label-callout/UI pass keeps those generated label meshes but makes
 labels selected-only by default, lowers default scale/limit, moves tags to
 outside-shell callouts with pooled leader lines, and moves primary category
 checkboxes above advanced label/overlay tuning in the native VaM panel.
-The `0.1.50` creator-host pass fixes mirrored procedural label facing, thins
-height-stem cross sections, ships both Empty and `CustomUnityAsset` host presets,
-and adds a default-off atom-attached `Room Compass` 1:1 world-overlay mode.
+The `0.1.51` hand-input pass preserves the corrected creator-host visuals and
+Room Compass behavior, reads only current active SteamVR wrist skeleton data
+for optical wrist reveal, falls back cleanly to controller wrist placement,
+and restores an invisible VaM full-grab target for optical HoldGrab movement.
 
 ## Free Edition
 
@@ -100,8 +101,9 @@ Free is the radar.
 
 - same generated HUD radar foundation
 - free movement, scale, and placement controls
-- session-plugin direct grip movement with OVR haptics; grip near the radar,
-  move the controller, and release to apply the HUD/static/wrist placement state
+- session-plugin direct grip movement: controller grip keeps its proximity and
+  OVR-haptic path, while optical pinch/HoldGrab moves the same placement state
+  through an invisible VaM `FreeControllerV3` target and stock full-grab result
 - two-hand outward-twist accordion scaling for HUD and wrist modes
 - wrist/HUD placement behavior and handoff logic remain runtime features, but
   Free does not expose prototype wrist tuning controls in the plugin UI
@@ -192,7 +194,7 @@ Rules:
 Current build helpers stage candidate `.var` packages:
 
 - `FrameAngelDev.Radar.1.var`
-- `fa_radar.pro.0.1.50.var`
+- `fa_radar.pro.0.1.51.var`
 
 The Pro candidate package includes both creator presets under
 `Custom/Atom/Empty` and `Custom/Atom/CustomUnityAsset`; Free does not ship
