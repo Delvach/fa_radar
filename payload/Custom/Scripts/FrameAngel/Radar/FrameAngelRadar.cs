@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Text;
 using MVR.FileManagementSecure;
 using UnityEngine;
@@ -87,8 +86,6 @@ public class FrameAngelRadar : MVRScript
     private const float GrabHapticCooldownSeconds = 0.08f;
     private const float GripGrabPressThreshold = 0.62f;
     private const float GripGrabReleaseThreshold = 0.34f;
-    private static readonly uint OpticalSkeletalActionDataSize =
-        (uint)Marshal.SizeOf(typeof(InputSkeletalActionData_t));
 #if FA_RADAR_PRO
     private const float GrabThrowMinimumReleaseVelocity = 0.18f;
     private const float GrabThrowStopVelocity = 0.04f;
@@ -568,8 +565,6 @@ public class FrameAngelRadar : MVRScript
     private GameObject opticalWristPoseRightObject;
     private SteamVR_Action_Skeleton opticalSkeletonLeftAction;
     private SteamVR_Action_Skeleton opticalSkeletonRightAction;
-    private InputSkeletalActionData_t opticalSkeletonLeftActionData;
-    private InputSkeletalActionData_t opticalSkeletonRightActionData;
     private int opticalWristPoseSampleFrame = -1;
     private bool opticalWristPoseLeftValid;
     private bool opticalWristPoseRightValid;
@@ -3878,7 +3873,6 @@ public class FrameAngelRadar : MVRScript
             opticalWristPoseLeftValid = TrySampleOpticalWristPose(
                 opticalSkeletonLeftAction,
                 GrabHandLeft,
-                ref opticalSkeletonLeftActionData,
                 ref opticalWristPoseLeftObject,
                 ref opticalWristPoseLeft);
         }
@@ -3887,7 +3881,6 @@ public class FrameAngelRadar : MVRScript
             opticalWristPoseRightValid = TrySampleOpticalWristPose(
                 opticalSkeletonRightAction,
                 GrabHandRight,
-                ref opticalSkeletonRightActionData,
                 ref opticalWristPoseRightObject,
                 ref opticalWristPoseRight);
         }
@@ -3931,23 +3924,14 @@ public class FrameAngelRadar : MVRScript
     private bool TrySampleOpticalWristPose(
         SteamVR_Action_Skeleton action,
         int hand,
-        ref InputSkeletalActionData_t actionData,
         ref GameObject poseObject,
         ref Transform poseTransform)
     {
         try
         {
-            CVRInput input = OpenVR.Input;
-            if (input == null || action == null)
-            {
-                return false;
-            }
-
-            EVRInputError inputError = input.GetSkeletalActionData(
-                action.handle,
-                ref actionData,
-                OpticalSkeletalActionDataSize);
-            if (inputError != EVRInputError.None || !actionData.bActive)
+            // SteamVR already owns and updates this shared action. GetActive reads its
+            // current source state without another native call or input subscription.
+            if (action == null || !action.GetActive())
             {
                 return false;
             }

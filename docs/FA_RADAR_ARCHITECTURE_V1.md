@@ -215,7 +215,8 @@ active.
 
 In `HUD`, the existing HUD/static/atom anchor behavior is unchanged. In wrist
 modes, Radar first performs a read-only lookup of VaM's shared SteamVR skeleton
-action and requires the current `InputSkeletalActionData_t.bActive` bit. It
+action and requires its current `GetActive()` source state, which SteamVR owns
+from the skeletal action's active data. It
 reconstructs only wrist joint 1 into a Radar-owned transform. Any missing action,
 inactive source, unsupported transform space, invalid pose, or unavailable
 OpenVR frame fails closed to the existing motion-controller transform; the
