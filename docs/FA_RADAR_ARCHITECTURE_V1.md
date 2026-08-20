@@ -214,26 +214,22 @@ and wrist modes are ignored while the creator-anchor preference profile is
 active.
 
 In `HUD`, the existing HUD/static/atom anchor behavior is unchanged. In wrist
-modes, Radar first performs a read-only lookup of VaM's shared SteamVR skeleton
-action and requires its current `GetActive()` source state, which SteamVR owns
-from the skeletal action's active data. It
-reconstructs only wrist joint 1 into a Radar-owned transform. Any missing action,
-inactive source, unsupported transform space, invalid pose, or unavailable
-OpenVR frame fails closed to the existing motion-controller transform; the
-hand/arm plugin is optional and no hand state is written.
+modes, Radar first reads the current active VaM motion-controller transform,
+then an active VaM hand/alternate-hand transform. If neither public VaM source
+exists, the wrist mode fails closed. Radar does not reference `Valve.VR` or
+`SteamVR.dll`; a hand-specific exact wrist remains an integration seam for the
+hand plugin to publish through an ordinary VaM-safe transform.
 
-The HUD root position uses that selected optical/controller transform plus the
+The HUD root position uses that selected hand/controller transform plus the
 wrist-relative `Wrist Offset X/Y/Z` and `Wrist Scale` preferences. Wrist mode
 does not inherit the live wrist rotation for display; rotation stays view-facing
 while the wrist transform supplies only position and reveal orientation.
 
-`wrist-left` and `wrist-right` start hidden. An optical wrist reveals from its
-handed palm-facing axis as the palm turns upward past `Wrist Twist Degrees`; a
-controller retains the prior outward-roll calculation. Both use the existing
-hysteresis band. Optical reveal is read-only and does not pulse controller
-haptics. The two `always-on` wrist modes stay visible whenever the selected
-optical/controller transform exists. Show/hide is a short alpha fade, and
-hand-off placement uses a short reveal grace.
+`wrist-left` and `wrist-right` start hidden and reveal from the selected public
+VaM transform's outward-roll calculation, with the existing hysteresis band.
+The two `always-on` wrist modes stay visible whenever the selected transform
+exists. Show/hide is a short alpha fade, and hand-off placement uses a short
+reveal grace.
 
 While in wrist mode, the opposing controller can grip the visible radar and
 adjust the current wrist-relative offset. If the drag carries the radar closer

@@ -51,9 +51,9 @@ The current slice is compiled C# only:
   ownership; no visible grab handles are drawn
 - optional `Radar Mode` values: `HUD`, `wrist-left`, `wrist-right`,
   `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
-  modes start hidden until the wrist-twist reveal is active; a current active
-  SteamVR skeleton wrist is read without changing hand/input state, and any
-  missing/inactive/invalid optical source falls back to the normal controller
+  modes start hidden until the wrist-twist reveal is active; Radar reads only
+  active VaM controller/hand transforms and fails closed when neither exists,
+  without taking a hard dependency on VaM's prohibited SteamVR API surface
 - wrist modes use their own wrist-relative offset/scale prefs and can hand off
   to the opposing controller with a grip drag across the body
 - Pro creator presets for both movable host types:

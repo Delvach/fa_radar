@@ -150,8 +150,7 @@ if (-not $SkipCompile.IsPresent) {
         (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.CoreModule.dll"),
         (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.PhysicsModule.dll"),
         (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.UI.dll"),
-        (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.UIModule.dll"),
-        (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "SteamVR.dll")
+        (Get-RequiredReference -ManagedDir $resolvedVamManagedDir -Name "UnityEngine.UIModule.dll")
     )
 }
 

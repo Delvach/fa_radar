@@ -4,8 +4,8 @@
   "version": "0.1.51",
   "channel": "dev",
   "branch": "codex/0.1.51-hand-wrist-grab",
-  "status": "optical-wrist-holdgrab",
-  "versionNote": "0.1.51 reads the existing SteamVR wrist skeleton non-mutatingly when active, falls back to normal controller wrist placement when unavailable, and restores an invisible VaM FreeController grab target so optical HoldGrab can reposition the session Radar through VaM's stock full-grab ownership.",
+  "status": "vam-safe-wrist-holdgrab",
+  "versionNote": "0.1.51 uses only active VaM controller/hand transforms for wrist placement, fails closed when neither is available, and restores an invisible VaM FreeController grab target so optical HoldGrab can reposition the session Radar through VaM's stock full-grab ownership without a hard SteamVR assembly dependency.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
@@ -90,5 +90,5 @@
     "profile": "vam_compat",
     "pluginKey": "fa_radar"
   },
-  "updatedAt": "2026-08-19T14:10:00-06:00"
+  "updatedAt": "2026-08-20T13:05:00-06:00"
 }

@@ -7,7 +7,6 @@ using MVR.FileManagementSecure;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
-using Valve.VR;
 
 public class FrameAngelRadar : MVRScript
 {
@@ -64,11 +63,6 @@ public class FrameAngelRadar : MVRScript
     private const string RadarModeWristRight = "wrist-right";
     private const string RadarModeWristLeftAlwaysOn = "wrist-left-always-on";
     private const string RadarModeWristRightAlwaysOn = "wrist-right-always-on";
-    private const string OpticalSkeletonActionSetName = "default";
-    private const string OpticalSkeletonLeftActionName = "SkeletonLeftHand";
-    private const string OpticalSkeletonRightActionName = "SkeletonRightHand";
-    private const int OpticalSkeletonRootBoneIndex = 0;
-    private const int OpticalSkeletonWristBoneIndex = 1;
     private const string GrabHandlePrimarySuffix = "primary";
     private const string GrabHandleResizeSuffix = "resize";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
@@ -76,7 +70,6 @@ public class FrameAngelRadar : MVRScript
     private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
     private const float RadarVisibilityFadeSeconds = 0.18f;
     private const float WristRevealGraceSeconds = 0.55f;
-    private const float OpticalSkeletonResolveIntervalSeconds = 0.5f;
     private const float WristHandOffDistanceMeters = 0.61f;
     private const float WristHandOffMinimumTravelMeters = 0.30f;
     private const float HudHandOffDistanceMeters = 0.38f;
@@ -526,7 +519,6 @@ public class FrameAngelRadar : MVRScript
     private float nextGlobalPreferencesFlushTime;
     private float nextGlobalPreferencesPollTime;
     private float nextRecorderVisibilityPollTime;
-    private float nextOpticalSkeletonResolveTime;
     private float radarVisibilityAlpha = 1.0f;
     private float radarVisibilityTargetAlpha = 1.0f;
     private float resizeStartScale;
@@ -552,22 +544,13 @@ public class FrameAngelRadar : MVRScript
     private int resizeGrabHand = GrabHandUnknown;
     private bool moveGrabWorldOverrideActive;
     private bool accordionResizeActive;
-    private bool accordionResizeUsesOpticalHands;
+    private bool accordionResizeUsesHandFallback;
     private string lastAppliedCommonPreferencesJson = "";
     private string lastAppliedProPreferencesJson = "";
     private string primaryGrabHandleUid = "";
     private string resizeGrabHandleUid = "";
     private Transform currentHudAnchor;
     private Transform lastGoodViewerTransform;
-    private Transform opticalWristPoseLeft;
-    private Transform opticalWristPoseRight;
-    private GameObject opticalWristPoseLeftObject;
-    private GameObject opticalWristPoseRightObject;
-    private SteamVR_Action_Skeleton opticalSkeletonLeftAction;
-    private SteamVR_Action_Skeleton opticalSkeletonRightAction;
-    private int opticalWristPoseSampleFrame = -1;
-    private bool opticalWristPoseLeftValid;
-    private bool opticalWristPoseRightValid;
     private int availableAtomRevision;
     private int lastAvailableMarkerFrameSignature = int.MinValue;
 
@@ -597,12 +580,6 @@ public class FrameAngelRadar : MVRScript
     {
         FlushGlobalPreferencesIfDue(true);
         DestroySessionGrabHandles();
-        DestroyOwnedObject(opticalWristPoseLeftObject);
-        DestroyOwnedObject(opticalWristPoseRightObject);
-        opticalWristPoseLeftObject = null;
-        opticalWristPoseRightObject = null;
-        opticalWristPoseLeft = null;
-        opticalWristPoseRight = null;
         DestroyRuntimeVisuals();
     }
 
@@ -3795,7 +3772,7 @@ public class FrameAngelRadar : MVRScript
         if (!wristCompassRevealed && twistDegrees >= threshold)
         {
             wristCompassRevealed = true;
-            if (!IsOpticalWristTransform(wristAnchor, hand))
+            if (IsMotionControllerTransform(wristAnchor, hand))
             {
                 PulseGrabHandleHaptics(hand, 0.22f, 0.22f, 0.035f);
             }
@@ -3814,12 +3791,6 @@ public class FrameAngelRadar : MVRScript
 
     private Transform ResolveHandOrControllerTransform(int hand)
     {
-        Transform opticalWristTransform;
-        if (TryResolveOpticalWristTransform(hand, out opticalWristTransform))
-        {
-            return opticalWristTransform;
-        }
-
         Transform controllerTransform = ResolveMotionControllerTransform(hand);
         if (controllerTransform != null)
         {
@@ -3833,223 +3804,6 @@ public class FrameAngelRadar : MVRScript
         }
 
         return null;
-    }
-
-    private bool TryResolveOpticalWristTransform(int hand, out Transform wristTransform)
-    {
-        wristTransform = null;
-        SampleOpticalWristPosesIfNeeded();
-
-        Transform candidate = hand == GrabHandLeft
-            ? opticalWristPoseLeft
-            : opticalWristPoseRight;
-        bool valid = hand == GrabHandLeft
-            ? opticalWristPoseLeftValid
-            : opticalWristPoseRightValid;
-        if (!valid || candidate == null)
-        {
-            return false;
-        }
-
-        wristTransform = candidate;
-        return true;
-    }
-
-    private void SampleOpticalWristPosesIfNeeded()
-    {
-        int frame = Time.frameCount;
-        if (opticalWristPoseSampleFrame == frame)
-        {
-            return;
-        }
-
-        opticalWristPoseSampleFrame = frame;
-        opticalWristPoseLeftValid = false;
-        opticalWristPoseRightValid = false;
-
-        ResolveOpticalSkeletonActionsIfNeeded();
-        if (opticalSkeletonLeftAction != null)
-        {
-            opticalWristPoseLeftValid = TrySampleOpticalWristPose(
-                opticalSkeletonLeftAction,
-                GrabHandLeft,
-                ref opticalWristPoseLeftObject,
-                ref opticalWristPoseLeft);
-        }
-        if (opticalSkeletonRightAction != null)
-        {
-            opticalWristPoseRightValid = TrySampleOpticalWristPose(
-                opticalSkeletonRightAction,
-                GrabHandRight,
-                ref opticalWristPoseRightObject,
-                ref opticalWristPoseRight);
-        }
-    }
-
-    private void ResolveOpticalSkeletonActionsIfNeeded()
-    {
-        if (opticalSkeletonLeftAction != null && opticalSkeletonRightAction != null)
-        {
-            return;
-        }
-
-        float now = Time.unscaledTime;
-        if (now < nextOpticalSkeletonResolveTime)
-        {
-            return;
-        }
-
-        nextOpticalSkeletonResolveTime = now + OpticalSkeletonResolveIntervalSeconds;
-
-        try
-        {
-            opticalSkeletonLeftAction = SteamVR_Input.GetAction<SteamVR_Action_Skeleton>(
-                OpticalSkeletonActionSetName,
-                OpticalSkeletonLeftActionName,
-                false,
-                true);
-            opticalSkeletonRightAction = SteamVR_Input.GetAction<SteamVR_Action_Skeleton>(
-                OpticalSkeletonActionSetName,
-                OpticalSkeletonRightActionName,
-                false,
-                true);
-        }
-        catch
-        {
-            opticalSkeletonLeftAction = null;
-            opticalSkeletonRightAction = null;
-        }
-    }
-
-    private bool TrySampleOpticalWristPose(
-        SteamVR_Action_Skeleton action,
-        int hand,
-        ref GameObject poseObject,
-        ref Transform poseTransform)
-    {
-        try
-        {
-            // SteamVR already owns and updates this shared action. GetActive reads its
-            // current source state without another native call or input subscription.
-            if (action == null || !action.GetActive())
-            {
-                return false;
-            }
-
-            SuperController sc = SuperController.singleton;
-            Camera centerCamera = sc != null ? sc.ViveCenterCamera : null;
-            Transform standingOrigin = centerCamera != null ? centerCamera.transform.parent : null;
-            if (standingOrigin == null)
-            {
-                return false;
-            }
-
-            Vector3[] bonePositions = action.GetBonePositions(false);
-            Quaternion[] boneRotations = action.GetBoneRotations(false);
-            if (bonePositions == null
-                || boneRotations == null
-                || bonePositions.Length <= OpticalSkeletonWristBoneIndex
-                || boneRotations.Length <= OpticalSkeletonWristBoneIndex)
-            {
-                return false;
-            }
-
-            Vector3 wristModelPosition;
-            Quaternion wristModelRotation;
-            if (action.skeletalTransformSpace == EVRSkeletalTransformSpace.Parent)
-            {
-                Vector3 rootPosition = bonePositions[OpticalSkeletonRootBoneIndex];
-                Quaternion rootRotation = boneRotations[OpticalSkeletonRootBoneIndex];
-                wristModelPosition = rootPosition
-                    + (rootRotation * bonePositions[OpticalSkeletonWristBoneIndex]);
-                wristModelRotation = rootRotation
-                    * boneRotations[OpticalSkeletonWristBoneIndex];
-            }
-            else if (action.skeletalTransformSpace == EVRSkeletalTransformSpace.Model)
-            {
-                wristModelPosition = bonePositions[OpticalSkeletonWristBoneIndex];
-                wristModelRotation = boneRotations[OpticalSkeletonWristBoneIndex];
-            }
-            else
-            {
-                return false;
-            }
-
-            Vector3 carrierLocalPosition = action.GetLocalPosition();
-            Quaternion carrierLocalRotation = action.GetLocalRotation();
-            if (!IsFiniteVector(carrierLocalPosition)
-                || !IsFiniteQuaternion(carrierLocalRotation)
-                || !IsFiniteVector(wristModelPosition)
-                || !IsFiniteQuaternion(wristModelRotation))
-            {
-                return false;
-            }
-
-            Vector3 carrierWorldPosition = standingOrigin.TransformPoint(carrierLocalPosition);
-            Quaternion carrierWorldRotation = standingOrigin.rotation * carrierLocalRotation;
-            Vector3 wristWorldPosition = carrierWorldPosition
-                + (carrierWorldRotation * wristModelPosition);
-            Quaternion wristWorldRotation = carrierWorldRotation * wristModelRotation;
-            if (!IsFiniteVector(wristWorldPosition) || !IsFiniteQuaternion(wristWorldRotation))
-            {
-                return false;
-            }
-
-            EnsureOpticalWristPoseTransform(hand, ref poseObject, ref poseTransform);
-            if (poseTransform == null)
-            {
-                return false;
-            }
-
-            poseTransform.position = wristWorldPosition;
-            poseTransform.rotation = wristWorldRotation;
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private void EnsureOpticalWristPoseTransform(
-        int hand,
-        ref GameObject poseObject,
-        ref Transform poseTransform)
-    {
-        if (poseObject != null && poseTransform != null)
-        {
-            return;
-        }
-
-        poseObject = new GameObject(
-            hand == GrabHandLeft
-                ? "FA Radar Optical Wrist Left"
-                : "FA Radar Optical Wrist Right");
-        poseObject.hideFlags = HideFlags.DontSave;
-        poseTransform = poseObject.transform;
-        poseTransform.SetParent(transform, false);
-    }
-
-    private static bool IsFiniteVector(Vector3 value)
-    {
-        return IsFiniteFloat(value.x) && IsFiniteFloat(value.y) && IsFiniteFloat(value.z);
-    }
-
-    private static bool IsFiniteQuaternion(Quaternion value)
-    {
-        return IsFiniteFloat(value.x)
-            && IsFiniteFloat(value.y)
-            && IsFiniteFloat(value.z)
-            && IsFiniteFloat(value.w)
-            && ((value.x * value.x)
-                + (value.y * value.y)
-                + (value.z * value.z)
-                + (value.w * value.w)) > 0.000001f;
-    }
-
-    private static bool IsFiniteFloat(float value)
-    {
-        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private bool TryResolveHandTransform(int hand, out Transform handTransform)
@@ -4101,6 +3855,12 @@ public class FrameAngelRadar : MVRScript
     private static bool IsActiveTransform(Transform candidate)
     {
         return candidate != null && candidate.gameObject.activeInHierarchy;
+    }
+
+    private bool IsMotionControllerTransform(Transform candidate, int hand)
+    {
+        Transform controller = ResolveMotionControllerTransform(hand);
+        return candidate != null && controller != null && candidate == controller;
     }
 
     private int ResolveWristCompassHand()
@@ -4164,14 +3924,6 @@ public class FrameAngelRadar : MVRScript
             return 0.0f;
         }
 
-        if (IsOpticalWristTransform(controller, hand))
-        {
-            Vector3 palmFacing = controller.rotation
-                * (hand == GrabHandLeft ? Vector3.right : Vector3.left);
-            float palmUpAmount = Mathf.Clamp(Vector3.Dot(palmFacing.normalized, Vector3.up), 0.0f, 1.0f);
-            return Mathf.Asin(palmUpAmount) * Mathf.Rad2Deg;
-        }
-
         Vector3 outward = viewer != null
             ? (hand == GrabHandLeft ? -viewer.right : viewer.right)
             : (hand == GrabHandLeft ? Vector3.left : Vector3.right);
@@ -4180,12 +3932,6 @@ public class FrameAngelRadar : MVRScript
         float outwardAmount = Mathf.Max(0.0f, Vector3.Dot(controllerUp, outward));
         float upAmount = Mathf.Max(0.0f, Vector3.Dot(controllerUp, Vector3.up));
         return Mathf.Atan2(outwardAmount, upAmount) * Mathf.Rad2Deg;
-    }
-
-    private bool IsOpticalWristTransform(Transform candidate, int hand)
-    {
-        return candidate != null
-            && candidate == (hand == GrabHandLeft ? opticalWristPoseLeft : opticalWristPoseRight);
     }
 
     private string ResolveAnchorMode()
@@ -7142,11 +6888,11 @@ public class FrameAngelRadar : MVRScript
             Transform leftSource = ResolveHandOrControllerTransform(GrabHandLeft);
             Transform rightSource = ResolveHandOrControllerTransform(GrabHandRight);
             accordionResizeActive = true;
-            accordionResizeUsesOpticalHands = IsOpticalWristTransform(leftSource, GrabHandLeft)
-                || IsOpticalWristTransform(rightSource, GrabHandRight);
+            accordionResizeUsesHandFallback = !IsMotionControllerTransform(leftSource, GrabHandLeft)
+                || !IsMotionControllerTransform(rightSource, GrabHandRight);
             accordionResizeStartScale = ResolveActivePlacementScale();
             accordionResizeStartDistance = currentDistance;
-            if (!accordionResizeUsesOpticalHands)
+            if (!accordionResizeUsesHandFallback)
             {
                 PulseGrabHandleHaptics(GrabHandUnknown, 0.30f, 0.22f, 0.035f);
             }
@@ -7196,7 +6942,7 @@ public class FrameAngelRadar : MVRScript
         {
             MarkGlobalPreferencesDirty();
             FlushGlobalPreferencesIfDue(true);
-            if (!accordionResizeUsesOpticalHands)
+            if (!accordionResizeUsesHandFallback)
             {
                 PulseGrabHandleHaptics(GrabHandUnknown, 0.24f, 0.18f, 0.03f);
             }
@@ -7204,7 +6950,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         accordionResizeActive = false;
-        accordionResizeUsesOpticalHands = false;
+        accordionResizeUsesHandFallback = false;
         accordionResizeStartDistance = 0.0f;
         accordionResizeStartScale = 0.0f;
         SetResizeGuideLineVisible(false);
@@ -8523,7 +8269,7 @@ public class FrameAngelRadar : MVRScript
         moveGrabActive = false;
         resizeGrabActive = false;
         accordionResizeActive = false;
-        accordionResizeUsesOpticalHands = false;
+        accordionResizeUsesHandFallback = false;
         resizeHandleDismissedUntilMoveRelease = false;
         moveGrabWorldOverrideActive = false;
         moveGrabHand = GrabHandUnknown;

@@ -91,9 +91,10 @@ labels selected-only by default, lowers default scale/limit, moves tags to
 outside-shell callouts with pooled leader lines, and moves primary category
 checkboxes above advanced label/overlay tuning in the native VaM panel.
 The `0.1.51` hand-input pass preserves the corrected creator-host visuals and
-Room Compass behavior, reads only current active SteamVR wrist skeleton data
-for optical wrist reveal, falls back cleanly to controller wrist placement,
-and restores an invisible VaM full-grab target for optical HoldGrab movement.
+Room Compass behavior, reads only active public VaM controller/hand transforms
+for wrist placement, fails closed when neither exists, and restores an invisible
+VaM full-grab target for optical HoldGrab movement without a hard SteamVR
+assembly dependency.
 
 ## Free Edition
 
