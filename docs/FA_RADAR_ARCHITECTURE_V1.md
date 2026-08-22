@@ -10,12 +10,12 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.51` on branch
-  `codex/0.1.51-hand-wrist-grab`.
+- Version: `0.1.52` on branch
+  `codex/0.1.52-hand-palm-actions`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.51.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.51.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.52.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.52.dll`.
 - Pro ships thin Empty and CustomUnityAsset host presets:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap` and
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
@@ -29,7 +29,7 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.51` branch preserves the generated visual treatment, keeps the normal
+The `0.1.52` branch preserves the generated visual treatment, keeps the normal
 plugin UI trimmed to daily controls, forces automatic preference writes, and
 keeps separate scene/session `Desktop Placement` and `VR Placement` prefs. It
 also keeps the 0.1.39 performance budget pass and fixes player
@@ -72,7 +72,7 @@ selected-only, reduces glyph scale, moves labels to outside-shell callout
 anchors with pooled leader lines, and reorders the native Pro plugin UI so
 primary atom/category checkboxes and display toggles appear before advanced
 tuning sliders.
-The 0.1.51 pass preserves the corrected generated label mesh-facing basis, reduces
+The 0.1.52 pass preserves the corrected generated label mesh-facing basis, reduces
 height-stem X/Z half-width from `0.018` to `0.010`, adds the CUA preset, and
 adds default-off `Room Compass` to both Empty- and CUA-hosted instances.
 
@@ -461,8 +461,8 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.51.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.51.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.52.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.52.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -478,12 +478,12 @@ Empty and CustomUnityAsset Radar presets.
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.51.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.51.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.52.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.52.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.51.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.51.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.52.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.52.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

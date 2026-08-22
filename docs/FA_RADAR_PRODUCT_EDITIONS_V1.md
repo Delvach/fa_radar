@@ -7,11 +7,11 @@ Updated: 2026-08-03
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.51`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.52`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.51.dll`
-- `fa_radar.pro.0.1.51.dll`
+- `fa_radar.free.0.1.52.dll`
+- `fa_radar.pro.0.1.52.dll`
 
 The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
 branding remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.51 intentionally keeps Free sparse: desktop
+buttons, and text fields, but 0.1.52 intentionally keeps Free sparse: desktop
 placement, VR placement, scale, HUD offsets, and static desktop offsets.
 Free's grab/wrist behavior remains available through the default runtime path
 and saved preferences without exposing prototype tuning controls.
@@ -90,7 +90,7 @@ The `0.1.49` label-callout/UI pass keeps those generated label meshes but makes
 labels selected-only by default, lowers default scale/limit, moves tags to
 outside-shell callouts with pooled leader lines, and moves primary category
 checkboxes above advanced label/overlay tuning in the native VaM panel.
-The `0.1.51` hand-input pass preserves the corrected creator-host visuals and
+The `0.1.52` hand-input pass preserves the corrected creator-host visuals and
 Room Compass behavior, reads only active public VaM controller/hand transforms
 for wrist placement, fails closed when neither exists, and restores an invisible
 VaM full-grab target for optical HoldGrab movement without a hard SteamVR
@@ -195,7 +195,7 @@ Rules:
 Current build helpers stage candidate `.var` packages:
 
 - `FrameAngelDev.Radar.1.var`
-- `fa_radar.pro.0.1.51.var`
+- `fa_radar.pro.0.1.52.var`
 
 The Pro candidate package includes both creator presets under
 `Custom/Atom/Empty` and `Custom/Atom/CustomUnityAsset`; Free does not ship

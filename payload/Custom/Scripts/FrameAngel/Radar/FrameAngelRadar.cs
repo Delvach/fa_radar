@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.51";
+    private const string Version = "0.1.52";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -63,6 +63,12 @@ public class FrameAngelRadar : MVRScript
     private const string RadarModeWristRight = "wrist-right";
     private const string RadarModeWristLeftAlwaysOn = "wrist-left-always-on";
     private const string RadarModeWristRightAlwaysOn = "wrist-right-always-on";
+    private const string RadarModePalmLeft = "palm-left";
+    private const string RadarModePalmRight = "palm-right";
+    private const string TrackedHandRuntimeRoot = "FAARTrackedHandArmColliders";
+    private const string TrackedHandStateSchema = "faar.tracked-hand-state.v7";
+    private const string LeftPalmSegmentName = "Segment_0";
+    private const string RightPalmSegmentName = "Segment_27";
     private const string GrabHandlePrimarySuffix = "primary";
     private const string GrabHandleResizeSuffix = "resize";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
@@ -218,6 +224,22 @@ public class FrameAngelRadar : MVRScript
         public Mesh labelMesh;
         public string labelText;
 #endif
+    }
+
+    [Serializable]
+    private sealed class TrackedHandRuntimeState
+    {
+        public string schema = "";
+        public bool leftTracking = false;
+        public bool rightTracking = false;
+        public bool leftIndexPinched = false;
+        public bool rightIndexPinched = false;
+        public bool leftMiddlePinched = false;
+        public bool rightMiddlePinched = false;
+        public bool leftHoldGrabLatched = false;
+        public bool rightHoldGrabLatched = false;
+        public bool leftPalmPresented = false;
+        public bool rightPalmPresented = false;
     }
 
     private struct CachedMaterialState
@@ -550,6 +572,13 @@ public class FrameAngelRadar : MVRScript
     private string primaryGrabHandleUid = "";
     private string resizeGrabHandleUid = "";
     private Transform currentHudAnchor;
+    private GameObject trackedHandRuntimeRoot;
+    private readonly Transform[] trackedPalmAnchors = new Transform[2];
+    private readonly bool[] trackedHandsLive = new bool[2];
+    private readonly bool[] trackedPalmsPresented = new bool[2];
+    private readonly bool[] trackedIndexPinched = new bool[2];
+    private readonly bool[] trackedMiddlePinched = new bool[2];
+    private readonly bool[] trackedHoldGrabLatched = new bool[2];
     private Transform lastGoodViewerTransform;
     private int availableAtomRevision;
     private int lastAvailableMarkerFrameSignature = int.MinValue;
@@ -560,6 +589,7 @@ public class FrameAngelRadar : MVRScript
         LoadGlobalPreferences();
         BuildUi();
         EnsureRuntimeVisuals();
+        ConnectTrackedHandRuntime();
         SetStatus("Frame Angel Radar " + Version + " " + EditionName + " ready.");
     }
 
@@ -578,6 +608,7 @@ public class FrameAngelRadar : MVRScript
 
     private void OnDestroy()
     {
+        DisconnectTrackedHandRuntime();
         FlushGlobalPreferencesIfDue(true);
         DestroySessionGrabHandles();
         DestroyRuntimeVisuals();
@@ -663,7 +694,9 @@ public class FrameAngelRadar : MVRScript
                 RadarModeWristLeft,
                 RadarModeWristRight,
                 RadarModeWristLeftAlwaysOn,
-                RadarModeWristRightAlwaysOn
+                RadarModeWristRightAlwaysOn,
+                RadarModePalmLeft,
+                RadarModePalmRight
             },
             RadarModeHud,
             "Radar Mode");
@@ -673,7 +706,9 @@ public class FrameAngelRadar : MVRScript
             RadarModeWristLeft,
             RadarModeWristRight,
             RadarModeWristLeftAlwaysOn,
-            RadarModeWristRightAlwaysOn
+            RadarModeWristRightAlwaysOn,
+            "Palm - Left",
+            "Palm - Right"
         };
         desktopPlacementField = new JSONStorableStringChooser(
             "Desktop Placement",
@@ -3458,6 +3493,74 @@ public class FrameAngelRadar : MVRScript
         return -Mathf.Atan2(localWorldRight.z, localWorldRight.x) * Mathf.Rad2Deg;
     }
 
+    private void ConnectTrackedHandRuntime()
+    {
+        GameObject root = GameObject.Find(TrackedHandRuntimeRoot);
+        if (root == null)
+        {
+            return;
+        }
+
+        trackedHandRuntimeRoot = root;
+        trackedPalmAnchors[GrabHandLeft] =
+            root.transform.Find(LeftPalmSegmentName);
+        trackedPalmAnchors[GrabHandRight] =
+            root.transform.Find(RightPalmSegmentName);
+        root.SendMessage(
+            "RegisterHandStateReceiver",
+            gameObject,
+            SendMessageOptions.RequireReceiver);
+    }
+
+    private void DisconnectTrackedHandRuntime()
+    {
+        GameObject root = trackedHandRuntimeRoot;
+        trackedHandRuntimeRoot = null;
+        for (int hand = GrabHandLeft; hand <= GrabHandRight; hand++)
+        {
+            trackedPalmAnchors[hand] = null;
+            trackedHandsLive[hand] = false;
+            trackedPalmsPresented[hand] = false;
+            trackedIndexPinched[hand] = false;
+            trackedMiddlePinched[hand] = false;
+            trackedHoldGrabLatched[hand] = false;
+        }
+        if (root == null) return;
+        try
+        {
+            root.SendMessage(
+                "UnregisterHandStateReceiver",
+                gameObject,
+                SendMessageOptions.DontRequireReceiver);
+        }
+        catch
+        {
+        }
+    }
+
+    public void ApplyHandRuntimeStateJson(string json)
+    {
+        TrackedHandRuntimeState state =
+            JsonUtility.FromJson<TrackedHandRuntimeState>(json);
+        if (state == null || !string.Equals(
+            state.schema, TrackedHandStateSchema, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "FAAR tracked-hand state is invalid.");
+        }
+
+        trackedHandsLive[GrabHandLeft] = state.leftTracking;
+        trackedHandsLive[GrabHandRight] = state.rightTracking;
+        trackedIndexPinched[GrabHandLeft] = state.leftIndexPinched;
+        trackedIndexPinched[GrabHandRight] = state.rightIndexPinched;
+        trackedMiddlePinched[GrabHandLeft] = state.leftMiddlePinched;
+        trackedMiddlePinched[GrabHandRight] = state.rightMiddlePinched;
+        trackedHoldGrabLatched[GrabHandLeft] = state.leftHoldGrabLatched;
+        trackedHoldGrabLatched[GrabHandRight] = state.rightHoldGrabLatched;
+        trackedPalmsPresented[GrabHandLeft] = state.leftPalmPresented;
+        trackedPalmsPresented[GrabHandRight] = state.rightPalmPresented;
+    }
+
     private void ApplyHudAnchor(Transform viewer)
     {
         if (hudRoot == null || viewer == null)
@@ -3746,6 +3849,16 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
+        if (IsPalmCompassModeActive())
+        {
+            int palm = ResolveWristCompassHand();
+            wristCompassRevealed = trackedHandsLive[palm]
+                && trackedPalmsPresented[palm]
+                && ResolveTrackedPalmTransform(palm) != null;
+            wristRevealGraceUntil = 0f;
+            return;
+        }
+
         if (IsWristCompassAlwaysOn())
         {
             wristCompassRevealed = ResolveWristCompassAnchorTransform() != null;
@@ -3786,7 +3899,27 @@ public class FrameAngelRadar : MVRScript
 
     private Transform ResolveWristCompassAnchorTransform()
     {
+        if (IsPalmCompassModeActive())
+        {
+            return ResolveTrackedPalmTransform(ResolveWristCompassHand());
+        }
         return ResolveHandOrControllerTransform(ResolveWristCompassHand());
+    }
+
+    private Transform ResolveTrackedPalmTransform(int hand)
+    {
+        if (hand != GrabHandLeft && hand != GrabHandRight) return null;
+        if (!trackedHandsLive[hand]) return null;
+        GameObject root = trackedHandRuntimeRoot;
+        if (root == null) return null;
+        Transform anchor = trackedPalmAnchors[hand];
+        if (anchor == null)
+        {
+            anchor = root.transform.Find(hand == GrabHandLeft
+                ? LeftPalmSegmentName : RightPalmSegmentName);
+            trackedPalmAnchors[hand] = anchor;
+        }
+        return IsActiveTransform(anchor) ? anchor : null;
     }
 
     private Transform ResolveHandOrControllerTransform(int hand)
@@ -3868,8 +4001,16 @@ public class FrameAngelRadar : MVRScript
         string radarMode = ResolveRadarMode();
         return string.Equals(radarMode, RadarModeWristRight, StringComparison.Ordinal)
             || string.Equals(radarMode, RadarModeWristRightAlwaysOn, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModePalmRight, StringComparison.Ordinal)
             ? GrabHandRight
             : GrabHandLeft;
+    }
+
+    private bool IsPalmCompassModeActive()
+    {
+        string radarMode = ResolveRadarMode();
+        return string.Equals(radarMode, RadarModePalmLeft, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModePalmRight, StringComparison.Ordinal);
     }
 
     private bool IsWristCompassAlwaysOn()
@@ -3889,7 +4030,9 @@ public class FrameAngelRadar : MVRScript
         return string.Equals(radarMode, RadarModeWristLeft, StringComparison.Ordinal)
             || string.Equals(radarMode, RadarModeWristRight, StringComparison.Ordinal)
             || string.Equals(radarMode, RadarModeWristLeftAlwaysOn, StringComparison.Ordinal)
-            || string.Equals(radarMode, RadarModeWristRightAlwaysOn, StringComparison.Ordinal);
+            || string.Equals(radarMode, RadarModeWristRightAlwaysOn, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModePalmLeft, StringComparison.Ordinal)
+            || string.Equals(radarMode, RadarModePalmRight, StringComparison.Ordinal);
     }
 
     private static string NormalizeRadarMode(string value)
@@ -3912,6 +4055,16 @@ public class FrameAngelRadar : MVRScript
         if (string.Equals(value, RadarModeWristRightAlwaysOn, StringComparison.OrdinalIgnoreCase))
         {
             return RadarModeWristRightAlwaysOn;
+        }
+
+        if (string.Equals(value, RadarModePalmLeft, StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModePalmLeft;
+        }
+
+        if (string.Equals(value, RadarModePalmRight, StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModePalmRight;
         }
 
         return RadarModeHud;

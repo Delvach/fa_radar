@@ -1,11 +1,11 @@
 {
   "schemaVersion": "fa_radar_version_v2",
   "product": "fa_radar",
-  "version": "0.1.51",
+  "version": "0.1.52",
   "channel": "dev",
-  "branch": "codex/0.1.51-hand-wrist-grab",
-  "status": "vam-safe-wrist-holdgrab",
-  "versionNote": "0.1.51 uses only active VaM controller/hand transforms for wrist placement, fails closed when neither is available, and restores an invisible VaM FreeController grab target so optical HoldGrab can reposition the session Radar through VaM's stock full-grab ownership without a hard SteamVR assembly dependency.",
+  "branch": "codex/0.1.52-hand-palm-actions",
+  "status": "tracked-palm-actions",
+  "versionNote": "0.1.52 adds left/right tracked-palm presentation from the existing FAAR BepInEx hand runtime while preserving the 0.1.51 VaM wrist and stock-grab behavior.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",
@@ -14,7 +14,7 @@
     "lineageNote": "FA Keyboard informed camera-relative placement and generated overlay visuals. FAP informs build, obfuscation, and package receipt shape. No source from either repo is copied into the runtime plugin."
   },
   "deployment": {
-    "pluginFileName": "fa_radar.pro.0.1.51.dll",
+    "pluginFileName": "fa_radar.pro.0.1.52.dll",
     "vamRoots": [
       "F:\\sim\\vam",
       "C:\\vam\\virgin-recordable-02"
@@ -28,7 +28,7 @@
       "compileSymbols": [
         "FA_RADAR_FREE"
       ],
-      "pluginFileName": "fa_radar.free.0.1.51.dll",
+      "pluginFileName": "fa_radar.free.0.1.52.dll",
       "packageFileName": "FrameAngelDev.Radar.1.var",
       "packageName": "Radar",
       "packageCreator": "FrameAngelDev",
@@ -43,8 +43,8 @@
       "compileSymbols": [
         "FA_RADAR_PRO"
       ],
-      "pluginFileName": "fa_radar.pro.0.1.51.dll",
-      "packageFileName": "fa_radar.pro.0.1.51.var",
+      "pluginFileName": "fa_radar.pro.0.1.52.dll",
+      "packageFileName": "fa_radar.pro.0.1.52.var",
       "packageName": "FrameAngel.RadarPro",
       "packageCreator": "FrameAngel",
       "summary": "Operational scene-map radar controls with native VaM plugin UI filters, category colors, rotation axes, light volumes, and filming POV helpers.",
@@ -71,7 +71,7 @@
         "customUnityAssetPreset": "Custom\\Atom\\CustomUnityAsset\\Preset_FrameAngel_Radar_CUA.vap",
         "anchorMode": "Containing Atom",
         "roomCompassDefault": false,
-        "pluginFileName": "fa_radar.pro.0.1.51.dll"
+        "pluginFileName": "fa_radar.pro.0.1.52.dll"
       }
     }
   },
@@ -90,5 +90,5 @@
     "profile": "vam_compat",
     "pluginKey": "fa_radar"
   },
-  "updatedAt": "2026-08-20T13:05:00-06:00"
+  "updatedAt": "2026-08-21T23:20:00-06:00"
 }
