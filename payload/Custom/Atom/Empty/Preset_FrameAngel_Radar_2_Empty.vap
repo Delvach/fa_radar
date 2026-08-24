@@ -1,0 +1,34 @@
+{
+  "setUnlistedParamsToDefault" : "true",
+  "storables" : [
+    {
+      "id" : "PhysicsMaterialControl",
+      "dynamicFriction" : "0.6",
+      "staticFriction" : "0.6",
+      "bounciness" : "0",
+      "frictionCombine" : "Average",
+      "bounceCombine" : "Average"
+    },
+    {
+      "id" : "CollisionTrigger",
+      "triggerEnabled" : "false"
+    },
+    {
+      "id" : "scale",
+      "scale" : "1"
+    },
+    {
+      "id" : "PluginManager",
+      "plugins" : {
+        "plugin#0" : "Custom/Plugins/fa_radar.2.0.0.dll"
+      }
+    },
+    {
+      "id" : "plugin#0_FrameAngelRadar2",
+      "enabled" : "true",
+      "pluginLabel" : "Frame Angel Radar 2",
+      "Radar Enabled" : "true",
+      "Mode" : "Scene"
+    }
+  ]
+}

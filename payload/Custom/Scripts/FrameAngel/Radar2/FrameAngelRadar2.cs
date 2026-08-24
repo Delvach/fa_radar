@@ -47,16 +47,16 @@ public class FrameAngelRadar2 : MVRScript
     private sealed class TrackedHandRuntimeState
     {
         public string schema = "";
-        public bool leftTracking;
-        public bool rightTracking;
-        public bool leftIndexPinched;
-        public bool rightIndexPinched;
-        public bool leftMiddlePinched;
-        public bool rightMiddlePinched;
-        public bool leftHoldGrabLatched;
-        public bool rightHoldGrabLatched;
-        public bool leftPalmPresented;
-        public bool rightPalmPresented;
+        public bool leftTracking = false;
+        public bool rightTracking = false;
+        public bool leftIndexPinched = false;
+        public bool rightIndexPinched = false;
+        public bool leftMiddlePinched = false;
+        public bool rightMiddlePinched = false;
+        public bool leftHoldGrabLatched = false;
+        public bool rightHoldGrabLatched = false;
+        public bool leftPalmPresented = false;
+        public bool rightPalmPresented = false;
     }
 
     private sealed class MarkerSlot
@@ -477,6 +477,14 @@ public class FrameAngelRadar2 : MVRScript
     {
         if (!presented)
         {
+            if (IsHostGrabbedByHand(hand))
+            {
+                FreeControllerV3 host = ResolveHostController();
+                if (host != null)
+                {
+                    ApplyRootPose(ReadControllerPosition(host), ReadControllerRotation(host), ReadSceneScale());
+                }
+            }
             CaptureScenePose();
             EndGrab(false);
             modeField.valNoCallback = ModeScene;
@@ -791,7 +799,7 @@ public class FrameAngelRadar2 : MVRScript
             {
                 return;
             }
-            DisconnectTrackedHandRuntime(false);
+            DisconnectTrackedHandRuntime(true);
             nextPalmAcquireAt = 0.0f;
         }
 

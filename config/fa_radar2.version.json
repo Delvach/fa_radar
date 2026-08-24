@@ -1,0 +1,8 @@
+{
+  "schema": "frameangel.radar2.version.v1",
+  "version": "2.0.0",
+  "publicType": "FrameAngelRadar2",
+  "pluginFileName": "fa_radar.2.0.0.dll",
+  "sourceRelativePath": "payload/Custom/Scripts/FrameAngel/Radar2/FrameAngelRadar2.cs",
+  "presetRelativePath": "payload/Custom/Atom/Empty/Preset_FrameAngel_Radar_2_Empty.vap"
+}
