@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.53";
+    private const string Version = "0.1.54";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -78,6 +78,8 @@ public class FrameAngelRadar : MVRScript
     private const float TrackedHandAcquireIntervalSeconds = 0.50f;
     private const float RadarVisibilityFadeSeconds = 0.18f;
     private const float WristRevealGraceSeconds = 0.55f;
+    private const float WristRevealIntentDwellSeconds = 0.45f;
+    private const float WristHideIntentGraceSeconds = 0.85f;
     private const float WristHandOffDistanceMeters = 0.61f;
     private const float WristHandOffMinimumTravelMeters = 0.30f;
     private const float HudHandOffDistanceMeters = 0.38f;
@@ -472,6 +474,14 @@ public class FrameAngelRadar : MVRScript
     private Atom lastSelectedAtom;
     private List<Atom> trackedAvailableAtoms = new List<Atom>();
     private List<AtomRecord> availableAtomRecords = new List<AtomRecord>();
+#if FA_RADAR_PRO
+    private readonly Dictionary<int, Light> cachedLightByAtomId =
+        new Dictionary<int, Light>();
+    private readonly HashSet<int> liveAtomIdsForLightCache =
+        new HashSet<int>();
+    private readonly List<int> staleLightCacheAtomIds =
+        new List<int>();
+#endif
     private MarkerSlot[] availableMarkerSlots;
     private Dictionary<Material, CachedMaterialState> materialStateByMaterial = new Dictionary<Material, CachedMaterialState>();
     private AtomRecord selectedAtomRecord;
@@ -510,6 +520,7 @@ public class FrameAngelRadar : MVRScript
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
     private bool wristCompassRevealed;
+    private bool wristRevealIntentArmed;
     private bool radarVisibilityAlphaInitialized;
     private bool primaryGrabHandleCreatePending;
     private bool resizeGrabHandleCreatePending;
@@ -553,6 +564,9 @@ public class FrameAngelRadar : MVRScript
     private float accordionResizeStartScale;
     private float accordionResizeStartDistance;
     private float wristRevealGraceUntil;
+    private float wristRevealIntentStartedAt = -1.0f;
+    private float wristHideIntentStartedAt = -1.0f;
+    private string wristRevealIntentMode = "";
     private float leftGripValue;
     private float rightGripValue;
     private float previousLeftGripValue;
@@ -3921,46 +3935,54 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateWristCompassReveal(Transform viewer)
     {
-        if (!IsWristCompassModeActive())
+        string radarMode = ResolveRadarMode();
+        if (!IsRadarModeWrist(radarMode))
         {
             wristCompassRevealed = false;
             wristRevealGraceUntil = 0.0f;
+            ResetWristRevealIntent("");
             return;
+        }
+
+        if (!string.Equals(wristRevealIntentMode, radarMode, StringComparison.Ordinal))
+        {
+            wristCompassRevealed = false;
+            ResetWristRevealIntent(radarMode);
         }
 
         if (moveGrabActive)
         {
             wristCompassRevealed = true;
             wristRevealGraceUntil = Time.unscaledTime + WristRevealGraceSeconds;
+            wristRevealIntentArmed = false;
+            wristRevealIntentStartedAt = -1.0f;
+            wristHideIntentStartedAt = -1.0f;
             return;
         }
 
         if (IsPalmCompassModeActive())
         {
             int palm = ResolveWristCompassHand();
-            wristCompassRevealed = trackedHandsLive[palm]
+            bool presented = trackedHandsLive[palm]
                 && trackedPalmsPresented[palm]
                 && ResolveTrackedPalmTransform(palm) != null;
-            wristRevealGraceUntil = 0f;
+            UpdateWristRevealFromIntent(presented, presented, !presented);
             return;
         }
 
         if (IsWristCompassAlwaysOn())
         {
             wristCompassRevealed = ResolveWristCompassAnchorTransform() != null;
+            wristRevealIntentArmed = false;
+            wristRevealIntentStartedAt = -1.0f;
+            wristHideIntentStartedAt = -1.0f;
             return;
         }
 
         Transform wristAnchor = ResolveWristCompassAnchorTransform();
         if (wristAnchor == null)
         {
-            wristCompassRevealed = false;
-            return;
-        }
-
-        if (Time.unscaledTime < wristRevealGraceUntil)
-        {
-            wristCompassRevealed = true;
+            UpdateWristRevealFromIntent(false, false, true);
             return;
         }
 
@@ -3968,19 +3990,89 @@ public class FrameAngelRadar : MVRScript
         float twistDegrees = ResolveControllerOutwardTwistDegrees(wristAnchor, hand, viewer);
         float threshold = Mathf.Clamp(ReadFloat(wristTwistDegreesField, 65.0f), 15.0f, 120.0f);
         float releaseThreshold = Mathf.Max(0.0f, threshold - 12.0f);
-        if (!wristCompassRevealed && twistDegrees >= threshold)
+        bool revealedNow = UpdateWristRevealFromIntent(
+            twistDegrees >= threshold,
+            twistDegrees >= releaseThreshold,
+            twistDegrees < releaseThreshold);
+        if (revealedNow)
         {
-            wristCompassRevealed = true;
             if (IsMotionControllerTransform(wristAnchor, hand))
             {
                 PulseGrabHandleHaptics(hand, 0.22f, 0.22f, 0.035f);
             }
             SetStatus("Wrist compass revealed.");
         }
-        else if (wristCompassRevealed && twistDegrees < releaseThreshold)
+    }
+
+    private bool UpdateWristRevealFromIntent(bool entryIntent, bool keepIntent, bool canArm)
+    {
+        float now = Time.unscaledTime;
+        if (wristCompassRevealed)
         {
+            wristRevealIntentArmed = false;
+            wristRevealIntentStartedAt = -1.0f;
+            if (keepIntent || now < wristRevealGraceUntil)
+            {
+                wristHideIntentStartedAt = -1.0f;
+                return false;
+            }
+
+            if (wristHideIntentStartedAt < 0.0f)
+            {
+                wristHideIntentStartedAt = now;
+                return false;
+            }
+
+            if (now - wristHideIntentStartedAt < WristHideIntentGraceSeconds)
+            {
+                return false;
+            }
+
             wristCompassRevealed = false;
+            wristHideIntentStartedAt = -1.0f;
+            wristRevealIntentArmed = canArm;
+            return false;
         }
+
+        wristHideIntentStartedAt = -1.0f;
+        if (canArm)
+        {
+            wristRevealIntentArmed = true;
+            wristRevealIntentStartedAt = -1.0f;
+            return false;
+        }
+
+        if (!wristRevealIntentArmed || !entryIntent)
+        {
+            wristRevealIntentStartedAt = -1.0f;
+            return false;
+        }
+
+        if (wristRevealIntentStartedAt < 0.0f)
+        {
+            wristRevealIntentStartedAt = now;
+            return false;
+        }
+
+        if (now - wristRevealIntentStartedAt < WristRevealIntentDwellSeconds)
+        {
+            return false;
+        }
+
+        wristCompassRevealed = true;
+        wristRevealIntentArmed = false;
+        wristRevealIntentStartedAt = -1.0f;
+        wristHideIntentStartedAt = -1.0f;
+        return true;
+    }
+
+    private void ResetWristRevealIntent(string radarMode)
+    {
+        wristRevealIntentMode = radarMode ?? "";
+        wristRevealGraceUntil = 0.0f;
+        wristRevealIntentArmed = false;
+        wristRevealIntentStartedAt = -1.0f;
+        wristHideIntentStartedAt = -1.0f;
     }
 
     private Transform ResolveWristCompassAnchorTransform()
@@ -5025,6 +5117,11 @@ public class FrameAngelRadar : MVRScript
 
         if (!availableAtomMarkersEnabledField.val || SuperController.singleton == null)
         {
+#if FA_RADAR_PRO
+            cachedLightByAtomId.Clear();
+            liveAtomIdsForLightCache.Clear();
+            staleLightCacheAtomIds.Clear();
+#endif
             return;
         }
 
@@ -5034,6 +5131,9 @@ public class FrameAngelRadar : MVRScript
             return;
         }
         lastAvailableAtomSceneCount = atoms.Count;
+#if FA_RADAR_PRO
+        liveAtomIdsForLightCache.Clear();
+#endif
 
         Atom anchorHost = ResolveAttachedAtomAnchorHost();
         int maxVisibleMarkers = ResolveMaxVisibleMarkerCount();
@@ -5041,6 +5141,12 @@ public class FrameAngelRadar : MVRScript
         for (int i = 0; i < atoms.Count; i++)
         {
             Atom atom = atoms[i];
+#if FA_RADAR_PRO
+            if (atom != null)
+            {
+                liveAtomIdsForLightCache.Add(atom.GetInstanceID());
+            }
+#endif
             AtomRecord record = BuildAtomRecord(atom, frame, availableAtomRecords.Count, false);
             if (!IsAtomVisibleByFilter(record, anchorHost))
             {
@@ -5051,6 +5157,9 @@ public class FrameAngelRadar : MVRScript
             HydrateAtomRecord(record, frame);
             InsertAvailableAtomRecordByDistance(record, maxVisibleMarkers);
         }
+#if FA_RADAR_PRO
+        PruneCachedLightAtoms();
+#endif
 
         trackedAvailableAtoms.Clear();
         for (int i = 0; i < availableAtomRecords.Count; i++)
@@ -6599,7 +6708,7 @@ public class FrameAngelRadar : MVRScript
         volumeObject.transform.localPosition = radarLocal * visualRadius;
         volumeObject.transform.localRotation = Quaternion.identity;
         volumeObject.transform.localScale = Vector3.one * rangeScale;
-        ApplyMaterialColor(volumeMaterial, ResolveLightVolumeColor(atom, light, ResolvePointLightRangeAlpha() * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val) * 0.35f);
+        ApplyLightVolumeCoverageColor(volumeMaterial, ResolveLightVolumeColor(atom, light, ResolvePointLightRangeAlpha() * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val) * 0.35f);
     }
 
     private void UpdateSpotlightCone(GameObject coneObject, Material coneMaterial, Atom atom, Transform target, Light light, Vector3 radarLocal, float fadeAlpha, bool hasLight)
@@ -6622,43 +6731,12 @@ public class FrameAngelRadar : MVRScript
         float rawRangeScale = Mathf.Max(0.001f, light.range) / ResolveEffectiveRadarRangeMeters() * visualRadius * ResolveLightVolumeScale();
         float spotAngle = Mathf.Clamp(light.spotAngle, 0.0f, 179.0f);
         float coneAngleRadius = Mathf.Tan(spotAngle * 0.5f * Mathf.Deg2Rad);
-        float maxRangeScale = ResolveDistanceToRadarShell(radarLocal * visualRadius, ResolveAxisRadarRotation(light.transform) * Vector3.forward, visualRadius);
-        float rangeScale = IsRoomCompassModeActive()
-            ? rawRangeScale
-            : ResolveClippedSpotlightConeScale(rawRangeScale, maxRangeScale);
-        float coneRadius = IsRoomCompassModeActive()
-            ? coneAngleRadius * rangeScale
-            : Mathf.Min(coneAngleRadius * rangeScale, visualRadius * 0.96f);
+        float rangeScale = rawRangeScale;
+        float coneRadius = coneAngleRadius * rangeScale;
         coneObject.transform.localPosition = radarLocal * visualRadius;
         coneObject.transform.localRotation = ResolveAxisRadarRotation(light.transform);
         coneObject.transform.localScale = new Vector3(coneRadius, coneRadius, rangeScale);
-        ApplyMaterialColor(coneMaterial, ResolveLightVolumeColor(atom, light, ResolveSpotlightConeAlpha() * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val) * 0.35f);
-    }
-
-    private float ResolveClippedSpotlightConeScale(float rawRangeScale, float maxRangeScale)
-    {
-        return Mathf.Clamp(
-            rawRangeScale,
-            0.001f,
-            Mathf.Max(0.001f, maxRangeScale));
-    }
-
-    private float ResolveDistanceToRadarShell(Vector3 localStart, Vector3 localDirection, float visualRadius)
-    {
-        Vector3 direction = localDirection.sqrMagnitude > 0.0001f
-            ? localDirection.normalized
-            : Vector3.forward;
-        float radius = Mathf.Max(0.001f, visualRadius);
-        float b = Vector3.Dot(localStart, direction);
-        float c = Vector3.Dot(localStart, localStart) - radius * radius;
-        float discriminant = b * b - c;
-        if (discriminant <= 0.0f)
-        {
-            return radius * 0.25f;
-        }
-
-        float distance = -b + Mathf.Sqrt(discriminant);
-        return Mathf.Clamp(distance, radius * 0.05f, radius * 1.96f);
+        ApplyLightVolumeCoverageColor(coneMaterial, ResolveLightVolumeColor(atom, light, ResolveSpotlightConeAlpha() * fadeAlpha), Mathf.Max(0.0f, emissionStrengthField.val) * 0.35f);
     }
 
     private float ResolvePointLightRangeAlpha()
@@ -6709,6 +6787,22 @@ public class FrameAngelRadar : MVRScript
             return record.hasLight && light != null;
         }
 
+        int atomInstanceId = record.atom != null ? record.atom.GetInstanceID() : 0;
+        Light cachedLight;
+        if (atomInstanceId != 0 && cachedLightByAtomId.TryGetValue(atomInstanceId, out cachedLight))
+        {
+            if (cachedLight != null && cachedLight.enabled)
+            {
+                light = cachedLight;
+                record.light = light;
+                record.hasLight = true;
+                record.lightResolved = true;
+                return true;
+            }
+
+            cachedLightByAtomId.Remove(atomInstanceId);
+        }
+
         Transform root = record.atom != null && record.atom.transform != null
             ? record.atom.transform
             : record.root;
@@ -6737,6 +6831,10 @@ public class FrameAngelRadar : MVRScript
                     record.light = light;
                     record.hasLight = true;
                     record.lightResolved = true;
+                    if (atomInstanceId != 0)
+                    {
+                        cachedLightByAtomId[atomInstanceId] = light;
+                    }
                     return true;
                 }
             }
@@ -6745,6 +6843,10 @@ public class FrameAngelRadar : MVRScript
             record.light = light;
             record.hasLight = light != null;
             record.lightResolved = true;
+            if (record.hasLight && atomInstanceId != 0)
+            {
+                cachedLightByAtomId[atomInstanceId] = light;
+            }
             return record.hasLight;
         }
         catch
@@ -6959,6 +7061,26 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
     }
+
+#if FA_RADAR_PRO
+    private void PruneCachedLightAtoms()
+    {
+        staleLightCacheAtomIds.Clear();
+        foreach (KeyValuePair<int, Light> entry in cachedLightByAtomId)
+        {
+            if (!liveAtomIdsForLightCache.Contains(entry.Key) || entry.Value == null)
+            {
+                staleLightCacheAtomIds.Add(entry.Key);
+            }
+        }
+
+        for (int i = 0; i < staleLightCacheAtomIds.Count; i++)
+        {
+            cachedLightByAtomId.Remove(staleLightCacheAtomIds[i]);
+        }
+        staleLightCacheAtomIds.Clear();
+    }
+#endif
 
     private bool IsMouseOverRadarVisual(Camera camera)
     {
@@ -9111,8 +9233,8 @@ public class FrameAngelRadar : MVRScript
         ApplyMaterialColor(rotationAxisZMaterial, WithAlpha(AxisZColor, 0.48f), emission);
         ApplyMaterialColor(rotationAxisCenterMaterial, new Color(0.86f, 0.96f, 1.0f, 0.66f), emission);
         ApplyMaterialColor(targetLabelMaterial, new Color(0.96f, 1.0f, 1.0f, Mathf.Clamp01(ReadFloat(labelAlphaField, DefaultLabelAlpha))), emission * 0.72f);
-        ApplyMaterialColor(targetLightRangeMaterial, new Color(1.0f, 0.86f, 0.42f, ResolvePointLightRangeAlpha()), emission * 0.35f);
-        ApplyMaterialColor(targetSpotlightConeMaterial, new Color(1.0f, 0.86f, 0.42f, ResolveSpotlightConeAlpha()), emission * 0.35f);
+        ApplyLightVolumeCoverageColor(targetLightRangeMaterial, new Color(1.0f, 0.86f, 0.42f, ResolvePointLightRangeAlpha()), emission * 0.35f);
+        ApplyLightVolumeCoverageColor(targetSpotlightConeMaterial, new Color(1.0f, 0.86f, 0.42f, ResolveSpotlightConeAlpha()), emission * 0.35f);
         ApplyMaterialColor(userPovFrustumMaterial, new Color(0.38f, 1.0f, 0.62f, Mathf.Clamp01(ReadFloat(povFrustumAlphaField, 0.035f))), emission * 0.3f);
         ApplyMaterialColor(desktopPovFrustumMaterial, new Color(0.50f, 0.84f, 1.0f, Mathf.Clamp01(ReadFloat(povFrustumAlphaField, 0.035f))), emission * 0.3f);
         ApplyMaterialColor(sceneCameraFrustumMaterial, new Color(0.94f, 0.72f, 1.0f, Mathf.Clamp01(ReadFloat(povFrustumAlphaField, 0.035f))), emission * 0.3f);
@@ -9212,6 +9334,23 @@ public class FrameAngelRadar : MVRScript
     {
         ApplyMaterialColorIfChanged(material, color, emissionStrength);
     }
+
+#if FA_RADAR_PRO
+    private void ApplyLightVolumeCoverageColor(Material material, Color desiredColor, float emissionStrength)
+    {
+        float alphaMultiplier = Mathf.Clamp01(radarMaterialAlphaMultiplier);
+        float desiredCoverage = Mathf.Clamp01(desiredColor.a * alphaMultiplier);
+        float sourceAlpha = Mathf.Sqrt(desiredCoverage);
+        Color coverageBalancedColor = desiredColor;
+        coverageBalancedColor.r *= sourceAlpha;
+        coverageBalancedColor.g *= sourceAlpha;
+        coverageBalancedColor.b *= sourceAlpha;
+        coverageBalancedColor.a = alphaMultiplier > 0.0001f
+            ? sourceAlpha / alphaMultiplier
+            : 0.0f;
+        ApplyMaterialColorIfChanged(material, coverageBalancedColor, emissionStrength);
+    }
+#endif
 
     private void ApplyMaterialColorIfChanged(Material material, Color color, float emissionStrength)
     {
@@ -10174,6 +10313,9 @@ public class FrameAngelRadar : MVRScript
         lastGoodViewerTransform = null;
 #if FA_RADAR_PRO
         targetLabelText = "";
+        cachedLightByAtomId.Clear();
+        liveAtomIdsForLightCache.Clear();
+        staleLightCacheAtomIds.Clear();
 #endif
 
         DestroyOwnedObject(shellMaterial);

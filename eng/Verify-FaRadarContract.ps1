@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.53"',
+        'private const string Version = "0.1.54"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -608,8 +608,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "BuildProAdvancedTuningUi",
         "CreateSpotlightConeMesh",
         "Spotlight Cone Mesh Open End",
-        "ResolveClippedSpotlightConeScale",
-        "ResolveDistanceToRadarShell",
+        "ApplyLightVolumeCoverageColor",
+        "UpdateWristRevealFromIntent",
+        "PruneCachedLightAtoms",
         "lastAvailableAtomVisibleCount",
         "Markers: 0 visible / ",
         "outside range",
@@ -730,7 +731,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "BuildWristCompassUi();"
         )) {
             if ($sceneSessionUiBlock.Contains($legacyPlacementCall)) {
-                Add-Failure "0.1.53 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
+                Add-Failure "0.1.54 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
             }
         }
     }
@@ -828,7 +829,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
                 "CreateToggle(grabHapticsEnabledField, true);"
             )) {
                 if (-not $freeEmptyUiBlock.Contains($snippet)) {
-                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.53 mode/scale/grab control: $snippet"
+                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.54 mode/scale/grab control: $snippet"
                 }
             }
             if ($freeEmptyUiBlock.Contains("BuildProFilterUi();") -or $freeEmptyUiBlock.Contains("CreateSlider(radarRangeMetersField")) {
@@ -1084,8 +1085,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.53.dll",
-        "fa_radar.pro.0.1.53.dll",
+        "fa_radar.free.0.1.54.dll",
+        "fa_radar.pro.0.1.54.dll",
         "UnityEngine.PhysicsModule.dll",
         "UnityEngine.JSONSerializeModule.dll",
         "FrameAngelDev.Radar.1.var",
@@ -1177,7 +1178,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.53.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.54.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -1208,7 +1209,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.53.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.54.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"pluginLabel" : "Frame Angel Radar CUA"',
         '"CUA Anchor Preset" : "true"',
@@ -1264,11 +1265,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.53") {
-        Add-Failure "Version config must declare version 0.1.53."
+    if ($version.version -ne "0.1.54") {
+        Add-Failure "Version config must declare version 0.1.54."
     }
-    if ($version.branch -ne "codex/0.1.53-world-wrist") {
-        Add-Failure "Version config branch must match codex/0.1.53-world-wrist."
+    if ($version.branch -ne "codex/0.1.54-performance-wrist-intent") {
+        Add-Failure "Version config branch must match codex/0.1.54-performance-wrist-intent."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -1277,8 +1278,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.53.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.53.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.54.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.54.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -1289,8 +1290,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.53.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.53.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.54.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.54.dll."
     }
     if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
         Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
@@ -1390,8 +1391,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.53.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.53.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.54.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.54.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
