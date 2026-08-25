@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.52`.
+Current branch version: `0.1.53`.
 
-Current product contract version: `0.1.52`.
+Current product contract version: `0.1.53`.
 
 The current slice is compiled C# only:
 
@@ -36,10 +36,12 @@ The current slice is compiled C# only:
   churn
 - shared anchor modes for HUD/view, static world placement, containing-atom/Empty
   placement, and explicit atom UID placement without duplicating radar logic
-- promoted HUD X/Y/Z and scale controls near the top of the native plugin UI,
-  with automatic global preference saves after values change
-- scene/session plugins expose separate `Desktop Placement` and `VR Placement`
-  choices, while Empty/atom-hosted instances stay scene-anchored to their host
+- one top-level `Radar Mode` selector exposes `World` alongside HUD, wrist, and
+  palm modes; `World` captures the current Radar pose and then keeps it fixed
+  in scene space
+- legacy HUD, wrist, static-world, and atom-relative placement storables remain
+  serialized for compatibility, but their offset/rotation/desktop/VR slider
+  forest is no longer drawn in the normal native plugin UI
 - scene/session desktop loads recover older pinned-world desktop prefs back to
   `Attached To UI` once, so a saved off-screen/static desktop placement cannot
   make Radar appear lost; Empty/atom-anchor prefs are not migrated
@@ -49,7 +51,7 @@ The current slice is compiled C# only:
   existing proximity path, while optical pinch/HoldGrab can lease Radar's
   invisible VaM `FreeControllerV3` target through VaM's normal full-grab
   ownership; no visible grab handles are drawn
-- optional `Radar Mode` values: `HUD`, `wrist-left`, `wrist-right`,
+- optional `Radar Mode` values: `HUD`, `World`, `wrist-left`, `wrist-right`,
   `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
   modes start hidden until the wrist-twist reveal is active; Radar reads only
   active VaM controller/hand transforms and fails closed when neither exists,
@@ -59,9 +61,9 @@ The current slice is compiled C# only:
 - Pro creator presets for both movable host types:
   `Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap` and
   `Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- the CUA preset exposes scale and normal Radar controls but no wrist, direct
-  grab, HUD/VR placement, local-offset, or anchor-rotation controls; placement
-  is owned by the CUA atom
+- Empty and CUA hosts expose mode, HUD/wrist scale, and the existing stock VaM
+  center-grab toggle, but no manual offset, anchor-rotation, desktop/VR, or
+  throw-placement controls
 - atom-attached `Room Compass` is default-off on both Empty and CUA hosts; when
   enabled it leaves the host atom untouched, places Radar content at scene origin, bypasses radar-edge
   clamping/fading, and maps world positions and height at 1:1 while retaining
@@ -181,12 +183,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.52.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.52.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.53.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.53.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.52.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.52.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.53.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.53.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

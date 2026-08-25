@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.52";
+    private const string Version = "0.1.53";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -59,6 +59,7 @@ public class FrameAngelRadar : MVRScript
     private const string DirectorReadabilityDefaultsVersion = "director_readability_v1";
     private const string LabelReadabilityDefaultsVersion = "label_callouts_v1";
     private const string RadarModeHud = "HUD";
+    private const string RadarModeWorld = "world";
     private const string RadarModeWristLeft = "wrist-left";
     private const string RadarModeWristRight = "wrist-right";
     private const string RadarModeWristLeftAlwaysOn = "wrist-left-always-on";
@@ -526,6 +527,7 @@ public class FrameAngelRadar : MVRScript
     private Vector3 moveStartHandlePosition;
     private Vector3 moveGrabStartRadarWorldCenter;
     private Vector3 moveGrabCurrentRadarWorldCenter;
+    private Quaternion moveGrabStartRadarWorldRotation = Quaternion.identity;
     private Vector3 moveStartHudOffset;
     private Vector3 moveStartWristOffset;
     private Vector3 moveStartStaticPosition;
@@ -691,6 +693,7 @@ public class FrameAngelRadar : MVRScript
             new List<string>
             {
                 RadarModeHud,
+                RadarModeWorld,
                 RadarModeWristLeft,
                 RadarModeWristRight,
                 RadarModeWristLeftAlwaysOn,
@@ -703,10 +706,11 @@ public class FrameAngelRadar : MVRScript
         radarModeField.displayChoices = new List<string>
         {
             RadarModeHud,
-            RadarModeWristLeft,
-            RadarModeWristRight,
-            RadarModeWristLeftAlwaysOn,
-            RadarModeWristRightAlwaysOn,
+            "World",
+            "Left Wrist",
+            "Right Wrist",
+            "Left Wrist - Always On",
+            "Right Wrist - Always On",
             "Palm - Left",
             "Palm - Right"
         };
@@ -957,18 +961,26 @@ public class FrameAngelRadar : MVRScript
 #if FA_RADAR_PRO
         CreateToggle(radarEnabledField, false);
         CreateToggle(roomCompassField, true);
-        CreateToggle(availableAtomMarkersEnabledField, false);
+        CreatePopup(radarModeField, false);
         CreateSlider(hudScaleField, true);
+        CreateToggle(availableAtomMarkersEnabledField, false);
+        CreateSlider(wristScaleField, true);
         BuildProPrimaryFilterUi();
         BuildProDisplayUi();
         CreateToggle(gridEnabledField, false);
         CreateSlider(radarRangeMetersField, true);
+        CreateToggle(grabHandlesEnabledField, false);
+        CreateToggle(grabHapticsEnabledField, true);
         BuildProAdvancedTuningUi();
         CreateTextField(statusField, true);
 #else
         CreateToggle(radarEnabledField, false);
         CreateToggle(roomCompassField, true);
+        CreatePopup(radarModeField, false);
         CreateSlider(hudScaleField, false);
+        CreateSlider(wristScaleField, true);
+        CreateToggle(grabHandlesEnabledField, false);
+        CreateToggle(grabHapticsEnabledField, true);
 #endif
     }
 
@@ -977,14 +989,15 @@ public class FrameAngelRadar : MVRScript
         UpdatePluginSurfaceStatus();
 #if FA_RADAR_PRO
         CreateToggle(radarEnabledField, false);
+        CreateToggle(roomCompassField, true);
+        CreatePopup(radarModeField, false);
+        CreateSlider(hudScaleField, true);
         CreateToggle(availableAtomMarkersEnabledField, true);
+        CreateSlider(wristScaleField, true);
         BuildProPrimaryFilterUi();
         BuildProDisplayUi();
         CreateToggle(gridEnabledField, false);
         CreateSlider(radarRangeMetersField, true);
-        BuildSceneSessionPlacementUi();
-        BuildPlacementUi();
-        BuildWristCompassUi();
         CreateToggle(grabHandlesEnabledField, false);
         CreateToggle(grabHapticsEnabledField, true);
         BuildProAdvancedTuningUi();
@@ -1000,9 +1013,12 @@ public class FrameAngelRadar : MVRScript
 
     private void BuildFreeSceneSessionUi()
     {
-        BuildSceneSessionPlacementUi();
-        BuildFreePlacementUi();
-        BuildFreeStaticWorldPlacementUi();
+        CreateToggle(roomCompassField, true);
+        CreatePopup(radarModeField, false);
+        CreateSlider(hudScaleField, false);
+        CreateSlider(wristScaleField, true);
+        CreateToggle(grabHandlesEnabledField, false);
+        CreateToggle(grabHapticsEnabledField, true);
     }
 
     private bool ShouldUseCreatorAnchorUi()
@@ -1016,17 +1032,17 @@ public class FrameAngelRadar : MVRScript
         CreateToggle(radarEnabledField, false);
         CreateToggle(roomCompassField, true);
 #if FA_RADAR_PRO
+        CreatePopup(radarModeField, false);
+        CreateSlider(hudScaleField, true);
         CreateToggle(availableAtomMarkersEnabledField, true);
+        CreateSlider(wristScaleField, true);
         BuildProPrimaryFilterUi();
         BuildProDisplayUi();
         CreateToggle(gridEnabledField, false);
         CreateSlider(radarRangeMetersField, true);
-        BuildEmptyAnchorPlacementUi();
+        CreateToggle(grabHandlesEnabledField, false);
+        CreateToggle(grabHapticsEnabledField, true);
         BuildProAdvancedTuningUi();
-        CreateButton("Reset Anchor Placement", false).button.onClick.AddListener(delegate
-        {
-            ResetCreatorAnchorPlacement();
-        });
         CreateTextField(statusField, true);
 #else
         BuildFreeEmptyAnchorUi();
@@ -1035,7 +1051,11 @@ public class FrameAngelRadar : MVRScript
 
     private void BuildFreeEmptyAnchorUi()
     {
-        BuildFreePlacementUi();
+        CreatePopup(radarModeField, false);
+        CreateSlider(hudScaleField, false);
+        CreateSlider(wristScaleField, true);
+        CreateToggle(grabHandlesEnabledField, false);
+        CreateToggle(grabHapticsEnabledField, true);
     }
 
     private void BuildEmptyAnchorPlacementUi()
@@ -1137,10 +1157,6 @@ public class FrameAngelRadar : MVRScript
         CreateSlider(lightMarkerScaleField, true);
         CreateSlider(povFrustumLengthField, false);
         CreateSlider(povFrustumAlphaField, true);
-        CreateToggle(grabThrowPinEnabledField, false);
-        CreateToggle(grabThrowSurfaceStopField, true);
-        CreateSlider(grabThrowGrowScaleField, false);
-        CreateSlider(grabThrowVelocityScaleField, true);
     }
 #endif
 
@@ -1188,7 +1204,24 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(availableAtomMarkersEnabledField);
         ConfigureGlobalPreferenceCallback(clickSelectMarkersField);
         ConfigureGlobalPreferenceCallback(grabHandlesEnabledField);
-        ConfigureGlobalPreferenceCallback(radarModeField);
+        if (radarModeField != null)
+        {
+            radarModeField.setCallbackFunction = delegate(string value)
+            {
+                if (!globalPreferencesLoading
+                    && string.Equals(NormalizeRadarMode(value), RadarModeWorld, StringComparison.Ordinal)
+                    && hudRoot != null)
+                {
+                    SetStaticWorldPositionNoCallback(hudRoot.transform.position);
+                    SetStaticWorldRotationNoCallback(hudRoot.transform.rotation);
+                }
+
+                MarkGlobalPreferencesDirty();
+                availableMarkersDirty = true;
+                haveSmoothedHudPosition = false;
+                InvalidateGridMesh();
+            };
+        }
         ConfigureGlobalPreferenceCallback(desktopPlacementField);
         ConfigureGlobalPreferenceCallback(vrPlacementField);
         ConfigureGlobalPreferenceCallback(grabHandleDebugVisibleField);
@@ -1819,6 +1852,11 @@ public class FrameAngelRadar : MVRScript
         if (IsRoomCompassModeActive())
         {
             return "Room Compass 1:1";
+        }
+
+        if (string.Equals(ResolveRadarMode(), RadarModeWorld, StringComparison.Ordinal))
+        {
+            return "World";
         }
 
         if (!IsSceneSessionPluginHostActive())
@@ -3741,7 +3779,9 @@ public class FrameAngelRadar : MVRScript
         }
 
         hudRoot.transform.position = moveGrabCurrentRadarWorldCenter;
-        hudRoot.transform.rotation = viewer != null ? viewer.rotation : Quaternion.identity;
+        hudRoot.transform.rotation = IsWristCompassModeActive() && viewer != null
+            ? viewer.rotation
+            : moveGrabStartRadarWorldRotation;
         hudRoot.transform.localScale = Vector3.one * ResolveActivePlacementScale();
     }
 
@@ -3809,8 +3849,7 @@ public class FrameAngelRadar : MVRScript
 
     private bool IsWristCompassModeActive()
     {
-        return IsRadarModeWrist(ResolveRadarMode())
-            && !IsCuaPreferenceProfileActive();
+        return IsRadarModeWrist(ResolveRadarMode());
     }
 
     private bool ResolveRadarRuntimeVisible(Transform viewer)
@@ -4037,6 +4076,12 @@ public class FrameAngelRadar : MVRScript
 
     private static string NormalizeRadarMode(string value)
     {
+        if (string.Equals(value, RadarModeWorld, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "World", StringComparison.OrdinalIgnoreCase))
+        {
+            return RadarModeWorld;
+        }
+
         if (string.Equals(value, RadarModeWristLeft, StringComparison.OrdinalIgnoreCase))
         {
             return RadarModeWristLeft;
@@ -4089,6 +4134,11 @@ public class FrameAngelRadar : MVRScript
 
     private string ResolveAnchorMode()
     {
+        if (string.Equals(ResolveRadarMode(), RadarModeWorld, StringComparison.Ordinal))
+        {
+            return AnchorModeWorldStatic;
+        }
+
         if (IsEmptyAnchorHostActive())
         {
             return AnchorModeContainingAtom;
@@ -7116,17 +7166,6 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        if (IsCuaPreferenceProfileActive())
-        {
-            return false;
-        }
-
-        Atom anchorHost = ResolveAttachedAtomAnchorHost();
-        if (anchorHost != null && IsCustomUnityAssetAtom(anchorHost))
-        {
-            return false;
-        }
-
         return recorderRadarVisible && radarEnabledField != null && radarEnabledField.val;
     }
 
@@ -7364,6 +7403,9 @@ public class FrameAngelRadar : MVRScript
         moveStartHandlePosition = handlePosition;
         moveGrabStartRadarWorldCenter = radarWorldCenter;
         moveGrabCurrentRadarWorldCenter = radarWorldCenter;
+        moveGrabStartRadarWorldRotation = hudRoot != null
+            ? hudRoot.transform.rotation
+            : Quaternion.identity;
         moveGrabWorldOverrideActive = true;
         moveStartHudOffset = GetHudOffset();
         moveStartWristOffset = GetWristOffset();

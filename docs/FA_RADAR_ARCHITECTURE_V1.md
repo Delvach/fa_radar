@@ -1,6 +1,6 @@
 # FA Radar Architecture V1
 
-Updated: 2026-08-03
+Updated: 2026-08-25
 
 ## Goal
 
@@ -10,18 +10,18 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.52` on branch
-  `codex/0.1.52-hand-palm-actions`.
+- Version: `0.1.53` on branch
+  `codex/0.1.53-world-wrist`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.52.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.52.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.53.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.53.dll`.
 - Pro ships thin Empty and CustomUnityAsset host presets:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap` and
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Supported plugin surfaces are scene/session, Empty, and CustomUnityAsset.
-  CUA-hosted Radar is moved with the CUA atom and does not expose a second
-  wrist/grab/placement system.
+  Empty/CUA-hosted Radar can follow its atom, select the same wrist/palm modes,
+  or select `World`; all hosts reuse one VaM stock full-grab center target.
 - No Unity project, asset bundles, raw runtime file IO, reflection, broad JSON
   object serializers, repo-local runtime dependencies, or absolute dev paths.
   Global user prefs are the only runtime file access and use VaM
@@ -29,9 +29,10 @@ HUD-relative radar centered on the user.
 
 ## Prototype Visual
 
-The `0.1.52` branch preserves the generated visual treatment, keeps the normal
-plugin UI trimmed to daily controls, forces automatic preference writes, and
-keeps separate scene/session `Desktop Placement` and `VR Placement` prefs. It
+The `0.1.53` branch preserves the complete 0.1.52 generated visual treatment,
+keeps the normal plugin UI trimmed to daily controls, and retains all legacy
+placement storables without drawing their offset/rotation/desktop/VR control
+forest. One visible `World` mode selects the existing static-world anchor. It
 also keeps the 0.1.39 performance budget pass and fixes player
 navigation/crosshair utility markers so they resolve to the active viewer
 height instead of VaM's floor-anchored utility atom root. The 0.1.41 polish
@@ -207,11 +208,11 @@ twist pose, their current distance still drives accordion scaling.
 
 ## Wrist Compass
 
-`Radar Mode` is a session/scene-only projection selector with these values:
-`HUD`, `wrist-left`, `wrist-right`, `wrist-left-always-on`, and
-`wrist-right-always-on`. It does not alter the Empty/atom-anchor preset path,
-and wrist modes are ignored while the creator-anchor preference profile is
-active.
+`Radar Mode` is shared by scene/session, Empty, and CUA hosts. Its values are
+`HUD`, `World`, `wrist-left`, `wrist-right`, `wrist-left-always-on`,
+`wrist-right-always-on`, `palm-left`, and `palm-right`. `World` captures the
+current Radar world pose when selected and then uses the existing static-world
+anchor. Wrist and palm modes are no longer suppressed on creator hosts.
 
 In `HUD`, the existing HUD/static/atom anchor behavior is unchanged. In wrist
 modes, Radar first reads the current active VaM motion-controller transform,
@@ -306,10 +307,9 @@ is the default for desktop testing because it avoids navigation jitter, keeps
 rotation locked to the current view, and prevents add/remove atom churn from
 reanchoring to a transient camera.
 
-`Desktop Placement` and `VR Placement` are the daily selectors for scene/session
-plugins. The runtime chooses between them from VaM's active desktop/VR display
-state, so a desktop pinned-world session preference does not carry into VR HUD
-placement:
+`Desktop Placement` and `VR Placement` remain hidden compatibility storables.
+The runtime still understands their prior values, but `Radar Mode: World` is
+the single visible world-lock choice on every supported host:
 
 - `Attached To UI` maps to the existing HUD/view anchor.
 - `Pinned In World` maps to world static anchoring for session/scene plugins.
@@ -342,30 +342,21 @@ Any atom-attached Radar instance is treated as a creator anchor by default, so
 the Empty preset appears on and anchored without extra binding steps. When
 active, it uses the separate creator-anchor preference files listed above.
 
-Creator-anchor UIs intentionally omit session/HUD-only controls: no wrist
-mode selector, wrist offset/scale sliders, grab/haptic controls, global reset,
-VR placement selector, manual anchor-mode controls, or static-world capture
-controls. Empty keeps atom-local X/Y/Z offset, scale, local rotation, represented
-range, reset anchor placement, filters, display/tuning, grid, and status. CUA
-keeps Radar scale, represented range, filters, display/tuning, grid, status, and
-the default-off `Room Compass` toggle; it exposes no local offset or rotation
-controls because the CUA atom itself owns placement.
+Creator-anchor UIs expose Radar mode, HUD/wrist scale, grab/haptic toggles,
+represented range, filters, display/tuning, grid, status, and the default-off
+`Room Compass` toggle. They omit manual offset, anchor-rotation, desktop/VR,
+static-coordinate, and throw-placement controls. Existing hidden storables keep
+older scenes and preferences compatible.
 
 The normal plugin UI exposes the daily placement and operation controls:
 
 - Pro primary atom/category checkboxes
 - Pro display toggles and label mode/orientation
-- `Desktop Placement`
-- `VR Placement`
-- `HUD Offset X`
-- `HUD Offset Y`
-- `HUD Offset Z`
-- `HUD Scale`
 - `Radar Mode`
+- `HUD Scale`
 - `Wrist Scale`
-- `Wrist Offset X`
-- `Wrist Offset Y`
-- `Wrist Offset Z`
+- `Grab Handles Enabled`
+- `Grab Haptics`
 - `Radar Range Meters`
 - `Scene Atom Markers`
 - `Lights`
@@ -461,8 +452,8 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.52.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.52.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.53.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.53.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -478,12 +469,12 @@ Empty and CustomUnityAsset Radar presets.
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.52.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.52.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.53.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.53.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.52.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.52.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.53.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.53.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

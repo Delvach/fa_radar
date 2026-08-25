@@ -32,7 +32,7 @@
       {
          "id" : "PluginManager",
          "plugins" : {
-            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.52.dll"
+            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.53.dll"
          }
       },
       {
@@ -43,6 +43,8 @@
          "Global Prefs Auto Save" : "true",
          "Radar Enabled" : "true",
          "Room Compass" : "false",
+         "Radar Mode" : "HUD",
+         "Grab Handles Enabled" : "true",
          "Desktop Placement" : "Pinned In World",
          "Anchor Mode" : "Containing Atom",
          "Anchor Atom UID" : "",

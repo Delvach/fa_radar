@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.52"',
+        'private const string Version = "0.1.53"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -154,10 +154,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "SuperController.singleton.isOpenVR",
         "SuperController.singleton.disableVR",
         "Creator anchor preset active.",
-        "BuildPlacementUi();",
         "private void BuildPlacementUi()",
-        "BuildWristCompassUi();",
         "private void BuildWristCompassUi()",
+        'private const string RadarModeWorld = "world"',
+        '"World"',
+        "string.Equals(ResolveRadarMode(), RadarModeWorld, StringComparison.Ordinal)",
         "ConfigureImmediatePlacementPreferenceCallback",
         "FlushGlobalPreferencesIfDue(true)",
         "valNoCallback",
@@ -675,7 +676,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         foreach ($requiredCuaUiSnippet in @(
             "CreateToggle(radarEnabledField, false);",
             "CreateToggle(roomCompassField, true);",
+            "CreatePopup(radarModeField, false);",
             "CreateSlider(hudScaleField, true);",
+            "CreateSlider(wristScaleField, true);",
+            "CreateToggle(grabHandlesEnabledField, false);",
+            "CreateToggle(grabHapticsEnabledField, true);",
             "BuildProPrimaryFilterUi();",
             "BuildProDisplayUi();",
             "BuildProAdvancedTuningUi();"
@@ -699,11 +704,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "wristOffsetXField",
             "wristOffsetYField",
             "wristOffsetZField",
-            "wristScaleField",
             "desktopPlacementField",
-            "vrPlacementField",
-            "grabHandlesEnabledField",
-            "grabHapticsEnabledField"
+            "vrPlacementField"
         )) {
             if ($cuaUiBlock.Contains($forbiddenCuaUiSnippet)) {
                 Add-Failure "CUA-hosted UI must rely on CUA movement and hide wrist/placement control snippet: $forbiddenCuaUiSnippet"
@@ -716,6 +718,15 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         $sceneSessionUiBlock = $plugin.Substring($buildSceneSessionUiIndex, $shouldUseCreatorAnchorUiIndex - $buildSceneSessionUiIndex)
         if (-not $sceneSessionUiBlock.Contains("#if FA_RADAR_PRO") -or -not $sceneSessionUiBlock.Contains("#else") -or -not $sceneSessionUiBlock.Contains("BuildFreeSceneSessionUi();")) {
             Add-Failure "Scene/session UI must compile-gate Free edition to the simplified Free UI block before Pro controls."
+        }
+        foreach ($legacyPlacementCall in @(
+            "BuildSceneSessionPlacementUi();",
+            "BuildPlacementUi();",
+            "BuildWristCompassUi();"
+        )) {
+            if ($sceneSessionUiBlock.Contains($legacyPlacementCall)) {
+                Add-Failure "0.1.53 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
+            }
         }
     }
 
@@ -731,9 +742,12 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             $plugin.Substring($freeSceneUiIndex, $freeEmptyUiIndex - $freeSceneUiIndex)
         }
         $requiredFreeSceneUiSnippets = @(
-            "BuildSceneSessionPlacementUi();",
-            "BuildFreePlacementUi();",
-            "BuildFreeStaticWorldPlacementUi();"
+            "CreateToggle(roomCompassField, true);",
+            "CreatePopup(radarModeField, false);",
+            "CreateSlider(hudScaleField, false);",
+            "CreateSlider(wristScaleField, true);",
+            "CreateToggle(grabHandlesEnabledField, false);",
+            "CreateToggle(grabHapticsEnabledField, true);"
         )
         foreach ($snippet in $requiredFreeSceneUiSnippets) {
             if (-not $freeSceneUiBlock.Contains($snippet)) {
@@ -747,8 +761,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "CreateSlider(radarRangeMetersField",
             "CreateToggle(availableAtomMarkersEnabledField",
             "CreateToggle(gridEnabledField",
-            "CreateToggle(grabHandlesEnabledField",
-            "CreateToggle(grabHapticsEnabledField",
             "CreateTextField(statusField"
         )
         foreach ($snippet in $forbiddenFreeSceneUiSnippets) {
@@ -803,8 +815,16 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         $buildEmptyPlacementUiIndex = $plugin.IndexOf("private void BuildEmptyAnchorPlacementUi()")
         if ($buildEmptyPlacementUiIndex -gt $freeEmptyUiIndex) {
             $freeEmptyUiBlock = $plugin.Substring($freeEmptyUiIndex, $buildEmptyPlacementUiIndex - $freeEmptyUiIndex)
-            if (-not $freeEmptyUiBlock.Contains("BuildFreePlacementUi();")) {
-                Add-Failure "Free Empty/atom-anchor UI must expose only the simplified placement block."
+            foreach ($snippet in @(
+                "CreatePopup(radarModeField, false);",
+                "CreateSlider(hudScaleField, false);",
+                "CreateSlider(wristScaleField, true);",
+                "CreateToggle(grabHandlesEnabledField, false);",
+                "CreateToggle(grabHapticsEnabledField, true);"
+            )) {
+                if (-not $freeEmptyUiBlock.Contains($snippet)) {
+                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.53 mode/scale/grab control: $snippet"
+                }
             }
             if ($freeEmptyUiBlock.Contains("BuildProFilterUi();") -or $freeEmptyUiBlock.Contains("CreateSlider(radarRangeMetersField")) {
                 Add-Failure "Free Empty/atom-anchor UI must hide filters and radar range tuning."
@@ -821,6 +841,41 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 "@
     if (-not $plugin.Contains($markerMeshFieldSnippet.Trim())) {
         Add-Failure "Person/Panel/SubScene marker meshes must be compiled only for Pro."
+    }
+
+    $resolveAnchorModeIndex = $plugin.IndexOf("private string ResolveAnchorMode()")
+    $desktopAttachedIndex = $plugin.IndexOf("private bool IsDesktopPlacementAttachedToUi()", [Math]::Max(0, $resolveAnchorModeIndex))
+    if ($resolveAnchorModeIndex -lt 0 -or $desktopAttachedIndex -le $resolveAnchorModeIndex) {
+        Add-Failure "World-mode anchor resolver block must remain inspectable."
+    } else {
+        $resolveAnchorModeBlock = $plugin.Substring($resolveAnchorModeIndex, $desktopAttachedIndex - $resolveAnchorModeIndex)
+        $worldIndex = $resolveAnchorModeBlock.IndexOf("RadarModeWorld")
+        $emptyIndex = $resolveAnchorModeBlock.IndexOf("IsEmptyAnchorHostActive()")
+        if ($worldIndex -lt 0 -or $emptyIndex -lt 0 -or $worldIndex -gt $emptyIndex) {
+            Add-Failure "World mode must select the static world anchor before Empty/CUA host anchoring."
+        }
+    }
+
+    $wristActiveIndex = $plugin.IndexOf("private bool IsWristCompassModeActive()")
+    $runtimeVisibleIndex = $plugin.IndexOf("private bool ResolveRadarRuntimeVisible", [Math]::Max(0, $wristActiveIndex))
+    if ($wristActiveIndex -lt 0 -or $runtimeVisibleIndex -le $wristActiveIndex) {
+        Add-Failure "Wrist-mode activation block must remain inspectable."
+    } else {
+        $wristActiveBlock = $plugin.Substring($wristActiveIndex, $runtimeVisibleIndex - $wristActiveIndex)
+        if ($wristActiveBlock.Contains("IsCuaPreferenceProfileActive")) {
+            Add-Failure "Wrist modes must not be suppressed merely because Radar is hosted on Empty/CUA."
+        }
+    }
+
+    $grabEligibilityIndex = $plugin.IndexOf("private bool ShouldUseSessionGrabHandles")
+    $ensurePrimaryIndex = $plugin.IndexOf("private void EnsurePrimaryGrabHandleAtom", [Math]::Max(0, $grabEligibilityIndex))
+    if ($grabEligibilityIndex -lt 0 -or $ensurePrimaryIndex -le $grabEligibilityIndex) {
+        Add-Failure "Stock full-grab target eligibility block must remain inspectable."
+    } else {
+        $grabEligibilityBlock = $plugin.Substring($grabEligibilityIndex, $ensurePrimaryIndex - $grabEligibilityIndex)
+        if ($grabEligibilityBlock.Contains("IsCuaPreferenceProfileActive") -or $grabEligibilityBlock.Contains("IsCustomUnityAssetAtom")) {
+            Add-Failure "The existing stock full-grab center target must remain eligible on Empty/CUA hosts."
+        }
     }
 
     $resolveMarkerMeshIndex = $plugin.IndexOf("private Mesh ResolveMarkerMeshForAtom(Atom atom)")
@@ -840,12 +895,12 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         }
     }
 
-    $placementUiIndex = $plugin.IndexOf("BuildPlacementUi();")
+    $placementUiIndex = $plugin.IndexOf("CreatePopup(radarModeField, false);")
     $grabUiIndex = $plugin.IndexOf("CreateToggle(grabHandlesEnabledField")
     if ($placementUiIndex -lt 0) {
-        Add-Failure "Plugin menu must expose placement controls near the top via BuildPlacementUi."
+        Add-Failure "Plugin menu must expose Radar Mode near the top."
     } elseif ($grabUiIndex -ge 0 -and $placementUiIndex -gt $grabUiIndex) {
-        Add-Failure "Placement controls must appear before grab-handle/advanced controls in the plugin menu."
+        Add-Failure "Radar Mode must appear before grab-handle/advanced controls in the plugin menu."
     }
 
     $hiddenCompatibilityUiSnippets = @(
@@ -989,8 +1044,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.52.dll",
-        "fa_radar.pro.0.1.52.dll",
+        "fa_radar.free.0.1.53.dll",
+        "fa_radar.pro.0.1.53.dll",
         "UnityEngine.PhysicsModule.dll",
         "UnityEngine.JSONSerializeModule.dll",
         "FrameAngelDev.Radar.1.var",
@@ -1082,13 +1137,15 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.52.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.53.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
         '"Desktop Placement" : "Pinned In World"',
         '"CUA Anchor Preset" : "true"',
         '"Room Compass" : "false"',
+        '"Radar Mode" : "HUD"',
+        '"Grab Handles Enabled" : "true"',
         '"HUD Offset X"',
         '"HUD Offset Y"',
         '"HUD Offset Z"',
@@ -1113,12 +1170,14 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.52.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.53.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"pluginLabel" : "Frame Angel Radar CUA"',
         '"CUA Anchor Preset" : "true"',
         '"Radar Enabled" : "true"',
         '"Room Compass" : "false"',
+        '"Radar Mode" : "HUD"',
+        '"Grab Handles Enabled" : "true"',
         '"HUD Scale" : "0.75"'
     )
     foreach ($snippet in $requiredCuaPresetSnippets) {
@@ -1127,7 +1186,6 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
         }
     }
     foreach ($forbiddenCuaPresetSnippet in @(
-        '"Radar Mode"',
         '"Anchor Mode"',
         '"Anchor Atom UID"',
         '"HUD Offset',
@@ -1136,7 +1194,6 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
         '"Wrist Scale"',
         '"Desktop Placement"',
         '"VR Placement"',
-        '"Grab Handles Enabled"',
         '"Grab Haptics"'
     )) {
         if ($cuaPreset.Contains($forbiddenCuaPresetSnippet)) {
@@ -1171,11 +1228,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.52") {
-        Add-Failure "Version config must declare version 0.1.52."
+    if ($version.version -ne "0.1.53") {
+        Add-Failure "Version config must declare version 0.1.53."
     }
-    if ($version.branch -ne "codex/0.1.52-hand-palm-actions") {
-        Add-Failure "Version config branch must match codex/0.1.52-hand-palm-actions."
+    if ($version.branch -ne "codex/0.1.53-world-wrist") {
+        Add-Failure "Version config branch must match codex/0.1.53-world-wrist."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -1184,8 +1241,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.52.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.52.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.53.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.53.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -1196,8 +1253,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.52.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.52.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.53.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.53.dll."
     }
     if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
         Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
@@ -1297,8 +1354,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.52.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.52.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.53.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.53.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
