@@ -75,6 +75,7 @@ public class FrameAngelRadar : MVRScript
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
     private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
     private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
+    private const float TrackedHandAcquireIntervalSeconds = 0.50f;
     private const float RadarVisibilityFadeSeconds = 0.18f;
     private const float WristRevealGraceSeconds = 0.55f;
     private const float WristHandOffDistanceMeters = 0.61f;
@@ -516,6 +517,7 @@ public class FrameAngelRadar : MVRScript
     private bool resizeGrabActive;
     private bool moveGrabUsesGripFallback;
     private bool resizeGrabUsesGripFallback;
+    private bool trackedHandReceiverRegistered;
     private bool resizeHandleDismissedUntilMoveRelease;
     private bool ovrLeftGrabHapticActive;
     private bool ovrRightGrabHapticActive;
@@ -543,6 +545,7 @@ public class FrameAngelRadar : MVRScript
     private float nextGlobalPreferencesFlushTime;
     private float nextGlobalPreferencesPollTime;
     private float nextRecorderVisibilityPollTime;
+    private float nextTrackedHandAcquireAt;
     private float radarVisibilityAlpha = 1.0f;
     private float radarVisibilityTargetAlpha = 1.0f;
     private float resizeStartScale;
@@ -591,7 +594,8 @@ public class FrameAngelRadar : MVRScript
         LoadGlobalPreferences();
         BuildUi();
         EnsureRuntimeVisuals();
-        ConnectTrackedHandRuntime();
+        nextTrackedHandAcquireAt = 0.0f;
+        MaintainTrackedHandConnection();
         SetStatus("Frame Angel Radar " + Version + " " + EditionName + " ready.");
     }
 
@@ -605,12 +609,13 @@ public class FrameAngelRadar : MVRScript
         PollSharedGlobalPreferences();
         FlushGlobalPreferencesIfDue(false);
         TickGrabHandleHapticStops(Time.unscaledTime);
+        MaintainTrackedHandConnection();
         TickRadar();
     }
 
     private void OnDestroy()
     {
-        DisconnectTrackedHandRuntime();
+        DisconnectTrackedHandRuntime(true);
         FlushGlobalPreferencesIfDue(true);
         DestroySessionGrabHandles();
         DestroyRuntimeVisuals();
@@ -3532,29 +3537,67 @@ public class FrameAngelRadar : MVRScript
         return -Mathf.Atan2(localWorldRight.z, localWorldRight.x) * Mathf.Rad2Deg;
     }
 
-    private void ConnectTrackedHandRuntime()
+    private void MaintainTrackedHandConnection()
     {
-        GameObject root = GameObject.Find(TrackedHandRuntimeRoot);
-        if (root == null)
+        if (trackedHandReceiverRegistered)
+        {
+            if (trackedHandRuntimeRoot != null
+                && trackedPalmAnchors[GrabHandLeft] != null
+                && trackedPalmAnchors[GrabHandRight] != null)
+            {
+                return;
+            }
+
+            DisconnectTrackedHandRuntime(true);
+            nextTrackedHandAcquireAt = 0.0f;
+        }
+
+        if (Time.unscaledTime < nextTrackedHandAcquireAt)
+        {
+            return;
+        }
+        nextTrackedHandAcquireAt = Time.unscaledTime + TrackedHandAcquireIntervalSeconds;
+        TryConnectTrackedHandRuntime();
+    }
+
+    private void TryConnectTrackedHandRuntime()
+    {
+        GameObject candidate = GameObject.Find(TrackedHandRuntimeRoot);
+        if (candidate == null)
         {
             return;
         }
 
-        trackedHandRuntimeRoot = root;
-        trackedPalmAnchors[GrabHandLeft] =
-            root.transform.Find(LeftPalmSegmentName);
-        trackedPalmAnchors[GrabHandRight] =
-            root.transform.Find(RightPalmSegmentName);
-        root.SendMessage(
-            "RegisterHandStateReceiver",
-            gameObject,
-            SendMessageOptions.RequireReceiver);
+        Transform leftPalm = candidate.transform.Find(LeftPalmSegmentName);
+        Transform rightPalm = candidate.transform.Find(RightPalmSegmentName);
+        if (leftPalm == null || rightPalm == null)
+        {
+            return;
+        }
+
+        try
+        {
+            candidate.SendMessage(
+                "RegisterHandStateReceiver",
+                gameObject,
+                SendMessageOptions.RequireReceiver);
+            trackedHandRuntimeRoot = candidate;
+            trackedPalmAnchors[GrabHandLeft] = leftPalm;
+            trackedPalmAnchors[GrabHandRight] = rightPalm;
+            trackedHandReceiverRegistered = true;
+        }
+        catch
+        {
+            DisconnectTrackedHandRuntime(false);
+        }
     }
 
-    private void DisconnectTrackedHandRuntime()
+    private void DisconnectTrackedHandRuntime(bool unregister)
     {
-        GameObject root = trackedHandRuntimeRoot;
+        GameObject previousRoot = trackedHandRuntimeRoot;
+        bool wasRegistered = trackedHandReceiverRegistered;
         trackedHandRuntimeRoot = null;
+        trackedHandReceiverRegistered = false;
         for (int hand = GrabHandLeft; hand <= GrabHandRight; hand++)
         {
             trackedPalmAnchors[hand] = null;
@@ -3564,10 +3607,13 @@ public class FrameAngelRadar : MVRScript
             trackedMiddlePinched[hand] = false;
             trackedHoldGrabLatched[hand] = false;
         }
-        if (root == null) return;
+        if (!unregister || !wasRegistered || previousRoot == null)
+        {
+            return;
+        }
         try
         {
-            root.SendMessage(
+            previousRoot.SendMessage(
                 "UnregisterHandStateReceiver",
                 gameObject,
                 SendMessageOptions.DontRequireReceiver);

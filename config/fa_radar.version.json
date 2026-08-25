@@ -5,7 +5,7 @@
   "channel": "dev",
   "branch": "codex/0.1.53-world-wrist",
   "status": "world-mode-empty-stock-grab",
-  "versionNote": "0.1.53 preserves the complete 0.1.52 renderer and detailed controls, adds one top-level World mode, removes excessive visible placement controls, and enables the existing VaM stock full-grab center target on Empty and CUA hosts.",
+  "versionNote": "0.1.53 preserves the complete 0.1.52 renderer and detailed controls, adds one top-level World mode, removes excessive visible placement controls, enables the existing VaM stock full-grab center target on Empty and CUA hosts, and re-acquires the existing FAAR tracked-palm runtime when its root appears after Radar.",
   "sourceLineage": {
     "referenceRepo": "C:\\projects\\fa_keyboard",
     "referenceMode": "read-only HUD placement and emissive overlay pattern",

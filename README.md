@@ -51,6 +51,9 @@ The current slice is compiled C# only:
   existing proximity path, while optical pinch/HoldGrab can lease Radar's
   invisible VaM `FreeControllerV3` target through VaM's normal full-grab
   ownership; no visible grab handles are drawn
+- the existing FAAR tracked-palm receiver is re-acquired at a bounded cadence
+  while disconnected, so plugin/root load order cannot permanently strand Palm
+  mode; disconnect and destruction unregister the prior receiver cleanly
 - optional `Radar Mode` values: `HUD`, `World`, `wrist-left`, `wrist-right`,
   `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
   modes start hidden until the wrist-twist reveal is active; Radar reads only

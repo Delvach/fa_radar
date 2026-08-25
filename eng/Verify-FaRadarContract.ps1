@@ -93,6 +93,11 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "FrameAngelRadarProPreferencesPath",
         "FrameAngelRadarCuaCommonPreferencesPath",
         "FrameAngelRadarCuaProPreferencesPath",
+        "TrackedHandAcquireIntervalSeconds",
+        "MaintainTrackedHandConnection();",
+        "TryConnectTrackedHandRuntime",
+        "trackedHandReceiverRegistered",
+        "DisconnectTrackedHandRuntime(true)",
         "FrameAngelRadarCommonPreferencesSchemaVersion",
         "FrameAngelRadarProPreferencesSchemaVersion",
         "FrameAngelRadarCuaCommonPreferencesSchemaVersion",
@@ -875,6 +880,41 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         $grabEligibilityBlock = $plugin.Substring($grabEligibilityIndex, $ensurePrimaryIndex - $grabEligibilityIndex)
         if ($grabEligibilityBlock.Contains("IsCuaPreferenceProfileActive") -or $grabEligibilityBlock.Contains("IsCustomUnityAssetAtom")) {
             Add-Failure "The existing stock full-grab center target must remain eligible on Empty/CUA hosts."
+        }
+    }
+
+    $maintainHandsIndex = $plugin.IndexOf("private void MaintainTrackedHandConnection()")
+    $tryConnectHandsIndex = $plugin.IndexOf("private void TryConnectTrackedHandRuntime()", [Math]::Max(0, $maintainHandsIndex))
+    $disconnectHandsIndex = $plugin.IndexOf("private void DisconnectTrackedHandRuntime(bool unregister)", [Math]::Max(0, $tryConnectHandsIndex))
+    $applyHandStateIndex = $plugin.IndexOf("public void ApplyHandRuntimeStateJson", [Math]::Max(0, $disconnectHandsIndex))
+    if ($maintainHandsIndex -lt 0 -or $tryConnectHandsIndex -le $maintainHandsIndex -or $disconnectHandsIndex -le $tryConnectHandsIndex -or $applyHandStateIndex -le $disconnectHandsIndex) {
+        Add-Failure "Bounded tracked-hand lifecycle blocks must remain inspectable."
+    } else {
+        $maintainHandsBlock = $plugin.Substring($maintainHandsIndex, $tryConnectHandsIndex - $maintainHandsIndex)
+        foreach ($snippet in @(
+            "trackedHandReceiverRegistered",
+            "trackedHandRuntimeRoot != null",
+            "trackedPalmAnchors[GrabHandLeft] != null",
+            "trackedPalmAnchors[GrabHandRight] != null",
+            "DisconnectTrackedHandRuntime(true);",
+            "Time.unscaledTime < nextTrackedHandAcquireAt",
+            "TryConnectTrackedHandRuntime();"
+        )) {
+            if (-not $maintainHandsBlock.Contains($snippet)) {
+                Add-Failure "Tracked-hand maintenance missing lifecycle join: $snippet"
+            }
+        }
+
+        $disconnectHandsBlock = $plugin.Substring($disconnectHandsIndex, $applyHandStateIndex - $disconnectHandsIndex)
+        foreach ($snippet in @(
+            "GameObject previousRoot = trackedHandRuntimeRoot;",
+            "bool wasRegistered = trackedHandReceiverRegistered;",
+            "!unregister || !wasRegistered || previousRoot == null",
+            '"UnregisterHandStateReceiver"'
+        )) {
+            if (-not $disconnectHandsBlock.Contains($snippet)) {
+                Add-Failure "Tracked-hand disconnect missing stale-receiver cleanup: $snippet"
+            }
         }
     }
 

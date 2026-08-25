@@ -33,6 +33,8 @@ The `0.1.53` branch preserves the complete 0.1.52 generated visual treatment,
 keeps the normal plugin UI trimmed to daily controls, and retains all legacy
 placement storables without drawing their offset/rotation/desktop/VR control
 forest. One visible `World` mode selects the existing static-world anchor. It
+also replaces 0.1.52's one-shot hand-root registration with bounded
+re-acquisition and idempotent unregister while disconnected. It
 also keeps the 0.1.39 performance budget pass and fixes player
 navigation/crosshair utility markers so they resolve to the active viewer
 height instead of VaM's floor-anchored utility atom root. The 0.1.41 polish
