@@ -1204,6 +1204,7 @@ public class FrameAngelRadar : MVRScript
         ConfigureGlobalPreferenceCallback(availableAtomMarkersEnabledField);
         ConfigureGlobalPreferenceCallback(clickSelectMarkersField);
         ConfigureGlobalPreferenceCallback(grabHandlesEnabledField);
+        ConfigureGlobalPreferenceField(radarModeField);
         if (radarModeField != null)
         {
             radarModeField.setCallbackFunction = delegate(string value)

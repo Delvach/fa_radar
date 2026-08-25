@@ -43,8 +43,6 @@
          "Global Prefs Auto Save" : "true",
          "Radar Enabled" : "true",
          "Room Compass" : "false",
-         "Radar Mode" : "HUD",
-         "Grab Handles Enabled" : "true",
          "Desktop Placement" : "Pinned In World",
          "Anchor Mode" : "Containing Atom",
          "Anchor Atom UID" : "",

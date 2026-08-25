@@ -1144,8 +1144,6 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
         '"Desktop Placement" : "Pinned In World"',
         '"CUA Anchor Preset" : "true"',
         '"Room Compass" : "false"',
-        '"Radar Mode" : "HUD"',
-        '"Grab Handles Enabled" : "true"',
         '"HUD Offset X"',
         '"HUD Offset Y"',
         '"HUD Offset Z"',
@@ -1176,8 +1174,6 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
         '"CUA Anchor Preset" : "true"',
         '"Radar Enabled" : "true"',
         '"Room Compass" : "false"',
-        '"Radar Mode" : "HUD"',
-        '"Grab Handles Enabled" : "true"',
         '"HUD Scale" : "0.75"'
     )
     foreach ($snippet in $requiredCuaPresetSnippets) {
