@@ -1,5 +1,6 @@
 param(
-    [string]$RepoRoot = ""
+    [string]$RepoRoot = "",
+    [string]$AssemblyPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -93,6 +94,7 @@ Assert-Contains $source 'ApplyRootPose' 'Room/Scene pose state topology'
 @(
     'System.IO',
     'System.Reflection',
+    'System.Runtime.InteropServices',
     'MVR.FileManagementSecure',
     'FileManagerSecure',
     'Valve.VR',
@@ -128,5 +130,28 @@ Assert-Contains $source 'ApplyRootPose' 'Room/Scene pose state topology'
 Assert-Contains $preset 'Custom/Plugins/fa_radar.2.0.0.dll' 'preset DLL path'
 Assert-Contains $preset 'plugin#0_FrameAngelRadar2' 'preset public type storable'
 Assert-Contains $preset '"Mode" : "Scene"' 'preset default Scene mode'
+
+if (-not [string]::IsNullOrWhiteSpace($AssemblyPath)) {
+    if (-not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) {
+        throw "Radar 2 assembly does not exist: $AssemblyPath"
+    }
+    $resolvedAssemblyPath = (Resolve-Path -LiteralPath $AssemblyPath).Path
+    $assemblyBytes = [System.IO.File]::ReadAllBytes($resolvedAssemblyPath)
+    $assemblyAscii = [System.Text.Encoding]::ASCII.GetString($assemblyBytes)
+    $assemblyUnicode = [System.Text.Encoding]::Unicode.GetString($assemblyBytes)
+    @(
+        'System.IO',
+        'System.Reflection',
+        'System.Runtime.InteropServices',
+        'MVR.FileManagementSecure',
+        'FileManagerSecure',
+        'Valve.VR',
+        'SteamVR',
+        'OutAttribute'
+    ) | ForEach-Object {
+        Assert-Absent $assemblyAscii $_ ("compiled assembly metadata " + $_)
+        Assert-Absent $assemblyUnicode $_ ("compiled assembly metadata " + $_)
+    }
+}
 
 Write-Host "FA Radar 2 contract verification passed."

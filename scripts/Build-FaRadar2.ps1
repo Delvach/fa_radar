@@ -106,6 +106,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Radar 2 compile failed with exit code $LASTEXITCODE."
 }
 
+& (Join-Path $resolvedRepoRoot "eng\Verify-FaRadar2Contract.ps1") `
+    -RepoRoot $resolvedRepoRoot `
+    -AssemblyPath $pluginPath
+
 $stagedPluginDirectory = Join-Path $stageDirectory "Custom\Plugins"
 $stagedPresetDirectory = Join-Path $stageDirectory "Custom\Atom\Empty"
 Ensure-Directory $stagedPluginDirectory
@@ -158,7 +162,11 @@ $receipt = [ordered]@{
         }
     )
     managedReferenceRoot = $resolvedManagedDir
-    verifier = "eng/Verify-FaRadar2Contract.ps1"
+    verifier = [ordered]@{
+        path = "eng/Verify-FaRadar2Contract.ps1"
+        sourceContract = "passed-before-compile"
+        compiledMetadata = "passed-after-compile"
+    }
     installation = "not-performed"
     runtimeObservation = "not-performed"
     operatorAcceptance = "not-performed"

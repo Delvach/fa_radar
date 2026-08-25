@@ -516,8 +516,8 @@ public class FrameAngelRadar2 : MVRScript
 
     private void TryStartSceneGrab()
     {
-        int hand;
-        if (!TryResolveHostGrabbedHand(out hand))
+        int hand = ResolveHostGrabbedHand();
+        if (hand == NoHand)
         {
             return;
         }
@@ -667,20 +667,17 @@ public class FrameAngelRadar2 : MVRScript
             || trackedHoldGrabLatched[hand];
     }
 
-    private bool TryResolveHostGrabbedHand(out int hand)
+    private int ResolveHostGrabbedHand()
     {
-        hand = NoHand;
         if (IsHostGrabbedByHand(LeftHand))
         {
-            hand = LeftHand;
-            return true;
+            return LeftHand;
         }
         if (IsHostGrabbedByHand(RightHand))
         {
-            hand = RightHand;
-            return true;
+            return RightHand;
         }
-        return false;
+        return NoHand;
     }
 
     private bool IsHostGrabbedByHand(int hand)
