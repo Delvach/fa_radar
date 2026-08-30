@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.54`.
+Current branch version: `0.1.55`.
 
-Current product contract version: `0.1.54`.
+Current product contract version: `0.1.55`.
 
 The current slice is compiled C# only:
 
@@ -56,8 +56,8 @@ The current slice is compiled C# only:
   mode; disconnect and destruction unregister the prior receiver cleanly
 - optional `Radar Mode` values: `HUD`, `World`, `wrist-left`, `wrist-right`,
   `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
-  modes start hidden until the wrist-twist reveal is active; Radar reads only
-  active VaM controller/hand transforms and fails closed when neither exists,
+  modes reveal from the accepted FAAR optical-palm presentation signal when it
+  is live, otherwise retain the existing active VaM controller/hand fallback,
   without taking a hard dependency on VaM's prohibited SteamVR API surface
 - wrist modes use their own wrist-relative offset/scale prefs and can hand off
   to the opposing controller with a grip drag across the body
@@ -68,10 +68,11 @@ The current slice is compiled C# only:
   center-grab toggle, but no manual offset, anchor-rotation, desktop/VR, or
   throw-placement controls
 - atom-attached `Room Compass` is default-off on both Empty and CUA hosts; when
-  enabled it leaves the host atom untouched, places Radar content at scene origin, bypasses radar-edge
-  clamping/fading, and maps world positions and height at 1:1 while retaining
-  tunable Radar visual scale; its sphere, rings, and meter grid expand to the
-  configured `Radar Range Meters` in scene space
+  enabled it leaves the host atom untouched, places Radar content at scene
+  origin with identity rotation and unit scale, bypasses radar-edge
+  clamping/fading, maps one local unit to one world meter, and renders light
+  ranges/cones at their full scene size; its sphere, rings, and meter grid
+  expand to the configured `Radar Range Meters` in scene space
 - FAAR visibility handshake reads
   `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
   Radar visuals when `radarHudVisible` is false; the plugin status reports
@@ -186,12 +187,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.54.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.54.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.55.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.55.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.54.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.54.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.55.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.55.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

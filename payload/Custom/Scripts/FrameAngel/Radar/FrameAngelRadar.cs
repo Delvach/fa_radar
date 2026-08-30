@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.54";
+    private const string Version = "0.1.55";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -520,7 +520,6 @@ public class FrameAngelRadar : MVRScript
     private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
     private bool wristCompassRevealed;
-    private bool wristRevealIntentArmed;
     private bool radarVisibilityAlphaInitialized;
     private bool primaryGrabHandleCreatePending;
     private bool resizeGrabHandleCreatePending;
@@ -3725,7 +3724,7 @@ public class FrameAngelRadar : MVRScript
 
         hudRoot.transform.position = Vector3.zero;
         hudRoot.transform.rotation = Quaternion.identity;
-        hudRoot.transform.localScale = Vector3.one * ResolveHudScale();
+        hudRoot.transform.localScale = Vector3.one;
     }
 
     private void ApplyViewAnchor(Transform viewer)
@@ -3954,7 +3953,6 @@ public class FrameAngelRadar : MVRScript
         {
             wristCompassRevealed = true;
             wristRevealGraceUntil = Time.unscaledTime + WristRevealGraceSeconds;
-            wristRevealIntentArmed = false;
             wristRevealIntentStartedAt = -1.0f;
             wristHideIntentStartedAt = -1.0f;
             return;
@@ -3966,14 +3964,13 @@ public class FrameAngelRadar : MVRScript
             bool presented = trackedHandsLive[palm]
                 && trackedPalmsPresented[palm]
                 && ResolveTrackedPalmTransform(palm) != null;
-            UpdateWristRevealFromIntent(presented, presented, !presented);
+            UpdateWristRevealFromIntent(presented, presented);
             return;
         }
 
         if (IsWristCompassAlwaysOn())
         {
             wristCompassRevealed = ResolveWristCompassAnchorTransform() != null;
-            wristRevealIntentArmed = false;
             wristRevealIntentStartedAt = -1.0f;
             wristHideIntentStartedAt = -1.0f;
             return;
@@ -3982,18 +3979,25 @@ public class FrameAngelRadar : MVRScript
         Transform wristAnchor = ResolveWristCompassAnchorTransform();
         if (wristAnchor == null)
         {
-            UpdateWristRevealFromIntent(false, false, true);
+            UpdateWristRevealFromIntent(false, false);
             return;
         }
 
         int hand = ResolveWristCompassHand();
+        Transform trackedPalmAnchor = ResolveTrackedPalmTransform(hand);
+        if (trackedPalmAnchor != null && wristAnchor == trackedPalmAnchor)
+        {
+            bool presented = trackedPalmsPresented[hand];
+            UpdateWristRevealFromIntent(presented, presented);
+            return;
+        }
+
         float twistDegrees = ResolveControllerOutwardTwistDegrees(wristAnchor, hand, viewer);
         float threshold = Mathf.Clamp(ReadFloat(wristTwistDegreesField, 65.0f), 15.0f, 120.0f);
         float releaseThreshold = Mathf.Max(0.0f, threshold - 12.0f);
         bool revealedNow = UpdateWristRevealFromIntent(
             twistDegrees >= threshold,
-            twistDegrees >= releaseThreshold,
-            twistDegrees < releaseThreshold);
+            twistDegrees >= releaseThreshold);
         if (revealedNow)
         {
             if (IsMotionControllerTransform(wristAnchor, hand))
@@ -4004,12 +4008,11 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
-    private bool UpdateWristRevealFromIntent(bool entryIntent, bool keepIntent, bool canArm)
+    private bool UpdateWristRevealFromIntent(bool entryIntent, bool keepIntent)
     {
         float now = Time.unscaledTime;
         if (wristCompassRevealed)
         {
-            wristRevealIntentArmed = false;
             wristRevealIntentStartedAt = -1.0f;
             if (keepIntent || now < wristRevealGraceUntil)
             {
@@ -4030,19 +4033,11 @@ public class FrameAngelRadar : MVRScript
 
             wristCompassRevealed = false;
             wristHideIntentStartedAt = -1.0f;
-            wristRevealIntentArmed = canArm;
             return false;
         }
 
         wristHideIntentStartedAt = -1.0f;
-        if (canArm)
-        {
-            wristRevealIntentArmed = true;
-            wristRevealIntentStartedAt = -1.0f;
-            return false;
-        }
-
-        if (!wristRevealIntentArmed || !entryIntent)
+        if (!entryIntent)
         {
             wristRevealIntentStartedAt = -1.0f;
             return false;
@@ -4060,7 +4055,6 @@ public class FrameAngelRadar : MVRScript
         }
 
         wristCompassRevealed = true;
-        wristRevealIntentArmed = false;
         wristRevealIntentStartedAt = -1.0f;
         wristHideIntentStartedAt = -1.0f;
         return true;
@@ -4070,18 +4064,24 @@ public class FrameAngelRadar : MVRScript
     {
         wristRevealIntentMode = radarMode ?? "";
         wristRevealGraceUntil = 0.0f;
-        wristRevealIntentArmed = false;
         wristRevealIntentStartedAt = -1.0f;
         wristHideIntentStartedAt = -1.0f;
     }
 
     private Transform ResolveWristCompassAnchorTransform()
     {
+        int hand = ResolveWristCompassHand();
+        Transform trackedPalmAnchor = ResolveTrackedPalmTransform(hand);
+        if (trackedPalmAnchor != null)
+        {
+            return trackedPalmAnchor;
+        }
+
         if (IsPalmCompassModeActive())
         {
-            return ResolveTrackedPalmTransform(ResolveWristCompassHand());
+            return null;
         }
-        return ResolveHandOrControllerTransform(ResolveWristCompassHand());
+        return ResolveHandOrControllerTransform(hand);
     }
 
     private Transform ResolveTrackedPalmTransform(int hand)
@@ -4454,7 +4454,10 @@ public class FrameAngelRadar : MVRScript
 
     private bool ShouldFlattenRadarY()
     {
-        return desktopTopDownField != null && desktopTopDownField.val && !IsVrDisplayActive();
+        return !IsRoomCompassModeActive()
+            && desktopTopDownField != null
+            && desktopTopDownField.val
+            && !IsVrDisplayActive();
     }
 
     private void UpdateTargetBlip(RadarFrame frame, Transform target, bool showGroundDrop)
@@ -6751,6 +6754,11 @@ public class FrameAngelRadar : MVRScript
 
     private float ResolveLightVolumeScale()
     {
+        if (IsRoomCompassModeActive())
+        {
+            return 1.0f;
+        }
+
         return Mathf.Clamp(ReadFloat(lightVolumeScaleField, 0.62f), 0.1f, 2.0f);
     }
 
@@ -9041,7 +9049,7 @@ public class FrameAngelRadar : MVRScript
     {
         if (IsRoomCompassModeActive())
         {
-            return Mathf.Max(0.001f, ResolveHudScale() * ResolveVisualRadius());
+            return ResolveVisualRadius();
         }
 
         return ResolveConfiguredRadarRangeMeters();
@@ -9056,7 +9064,7 @@ public class FrameAngelRadar : MVRScript
     {
         if (IsRoomCompassModeActive())
         {
-            return ResolveConfiguredRadarRangeMeters() / Mathf.Max(0.001f, ResolveHudScale());
+            return ResolveConfiguredRadarRangeMeters();
         }
 
         return ResolveVisualRadius();
@@ -9066,7 +9074,7 @@ public class FrameAngelRadar : MVRScript
     {
         if (IsRoomCompassModeActive())
         {
-            return Mathf.Max(0.001f, ResolveHudScale() * ResolveVisualRadius());
+            return ResolveVisualRadius();
         }
 
         return Mathf.Max(0.25f, heightScaleMetersField.val) * ResolveFloorAreaScale();

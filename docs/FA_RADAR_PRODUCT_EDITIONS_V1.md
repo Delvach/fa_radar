@@ -1,17 +1,17 @@
 # FA Radar Product Editions V1
 
-Updated: 2026-08-25
+Updated: 2026-08-30
 
 ## Decision
 
 Free and Pro are compiled from one codebase. Edition differences are controlled
 by build gates, not by maintaining separate runtime forks.
 
-The current build slice is `0.1.54`. It produces Free and Pro DLLs from the
+The current build slice is `0.1.55`. It produces Free and Pro DLLs from the
 same source file:
 
-- `fa_radar.free.0.1.54.dll`
-- `fa_radar.pro.0.1.54.dll`
+- `fa_radar.free.0.1.55.dll`
+- `fa_radar.pro.0.1.55.dll`
 
 The first Free testing package is `FrameAngelDev.Radar.1.var`. Public release
 branding remains undecided.
@@ -26,7 +26,7 @@ The first release uses native VaM plugin UI only.
 - no separate control panel outside VaM's plugin UI
 
 Controls for the first version are ordinary plugin checkboxes, sliders, popups,
-buttons, and text fields, but 0.1.54 intentionally keeps Free sparse: Radar
+buttons, and text fields, but 0.1.55 intentionally keeps Free sparse: Radar
 mode, HUD/wrist scale, Room Compass, and stock-grab enable/haptics. Legacy
 desktop/VR, HUD/wrist offsets, anchor rotation, and static coordinates remain
 registered compatibility storables without visible tuning controls.
@@ -95,9 +95,13 @@ Room Compass behavior, reads only active public VaM controller/hand transforms
 for wrist placement, fails closed when neither exists, and restores an invisible
 VaM full-grab target for optical HoldGrab movement without a hard SteamVR
 assembly dependency.
-The `0.1.54` pass exposes the existing static-world authority as one `World`
+The `0.1.53` pass exposes the existing static-world authority as one `World`
 mode and makes the same invisible stock full-grab target eligible on
 scene/session, Empty, and CUA hosts without adding a Radar-owned gesture path.
+The `0.1.55` pass retains that surface and the 0.1.54 renderer/cache work while
+joining Wrist modes to the accepted optical-palm presentation seam before the
+physical controller fallback. Room Compass now uses a literal identity root,
+one local unit per world meter, and full-size light range/cone geometry.
 
 ## Free Edition
 
@@ -198,7 +202,7 @@ Rules:
 Current build helpers stage candidate `.var` packages:
 
 - `FrameAngelDev.Radar.1.var`
-- `fa_radar.pro.0.1.54.var`
+- `fa_radar.pro.0.1.55.var`
 
 The Pro candidate package includes both creator presets under
 `Custom/Atom/Empty` and `Custom/Atom/CustomUnityAsset`; Free does not ship

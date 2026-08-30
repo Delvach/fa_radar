@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.54"',
+        'private const string Version = "0.1.55"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -731,7 +731,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "BuildWristCompassUi();"
         )) {
             if ($sceneSessionUiBlock.Contains($legacyPlacementCall)) {
-                Add-Failure "0.1.54 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
+                Add-Failure "0.1.55 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
             }
         }
     }
@@ -829,7 +829,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
                 "CreateToggle(grabHapticsEnabledField, true);"
             )) {
                 if (-not $freeEmptyUiBlock.Contains($snippet)) {
-                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.54 mode/scale/grab control: $snippet"
+                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.55 mode/scale/grab control: $snippet"
                 }
             }
             if ($freeEmptyUiBlock.Contains("BuildProFilterUi();") -or $freeEmptyUiBlock.Contains("CreateSlider(radarRangeMetersField")) {
@@ -1085,8 +1085,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.54.dll",
-        "fa_radar.pro.0.1.54.dll",
+        "fa_radar.free.0.1.55.dll",
+        "fa_radar.pro.0.1.55.dll",
         "UnityEngine.PhysicsModule.dll",
         "UnityEngine.JSONSerializeModule.dll",
         "FrameAngelDev.Radar.1.var",
@@ -1178,7 +1178,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.54.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.55.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -1209,7 +1209,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.54.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.55.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"pluginLabel" : "Frame Angel Radar CUA"',
         '"CUA Anchor Preset" : "true"',
@@ -1265,11 +1265,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.54") {
-        Add-Failure "Version config must declare version 0.1.54."
+    if ($version.version -ne "0.1.55") {
+        Add-Failure "Version config must declare version 0.1.55."
     }
-    if ($version.branch -ne "codex/0.1.54-performance-wrist-intent") {
-        Add-Failure "Version config branch must match codex/0.1.54-performance-wrist-intent."
+    if ($version.branch -ne "codex/0.1.55-wrist-room-compass") {
+        Add-Failure "Version config branch must match codex/0.1.55-wrist-room-compass."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -1278,8 +1278,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.54.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.54.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.55.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.55.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -1290,8 +1290,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.54.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.54.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.55.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.55.dll."
     }
     if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
         Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
@@ -1391,8 +1391,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.54.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.54.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.55.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.55.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
@@ -1630,7 +1630,7 @@ if (Test-Path -LiteralPath $pluginPath) {
             "hudRoot.transform.SetParent(null, false);",
             "hudRoot.transform.position = Vector3.zero;",
             "hudRoot.transform.rotation = Quaternion.identity;",
-            "hudRoot.transform.localScale = Vector3.one * ResolveHudScale();"
+            "hudRoot.transform.localScale = Vector3.one;"
         )) {
             if (-not $roomCompassAnchorBlock.Contains($requiredRoomAnchorSnippet)) {
                 Add-Failure "Room Compass must leave its host atom untouched and place only Radar content at scene origin: $requiredRoomAnchorSnippet"
@@ -1647,11 +1647,34 @@ if (Test-Path -LiteralPath $pluginPath) {
         Add-Failure "Room Compass 1:1 scale helpers must remain inspectable."
     } else {
         $effectiveScaleBlock = $plugin.Substring($effectiveRangeIndex, $smoothPositionIndex - $effectiveRangeIndex)
-        if (([regex]::Matches($effectiveScaleBlock, 'ResolveHudScale\(\) \* ResolveVisualRadius\(\)')).Count -lt 2) {
-            Add-Failure "Room Compass horizontal and vertical map scales must both cancel the visual root scale for 1:1 world placement."
+        if (([regex]::Matches($effectiveScaleBlock, 'return ResolveVisualRadius\(\);')).Count -lt 2) {
+            Add-Failure "Room Compass horizontal and vertical map scales must both use the visual radius so one local unit maps to one world meter under the identity root."
         }
-        if (-not $effectiveScaleBlock.Contains("return ResolveConfiguredRadarRangeMeters() / Mathf.Max(0.001f, ResolveHudScale());")) {
-            Add-Failure "Room Compass surface radius must cancel HUD Scale so its sphere, rings, and grid use the configured world-space range."
+        if (-not $effectiveScaleBlock.Contains("return ResolveConfiguredRadarRangeMeters();")) {
+            Add-Failure "Room Compass sphere, rings, and grid must use the configured range directly in world meters."
+        }
+        if ($effectiveScaleBlock.Contains("ResolveHudScale() * ResolveVisualRadius()") -or
+            $effectiveScaleBlock.Contains("ResolveConfiguredRadarRangeMeters() / Mathf.Max(0.001f, ResolveHudScale())")) {
+            Add-Failure "Room Compass must not use the former HUD-scale cancellation mapping."
+        }
+    }
+
+    $flattenIndex = $plugin.IndexOf("private bool ShouldFlattenRadarY()")
+    $targetBlipIndex = $plugin.IndexOf("private void UpdateTargetBlip", [Math]::Max(0, $flattenIndex))
+    if ($flattenIndex -lt 0 -or $targetBlipIndex -le $flattenIndex -or
+        -not $plugin.Substring($flattenIndex, $targetBlipIndex - $flattenIndex).Contains("!IsRoomCompassModeActive()")) {
+        Add-Failure "Room Compass must remain full 3D and identity-rotated even when desktop top-down mode is configured."
+    }
+
+    $lightScaleIndex = $plugin.IndexOf("private float ResolveLightVolumeScale()")
+    $lightColorIndex = $plugin.IndexOf("private Color ResolveLightVolumeColor", [Math]::Max(0, $lightScaleIndex))
+    if ($lightScaleIndex -lt 0 -or $lightColorIndex -le $lightScaleIndex) {
+        Add-Failure "Light volume scale block must remain inspectable."
+    } else {
+        $lightScaleBlock = $plugin.Substring($lightScaleIndex, $lightColorIndex - $lightScaleIndex)
+        if (-not $lightScaleBlock.Contains("if (IsRoomCompassModeActive())") -or
+            -not $lightScaleBlock.Contains("return 1.0f;")) {
+            Add-Failure "Room Compass point-light ranges and spotlight cones must retain their full world-space size."
         }
     }
 
@@ -1679,6 +1702,31 @@ if (Test-Path -LiteralPath $pluginPath) {
     if ($clampIndex -lt 0 -or $worldMetersIndex -le $clampIndex -or
         -not $plugin.Substring($clampIndex, $worldMetersIndex - $clampIndex).Contains("if (IsRoomCompassModeActive())")) {
         Add-Failure "Room Compass must bypass radar-shell position clamping so world overlays stay on their subjects."
+    }
+
+    $wristRevealIndex = $plugin.IndexOf("private void UpdateWristCompassReveal(Transform viewer)")
+    $trackedPalmResolverIndex = $plugin.IndexOf("private Transform ResolveTrackedPalmTransform", [Math]::Max(0, $wristRevealIndex))
+    if ($wristRevealIndex -lt 0 -or $trackedPalmResolverIndex -le $wristRevealIndex) {
+        Add-Failure "Wrist reveal and anchor-selection block must remain inspectable."
+    } else {
+        $wristRevealBlock = $plugin.Substring($wristRevealIndex, $trackedPalmResolverIndex - $wristRevealIndex)
+        foreach ($requiredWristSnippet in @(
+            "Transform trackedPalmAnchor = ResolveTrackedPalmTransform(hand);",
+            "bool presented = trackedPalmsPresented[hand];",
+            "private bool UpdateWristRevealFromIntent(bool entryIntent, bool keepIntent)",
+            "return ResolveHandOrControllerTransform(hand);"
+        )) {
+            if (-not $wristRevealBlock.Contains($requiredWristSnippet)) {
+                Add-Failure "Wrist modes must consume the accepted optical-palm presentation seam and preserve the physical controller fallback: $requiredWristSnippet"
+            }
+        }
+        if ($wristRevealBlock.Contains("wristRevealIntentArmed")) {
+            Add-Failure "Wrist reveal must not retain the neutral-arm gate that can deadlock a mode entered while already presented."
+        }
+        if ($wristRevealBlock.IndexOf("Transform trackedPalmAnchor = ResolveTrackedPalmTransform(hand);") -gt
+            $wristRevealBlock.IndexOf("return ResolveHandOrControllerTransform(hand);")) {
+            Add-Failure "Wrist anchor selection must prefer the live optical palm before falling back to the physical controller/hand source."
+        }
     }
 
     $labelRotationIndex = $plugin.IndexOf("private Quaternion ResolveLabelRadarRotation")
