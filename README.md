@@ -3,9 +3,9 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.55`.
+Current branch version: `0.1.56`.
 
-Current product contract version: `0.1.55`.
+Current product contract version: `0.1.56`.
 
 The current slice is compiled C# only:
 
@@ -53,7 +53,8 @@ The current slice is compiled C# only:
   ownership; no visible grab handles are drawn
 - the existing FAAR tracked-palm receiver is re-acquired at a bounded cadence
   while disconnected, so plugin/root load order cannot permanently strand Palm
-  mode; disconnect and destruction unregister the prior receiver cleanly
+  mode; disconnect and destruction unregister the prior receiver cleanly; the
+  consumer accepts the current compatible v8 packet and the previous v7 packet
 - optional `Radar Mode` values: `HUD`, `World`, `wrist-left`, `wrist-right`,
   `wrist-left-always-on`, and `wrist-right-always-on`; non-always-on wrist
   modes reveal from the accepted FAAR optical-palm presentation signal when it
@@ -73,6 +74,8 @@ The current slice is compiled C# only:
   clamping/fading, maps one local unit to one world meter, and renders light
   ranges/cones at their full scene size; its sphere, rings, and meter grid
   expand to the configured `Radar Range Meters` in scene space
+- the same default-off `Room Compass` toggle works on the scene/session plugin;
+  its mapping is no longer silently disabled merely because no atom hosts Radar
 - FAAR visibility handshake reads
   `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
   Radar visuals when `radarHudVisible` is false; the plugin status reports
@@ -187,12 +190,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.55.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.55.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.56.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.56.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.55.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.55.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.56.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.56.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

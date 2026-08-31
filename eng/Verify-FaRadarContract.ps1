@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.55"',
+        'private const string Version = "0.1.56"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -731,7 +731,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "BuildWristCompassUi();"
         )) {
             if ($sceneSessionUiBlock.Contains($legacyPlacementCall)) {
-                Add-Failure "0.1.55 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
+                Add-Failure "0.1.56 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
             }
         }
     }
@@ -829,7 +829,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
                 "CreateToggle(grabHapticsEnabledField, true);"
             )) {
                 if (-not $freeEmptyUiBlock.Contains($snippet)) {
-                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.55 mode/scale/grab control: $snippet"
+                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.56 mode/scale/grab control: $snippet"
                 }
             }
             if ($freeEmptyUiBlock.Contains("BuildProFilterUi();") -or $freeEmptyUiBlock.Contains("CreateSlider(radarRangeMetersField")) {
@@ -915,6 +915,25 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         )) {
             if (-not $disconnectHandsBlock.Contains($snippet)) {
                 Add-Failure "Tracked-hand disconnect missing stale-receiver cleanup: $snippet"
+            }
+        }
+
+        $applyHudAnchorIndex = $plugin.IndexOf("private void ApplyHudAnchor", $applyHandStateIndex)
+        if ($applyHudAnchorIndex -le $applyHandStateIndex) {
+            Add-Failure "Tracked-hand state compatibility block must remain inspectable."
+        } else {
+            $applyHandStateBlock = $plugin.Substring($applyHandStateIndex, $applyHudAnchorIndex - $applyHandStateIndex)
+            foreach ($snippet in @(
+                'private const string TrackedHandStateSchema = "faar.tracked-hand-state.v8";',
+                'private const string PreviousTrackedHandStateSchema = "faar.tracked-hand-state.v7";',
+                "!IsSupportedTrackedHandStateSchema(state.schema)",
+                "private bool IsSupportedTrackedHandStateSchema(string schema)",
+                "schema, TrackedHandStateSchema, StringComparison.Ordinal",
+                "schema, PreviousTrackedHandStateSchema, StringComparison.Ordinal"
+            )) {
+                if (-not $plugin.Contains($snippet)) {
+                    Add-Failure "Tracked-hand consumer must accept only the current and known-compatible state schemas: $snippet"
+                }
             }
         }
     }
@@ -1085,8 +1104,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.55.dll",
-        "fa_radar.pro.0.1.55.dll",
+        "fa_radar.free.0.1.56.dll",
+        "fa_radar.pro.0.1.56.dll",
         "UnityEngine.PhysicsModule.dll",
         "UnityEngine.JSONSerializeModule.dll",
         "FrameAngelDev.Radar.1.var",
@@ -1178,7 +1197,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.55.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.56.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -1209,7 +1228,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.55.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.56.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"pluginLabel" : "Frame Angel Radar CUA"',
         '"CUA Anchor Preset" : "true"',
@@ -1265,11 +1284,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.55") {
-        Add-Failure "Version config must declare version 0.1.55."
+    if ($version.version -ne "0.1.56") {
+        Add-Failure "Version config must declare version 0.1.56."
     }
-    if ($version.branch -ne "codex/0.1.55-wrist-room-compass") {
-        Add-Failure "Version config branch must match codex/0.1.55-wrist-room-compass."
+    if ($version.branch -ne "codex/0.1.56-live-wrist-room") {
+        Add-Failure "Version config branch must match codex/0.1.56-live-wrist-room."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -1278,8 +1297,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.55.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.55.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.56.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.56.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -1290,8 +1309,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.55.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.55.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.56.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.56.dll."
     }
     if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
         Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
@@ -1391,8 +1410,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.55.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.55.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.56.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.56.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
@@ -1614,9 +1633,11 @@ if (Test-Path -LiteralPath $pluginPath) {
         Add-Failure "Room Compass activation helper must remain inspectable."
     } else {
         $roomCompassHelperBlock = $plugin.Substring($roomCompassHelperIndex, $sceneHostHelperIndex - $roomCompassHelperIndex)
-        if (-not $roomCompassHelperBlock.Contains("IsAttachedAtomAnchorHostActive()") -or
-            -not $roomCompassHelperBlock.Contains("roomCompassField.val")) {
-            Add-Failure "Room Compass must be available to every atom-attached Radar host and controlled by its default-off storable."
+        if (-not $roomCompassHelperBlock.Contains("roomCompassField.val")) {
+            Add-Failure "Room Compass must remain controlled by its default-off storable."
+        }
+        if ($roomCompassHelperBlock.Contains("IsAttachedAtomAnchorHostActive()")) {
+            Add-Failure "Room Compass is exposed on every host surface and must not be disabled for scene/session plugins."
         }
     }
 

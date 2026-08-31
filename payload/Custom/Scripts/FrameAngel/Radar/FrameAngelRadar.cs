@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.55";
+    private const string Version = "0.1.56";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -67,7 +67,8 @@ public class FrameAngelRadar : MVRScript
     private const string RadarModePalmLeft = "palm-left";
     private const string RadarModePalmRight = "palm-right";
     private const string TrackedHandRuntimeRoot = "FAARTrackedHandArmColliders";
-    private const string TrackedHandStateSchema = "faar.tracked-hand-state.v7";
+    private const string TrackedHandStateSchema = "faar.tracked-hand-state.v8";
+    private const string PreviousTrackedHandStateSchema = "faar.tracked-hand-state.v7";
     private const string LeftPalmSegmentName = "Segment_0";
     private const string RightPalmSegmentName = "Segment_27";
     private const string GrabHandlePrimarySuffix = "primary";
@@ -1789,8 +1790,7 @@ public class FrameAngelRadar : MVRScript
 
     private bool IsRoomCompassModeActive()
     {
-        return IsAttachedAtomAnchorHostActive()
-            && roomCompassField != null
+        return roomCompassField != null
             && roomCompassField.val;
     }
 
@@ -3640,8 +3640,7 @@ public class FrameAngelRadar : MVRScript
     {
         TrackedHandRuntimeState state =
             JsonUtility.FromJson<TrackedHandRuntimeState>(json);
-        if (state == null || !string.Equals(
-            state.schema, TrackedHandStateSchema, StringComparison.Ordinal))
+        if (state == null || !IsSupportedTrackedHandStateSchema(state.schema))
         {
             throw new InvalidOperationException(
                 "FAAR tracked-hand state is invalid.");
@@ -3657,6 +3656,14 @@ public class FrameAngelRadar : MVRScript
         trackedHoldGrabLatched[GrabHandRight] = state.rightHoldGrabLatched;
         trackedPalmsPresented[GrabHandLeft] = state.leftPalmPresented;
         trackedPalmsPresented[GrabHandRight] = state.rightPalmPresented;
+    }
+
+    private bool IsSupportedTrackedHandStateSchema(string schema)
+    {
+        return string.Equals(
+                schema, TrackedHandStateSchema, StringComparison.Ordinal)
+            || string.Equals(
+                schema, PreviousTrackedHandStateSchema, StringComparison.Ordinal);
     }
 
     private void ApplyHudAnchor(Transform viewer)
