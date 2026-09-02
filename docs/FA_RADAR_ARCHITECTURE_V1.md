@@ -1,6 +1,6 @@
 # FA Radar Architecture V1
 
-Updated: 2026-08-31
+Updated: 2026-09-02
 
 ## Goal
 
@@ -10,27 +10,67 @@ HUD-relative radar centered on the user.
 
 ## Current Slice
 
-- Version: `0.1.56` on branch
-  `codex/0.1.56-live-wrist-room`.
+- Version: `0.1.57` on branch
+  `codex/0.1.57-steady-state-performance`.
 - One MVRScript source: `FrameAngelRadar`.
 - Distributed as compiled VaM plugin DLLs:
-  `Custom/Plugins/fa_radar.free.0.1.56.dll` and
-  `Custom/Plugins/fa_radar.pro.0.1.56.dll`.
+  `Custom/Plugins/fa_radar.free.0.1.57.dll` and
+  `Custom/Plugins/fa_radar.pro.0.1.57.dll`.
 - Pro ships thin Empty and CustomUnityAsset host presets:
   `Custom/Atom/Empty/Preset_FrameAngel_Radar_Empty.vap` and
   `Custom/Atom/CustomUnityAsset/Preset_FrameAngel_Radar_CUA.vap`.
 - Supported plugin surfaces are scene/session, Empty, and CustomUnityAsset.
   Empty/CUA-hosted Radar can follow its atom, select the same wrist/palm modes,
   or select `World`; all hosts reuse one VaM stock full-grab center target.
-- No Unity project, asset bundles, raw runtime file IO, reflection, broad JSON
+- No Unity project, asset bundles, recurring runtime file I/O, reflection, broad JSON
   object serializers, repo-local runtime dependencies, or absolute dev paths.
   Global user prefs are the only runtime file access and use VaM
   `FileManagerSecure` under `Custom\PluginData\FrameAngel\Radar`.
 
+## Steady-State Architecture
+
+The runtime path is `VaM scene and selection state -> cached AtomRecord and
+RadarFrame representations -> dirty/moving/candidate subsets -> pooled mesh,
+material, label, and frustum objects -> the visible Radar root`. VaM atom add,
+remove, rename, parent, subscene, scene-load, and subscene-load delegates dirty
+the catalog directly. A full `GetAtoms()` catalog snapshot is reserved for
+initialization or scene-load recovery, and candidate filtering is reconciled at
+at most 12 catalog records per visible frame.
+
+The VaM 1.x host exposes no general selected-atom-changed delegate. Radar uses
+one allocation-free `GetSelectedAtom()` reference comparison while visible;
+selection-dependent strings and visuals update only when that reference or UID
+changes. Available atoms are split into active, moving, and dirty sets. Moving
+records update every frame until stable; four stationary catalog records per
+visible frame are sampled so externally animated atoms eventually enter the
+moving set without an all-atom walk. A stationary Radar with no dirty records
+does not traverse every active marker.
+
+Camera discovery uses `Camera.GetAllCameras` into a reusable buffer only when
+scene lifecycle dirties the camera catalog. When scene-camera frustums are
+enabled, a constant `allCamerasCount` comparison detects non-atom camera
+lifecycle changes and four cached cameras are sampled per frame for
+transform/FOV changes.
+Materials, grid meshes, labels, status storables, and plugin-surface storables
+are change-driven. Global preferences are read on startup or an explicit Load
+action and written only after a changed preference settles or during explicit
+save/destroy; there is no recurring preference or recorder-state file read.
+Disabled or fully hidden Radar returns before selection, scene reconciliation,
+marker, camera, desktop-input, or visual update work.
+
+Remaining visible per-frame work is intentionally bounded: visibility/reveal
+state, one selected-atom reference comparison, RadarFrame/reference transform
+math, controller/grip and desktop input edge reads, up to four stationary atom
+samples, every currently moving record, active grab/resize/throw state, and
+transform-only ring/marker animation when enabled. Animation does not rerun
+the dish, labels, light overlays, selection status, or marker reconciliation.
+HUD/wrist/palm modes also update their anchor pose when the display itself
+follows an unparented viewer or hand transform.
+
 ## Prototype Visual
 
-The `0.1.56` branch preserves the complete 0.1.55 generated visual treatment,
-feature defaults, fractional-alpha materials, and lifecycle-pruned light cache.
+The `0.1.57` branch preserves the complete 0.1.56 generated visual treatment,
+feature defaults, fractional-alpha materials, and visible control topology.
 Wrist modes prefer the accepted live FAAR optical-palm transform and published
 presentation state, then retain the existing physical controller/hand fallback;
 valid presentation can begin its dwell immediately instead of waiting for a
@@ -152,8 +192,10 @@ polygons so targeting can be tested before any art polish:
   identifier so FAAR/recorder tooling can locate the radar in final-recording
   workflows without adding a recorder dependency or scene-stored control data
 
-The selected atom is resolved with
-`SuperController.singleton.GetSelectedAtom()` on a configurable poll interval.
+The selected atom is resolved with one allocation-free
+`SuperController.singleton.GetSelectedAtom()` reference comparison while the
+Radar is visible. The serialized `Selection Poll Seconds` storable remains for
+saved-preset compatibility but no longer schedules work.
 The target position is converted through the active radar reference frame, then
 divided by `Radar Range Meters` and clamped to the unit sphere. HUD and wrist
 modes use the viewer as the reference origin. Static world and Empty/atom-anchor
@@ -279,13 +321,16 @@ the creator-anchor preference profile by default. The legacy `CUA Anchor
 Preset` storable remains registered so older CUA presets still load, but it is
 not exposed in the reduced Empty-host UI.
 
-Available atom markers poll `SuperController.singleton.GetAtoms()` on `Atom
-Poll Seconds`, sort nearby atoms first, and use pooled generated marker/stem
-objects. Free builds show every eligible atom that passes the baseline hidden,
-off, selected, and containing-atom checks. Pro builds add the type/category/uid
-bucket filters so normal operation can stay focused by leaving only useful
-lanes enabled. Person markers use pink for female metadata, blue for male
-metadata, and a neutral person color when no gender clue is available.
+Available atom markers use VaM atom/scene lifecycle delegates to dirty a cached
+catalog, reconcile nearby candidates in bounded chunks, and update pooled
+generated marker/stem objects from dirty and moving subsets. The serialized
+`Atom Poll Seconds` storable remains for saved-preset compatibility but no
+longer schedules a full-scene scan. Free builds show every eligible atom that
+passes the baseline hidden, off, selected, and containing-atom checks. Pro
+builds add the type/category/uid bucket filters so normal operation can stay
+focused by leaving only useful lanes enabled. Person markers use pink for
+female metadata, blue for male metadata, and a neutral person color when no
+gender clue is available.
 
 `Click Select Markers` uses cheap screen-space picking only on mouse-down. The
 plugin projects visible marker objects through `lookCamera.WorldToScreenPoint`,
@@ -393,17 +438,17 @@ offset sliders and reset button.
 
 ## Performance Posture
 
-Detailed 0.1.38 rewrite notes and the concrete improvement list live in
-`docs/FA_RADAR_PERFORMANCE_REWRITE_0.1.38.md`.
+The 0.1.38 notes remain historical. The current 0.1.57 authority is the
+steady-state architecture section above plus the executable checks in
+`eng/Verify-FaRadarContract.ps1`.
 
 - Meshes and materials are created once and destroyed with the plugin.
-- Selection is polled on `Selection Poll Seconds`; there is no per-frame atom
-  scan.
-- Available atom discovery is polled on `Atom Poll Seconds` and builds cached
-  `AtomRecord` entries with root transform, category flags, marker mesh,
-  scale-safe visual-center offset, optional Pro light handle, and cached
-  distance. Cheap category/visibility filtering happens before renderer bounds
-  or Unity light hierarchy scans.
+- Selection uses the source-evidenced minimal reference comparison; no timer or
+  string work runs when the reference and UID are unchanged.
+- Available atom discovery is lifecycle-dirtied. Initial/scene recovery builds
+  cached `AtomRecord` entries, and candidate reconciliation processes at most
+  12 catalog records per visible frame. Cheap category/visibility filtering
+  happens before renderer bounds or Unity light hierarchy hydration.
 - `RadarFrame` captures the active reference position/rotation/range/height
   scale/visual radius once per tick and produces a quantized signature. The
   available marker loop skips when the frame signature and atom transforms have
@@ -417,28 +462,29 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
   separate lazy overlay pool capped by `Detail Overlay Limit`; selected targets
   retain full Pro detail outside that budget.
 - Pro labels are generated glyph meshes, capped by `Label Limit`, and only
-  rebuild per slot when the cached atom label changes. Viewer-facing labels get
-  a small capped orientation refresh even when marker transforms skip.
+  rebuild per slot when the cached atom label changes. Viewer-facing labels
+  update with their dirty record or changed `RadarFrame`; there is no separate
+  all-label orientation walk.
 - Available markers and context-only Pro overlays use depth-weighted alpha/scale
   so dense scenes read as layers while selected-target markers keep their
   stronger selected fade floor and camera-edge cue.
-- Renderer bounds and Unity light hierarchy scans happen during atom polling,
-  not in the available marker render loop or sort comparer.
+- Renderer bounds and Unity light hierarchy scans happen once when an eligible
+  record is first hydrated, not in the available marker render loop or sort
+  comparer.
 - Available-atom sorting uses cached squared distances.
 - Material writes go through `ApplyMaterialColorIfChanged`, so unchanged color
   and emission values do not reapply shader properties every frame.
-- Marker status text is throttled to avoid per-tick formatting.
+- Marker and plugin-surface status are change-driven; throttling only coalesces
+  a changed diagnostic.
 - `commonMarkerDefaultsVersion` migrates older saved prefs back to showing
   target markers by default, preventing stale prototype prefs from making a
   scene look empty until a toggle is clicked.
 - Headless Unity prefab generation remains intentionally unused: this repo's
   runtime contract is self-contained C# under `payload/Custom/Scripts`, with no
   Unity project, assetbundle, or repo-local runtime asset dependency.
-- Per-frame work is selected target transform, small vector math, world-axis
-  yaw resolution, optional ring rotation, lightweight grid mesh refresh when
-  viewer grid offset changes, and active-state diffs. In anchored mode the HUD
-  position/rotation are local to the camera instead of smoothed through world
-  space.
+- Per-frame work follows the bounded dirty/moving contract above. In anchored
+  mode the HUD position/rotation remain local to the camera instead of smoothed
+  through world space.
 - Grid mesh rebuilds only when effective radar range (`Radar Range Meters`),
   clip mode, or the quantized radar-reference grid offset changes.
 - Click selection is idle unless the desktop left mouse button goes down.
@@ -449,20 +495,16 @@ Detailed 0.1.38 rewrite notes and the concrete improvement list live in
 - The generated object and material names include `favr.hud.radar` as the
   current filming identifier. New generated radar/studio visuals should derive
   stable reusable names from this identifier.
-- FAAR recorder visibility is read from
-  `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json`. If
-  `radarHudFilmSubjectIdentifier` matches `favr.hud.radar` and
-  `radarHudVisible` is false, Radar hides its generated visual root/materials.
-  This does not modify placement, anchor mode, offsets, scale, or scene data.
-  FAAR consumes identifiers and visibility state only; Radar retains placement
-  authority.
+- The generated `favr.hud.radar` identifier remains available for an active
+  product to address through an explicit event or command boundary. Radar has
+  no recorder package dependency and performs no recorder-state polling.
 
 ## Build And Deploy Contract
 
 `scripts\Build-FaRadar.ps1` compiles both editions by default:
 
-- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.56.dll`
-- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.56.dll`
+- Free: `FA_RADAR_FREE` -> `fa_radar.free.0.1.57.dll`
+- Pro: `FA_RADAR_PRO` -> `fa_radar.pro.0.1.57.dll`
 
 The build helper runs `scripts\Obfuscate-FaRadarPlugin.ps1` unless
 `-SkipObfuscation` is passed. The wrapper follows the FAP model: pinned
@@ -478,12 +520,12 @@ Empty and CustomUnityAsset Radar presets.
 `scripts\Deploy-FaRadar.ps1` calls the build helper, then copies edition DLLs
 to direct plugin folders, not subfolders:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.56.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.56.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.57.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.57.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.56.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.56.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.57.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.57.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

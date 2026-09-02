@@ -3,21 +3,22 @@
 Frame Angel Radar is a small VaM scene/session utility plugin that shows a
 HUD, wrist, or static-scene radar for selected and available atoms.
 
-Current branch version: `0.1.56`.
+Current branch version: `0.1.57`.
 
-Current product contract version: `0.1.56`.
+Current product contract version: `0.1.57`.
 
 The current slice is compiled C# only:
 
 - no Unity project
 - no asset bundle
 - compiled VaM plugin DLL
-- no raw runtime file IO; global prefs use VaM `FileManagerSecure` only
+- no recurring runtime file I/O; explicit global-pref load/save uses VaM
+  `FileManagerSecure` only
 - generated translucent/emissive sphere shell with a subtle unlit overlay
   material and higher subdivisions
 - generated HUD objects and materials carry the `favr.hud.radar` filming
-  identifier so FAAR/recorder tooling can locate the radar without scene
-  storage or a product dependency
+  identifier so active filming tooling can locate the radar through an
+  explicit integration without Radar polling another product's state file
 - static scene and Empty/atom-anchor radar displays use the radar's own world
   pose as the map origin; the user moves as a green marker while scene atoms
   stay stable in the display
@@ -76,10 +77,9 @@ The current slice is compiled C# only:
   expand to the configured `Radar Range Meters` in scene space
 - the same default-off `Room Compass` toggle works on the scene/session plugin;
   its mapping is no longer silently disabled merely because no atom hosts Radar
-- FAAR visibility handshake reads
-  `Custom\PluginData\FrameAngelMediaCore\recorder_v2_state.json` and hides
-  Radar visuals when `radarHudVisible` is false; the plugin status reports
-  `Hidden by FAAR radarHudVisible=false.` when that is the reason it is hidden
+- the generated `favr.hud.radar` identifier remains available to an active
+  filming product through an explicit event/command integration; Radar has no
+  recorder package dependency or recurring recorder-state file read
 - optional world-axis alignment for the grid and rings
 - ground-axis lock so the grid represents real world X/Z and camera roll does
   not roll the radar Z axis
@@ -154,8 +154,9 @@ The current slice is compiled C# only:
   only desktop/VR placement, scale, HUD offsets, and static desktop offsets,
   while Pro adds filters, category colors, marker shapes, light volumes,
   rotation axes, and filming POV helpers
-- FAAR/video-recorder integration consumes stable identifiers and visibility
-  state only; Radar keeps placement authority
+- active filming integrations may consume stable identifiers through an
+  explicit event/command seam; Radar keeps placement authority and does not
+  poll recorder state
 - first release UI is native VaM plugin UI only; no external/browser/companion
   UI surface
 - FAP-style Obfuscar wrapper and `.var` package candidate staging
@@ -190,12 +191,12 @@ directly into each root's `Custom/Plugins` folder:
 
 Default targets:
 
-- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.56.dll`
-- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.56.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.free.0.1.57.dll`
+- `F:\sim\vam\Custom\Plugins\fa_radar.pro.0.1.57.dll`
 - `F:\sim\vam\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `F:\sim\vam\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.56.dll`
-- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.56.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.free.0.1.57.dll`
+- `C:\vam\virgin-recordable-02\Custom\Plugins\fa_radar.pro.0.1.57.dll`
 - `C:\vam\virgin-recordable-02\Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap`
 - `C:\vam\virgin-recordable-02\Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap`
 

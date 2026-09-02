@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
 
     $requiredSnippets = @(
         "class FrameAngelRadar : MVRScript",
-        'private const string Version = "0.1.56"',
+        'private const string Version = "0.1.57"',
         "#if FA_RADAR_PRO",
         "private const bool IsProEdition = true",
         'private const string EditionName = "Pro"',
@@ -117,7 +117,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "WriteGlobalPreferences",
         "TryReadGlobalPreferencesFromDisk",
         "TryReadSharedGlobalPreferencesCache",
-        "PollSharedGlobalPreferences",
+        "ApplySharedGlobalPreferencesIfChanged",
         "MarkGlobalPreferencesDirty",
         "FlushGlobalPreferencesIfDue",
         "IsCuaPreferenceProfileActive",
@@ -173,18 +173,9 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "FilmSubjectIdentifier",
         '"favr.hud.radar"',
         "BuildFilmSubjectName",
-        "FrameAngelRecorderStatePath",
-        '"Custom\\PluginData\\FrameAngelMediaCore\\recorder_v2_state.json"',
-        "radarHudFilmSubjectIdentifier",
-        "radarHudVisible",
         "RadarVisibilityFadeSeconds",
         "WristRevealGraceSeconds",
         "WristHandOffDistanceMeters",
-        "SetRadarVisualsVisible",
-        "PollRecorderRadarVisibility",
-        "ReadRecorderRadarVisible",
-        "ApplyRecorderRadarVisibility",
-        "Hidden by FAAR radarHudVisible=false.",
         "SetRadarVisualsVisible",
         "SetMaterialAlphaMultiplier",
         "ExtractJsonBool",
@@ -322,7 +313,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Input.GetMouseButtonDown(0)",
         "WorldToScreenPoint",
         "SuperController.singleton.SelectController(atom.mainController, false, false, false, true)",
-        "PollAvailableAtomsIfDue",
+        "RebuildAtomCatalogIfNeeded",
+        "AdvanceAvailableCandidateReconciliation",
         "UpdateAvailableAtomMarkers",
         "IsLightAtom",
         "IsCustomUnityAssetAtom",
@@ -348,7 +340,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "return WithAlpha(FreeAtomMarkerColor, alpha)",
         "EnsureAvailableMarkerCapacity",
         "ResolveMaxVisibleMarkerCount",
-        "InsertAvailableAtomRecordByDistance",
+        "InsertAtomRecordByDistance",
         "EnsureAvailableProOverlayCapacity",
         "ConfigureRichOverlayPreferenceCallback",
         "ResolveRichOverlayBudget",
@@ -599,8 +591,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "UpdateLabelLeaderLine",
         "CreateLabelLeaderMesh",
         "UpdateSelectedAtomLabel(frame, selectedAtomRecord, target, radarLocal, markerScale, fadeAlpha);",
-        "UpdateAvailableAtomLabel(i, slot, record, frame, radarLocal, markerScale, fadeAlpha * depthAlpha);",
-        "RefreshActiveLabelOrientations(frame);",
+        "UpdateAvailableAtomLabel(index, slot, record, frame, radarLocal, markerScale, fadeAlpha * depthAlpha);",
         "PopulateLabelGlyphMesh",
         "ResolveLabelRadarRotation",
         "BuildProPrimaryFilterUi",
@@ -610,7 +601,6 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "Spotlight Cone Mesh Open End",
         "ApplyLightVolumeCoverageColor",
         "UpdateWristRevealFromIntent",
-        "PruneCachedLightAtoms",
         "lastAvailableAtomVisibleCount",
         "Markers: 0 visible / ",
         "outside range",
@@ -620,7 +610,8 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
         "private struct CachedMaterialState",
         "List<AtomRecord> availableAtomRecords",
         "BuildRadarFrame(viewer)",
-        "PollAvailableAtomsIfDue(frame)",
+        "RebuildAtomCatalogIfNeeded(frame)",
+        "AdvanceAvailableCandidateReconciliation(frame)",
         "UpdateAvailableAtomMarkers(frame)",
         "RefreshAtomRecordTransform(record)",
         "ApplyMaterialColorIfChanged",
@@ -670,6 +661,138 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
     foreach ($snippet in $requiredSnippets) {
         if (-not $plugin.Contains($snippet)) {
             Add-Failure "Plugin missing required snippet: $snippet"
+        }
+    }
+
+    $requiredPerformanceSnippets = @(
+        "private const int AvailableCandidateReconcileBudgetPerFrame = 12;",
+        "private const int StationaryAtomProbeBudgetPerFrame = 4;",
+        "movingAvailableAtomRecords",
+        "dirtyAvailableAtomRecords",
+        "candidateReconcilePending",
+        "onAtomAddedHandlers += HandleHostAtomAdded",
+        "onAtomRemovedHandlers += HandleHostAtomRemoved",
+        "onAtomUIDRenameHandlers += HandleHostAtomUidRenamed",
+        "onAtomParentChangedHandlers += HandleHostAtomParentChanged",
+        "onAtomSubSceneChangedHandlers += HandleHostAtomSubSceneChanged",
+        "onSceneLoadedHandlers += HandleHostSceneLoaded",
+        "onSubSceneLoadedHandlers += HandleHostSubSceneLoaded",
+        "onAtomAddedHandlers -= HandleHostAtomAdded",
+        "RefreshSelectedAtomFromHost",
+        "this reference comparison is allocation-free",
+        "if (!hudRoot.activeInHierarchy || radarVisibilityAlpha <= 0.001f)",
+        "Camera.GetAllCameras(sceneCameraBuffer)",
+        "ApplySharedGlobalPreferencesIfChanged",
+        "if (!surfaceStatusDirty",
+        "markerStatusDirty = false;",
+        "lastSelectedStatusSignature",
+        "UpdateRadarAnimations();"
+    )
+    foreach ($snippet in $requiredPerformanceSnippets) {
+        if (-not $plugin.Contains($snippet)) {
+            Add-Failure "Steady-state performance contract missing snippet: $snippet"
+        }
+    }
+
+    $retiredSteadyStateSnippets = @(
+        "FrameAngelMediaCore",
+        "recorder_v2_state.json",
+        "PollRecorderRadarVisibility",
+        "ReadRecorderRadarVisible",
+        "ApplyRecorderRadarVisibility",
+        "nextRecorderVisibilityPollTime",
+        "PollAvailableAtomsIfDue",
+        "nextAtomPollTime",
+        "PollSelectionIfDue",
+        "nextSelectionPollTime",
+        "PollSharedGlobalPreferences",
+        "nextGlobalPreferencesPollTime",
+        "Camera.allCameras;"
+    )
+    foreach ($snippet in $retiredSteadyStateSnippets) {
+        if ($plugin.Contains($snippet)) {
+            Add-Failure "Retired steady-state work returned: $snippet"
+        }
+    }
+
+    $updateIndex = $plugin.IndexOf("private void Update()")
+    $onDestroyIndex = $plugin.IndexOf("private void OnDestroy()", [Math]::Max(0, $updateIndex))
+    if ($updateIndex -lt 0 -or $onDestroyIndex -le $updateIndex) {
+        Add-Failure "Update lifecycle block must remain inspectable."
+    } else {
+        $updateBlock = $plugin.Substring($updateIndex, $onDestroyIndex - $updateIndex)
+        foreach ($forbiddenUpdateSnippet in @(
+            "FileManagerSecure.",
+            "JsonUtility.",
+            "GetAtoms()",
+            "GetComponentsInChildren",
+            "Camera.allCameras"
+        )) {
+            if ($updateBlock.Contains($forbiddenUpdateSnippet)) {
+                Add-Failure "Update must not perform unbounded/allocation-heavy steady-state work: $forbiddenUpdateSnippet"
+            }
+        }
+        foreach ($requiredUpdateSnippet in @(
+            "ApplySharedGlobalPreferencesIfChanged();",
+            "if (globalPreferencesDirty)",
+            "Time.unscaledTime >= nextTrackedHandAcquireAt",
+            "TickRadar();"
+        )) {
+            if (-not $updateBlock.Contains($requiredUpdateSnippet)) {
+                Add-Failure "Update is missing a bounded dirty gate: $requiredUpdateSnippet"
+            }
+        }
+    }
+
+    $tickIndex = $plugin.IndexOf("private void TickRadar()")
+    $setRadarVisibleIndex = $plugin.IndexOf("private void SetRadarVisualsVisible", [Math]::Max(0, $tickIndex))
+    if ($tickIndex -lt 0 -or $setRadarVisibleIndex -le $tickIndex) {
+        Add-Failure "TickRadar visibility-gating block must remain inspectable."
+    } else {
+        $tickBlock = $plugin.Substring($tickIndex, $setRadarVisibleIndex - $tickIndex)
+        $hiddenGateAt = $tickBlock.IndexOf("if (!hudRoot.activeInHierarchy || radarVisibilityAlpha <= 0.001f)")
+        foreach ($gatedCall in @(
+            "RefreshSelectedAtomFromHost();",
+            "RebuildAtomCatalogIfNeeded(frame);",
+            "AdvanceAvailableCandidateReconciliation(frame);",
+            "UpdateAvailableAtomMarkers(frame);",
+            "HandleDesktopRadarRangeScroll(viewer);",
+            "HandleRadarMarkerClick();"
+        )) {
+            $callAt = $tickBlock.IndexOf($gatedCall)
+            if ($hiddenGateAt -lt 0 -or $callAt -le $hiddenGateAt) {
+                Add-Failure "Hidden/disabled Radar must gate visual/runtime work before: $gatedCall"
+            }
+        }
+    }
+
+    foreach ($fileIoCall in @(
+        "FileManagerSecure.FileExists",
+        "FileManagerSecure.ReadAllText",
+        "FileManagerSecure.WriteAllText",
+        "FileManagerSecure.CreateDirectory"
+    )) {
+        if ([regex]::Matches($plugin, [regex]::Escape($fileIoCall)).Count -ne 1) {
+            Add-Failure "Preference-only file I/O must have exactly one source call site: $fileIoCall"
+        }
+    }
+
+    $animationIndex = $plugin.IndexOf("private void UpdateRadarAnimations()")
+    $nextAnimationHelperIndex = $plugin.IndexOf("private Quaternion ResolveRadarRingRotation", [Math]::Max(0, $animationIndex))
+    if ($animationIndex -lt 0 -or $nextAnimationHelperIndex -le $animationIndex) {
+        Add-Failure "Transform-only Radar animation block must remain inspectable."
+    } else {
+        $animationBlock = $plugin.Substring($animationIndex, $nextAnimationHelperIndex - $animationIndex)
+        foreach ($forbiddenAnimationSnippet in @(
+            "UpdateRadarDish(",
+            "UpdateTargetBlip(",
+            "UpdateUserMarker(",
+            "string.Format",
+            "new Quaternion[]"
+        )) {
+            if ($animationBlock.Contains($forbiddenAnimationSnippet)) {
+                Add-Failure "Continuous animation must remain transform-only: $forbiddenAnimationSnippet"
+            }
         }
     }
 
@@ -731,7 +854,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "BuildWristCompassUi();"
         )) {
             if ($sceneSessionUiBlock.Contains($legacyPlacementCall)) {
-                Add-Failure "0.1.56 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
+                Add-Failure "0.1.57 scene/session UI must hide the excessive placement block call: $legacyPlacementCall"
             }
         }
     }
@@ -829,7 +952,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
                 "CreateToggle(grabHapticsEnabledField, true);"
             )) {
                 if (-not $freeEmptyUiBlock.Contains($snippet)) {
-                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.56 mode/scale/grab control: $snippet"
+                    Add-Failure "Free Empty/atom-anchor UI missing 0.1.57 mode/scale/grab control: $snippet"
                 }
             }
             if ($freeEmptyUiBlock.Contains("BuildProFilterUi();") -or $freeEmptyUiBlock.Contains("CreateSlider(radarRangeMetersField")) {
@@ -898,7 +1021,7 @@ if (-not (Test-Path -LiteralPath $pluginPath)) {
             "trackedPalmAnchors[GrabHandLeft] != null",
             "trackedPalmAnchors[GrabHandRight] != null",
             "DisconnectTrackedHandRuntime(true);",
-            "Time.unscaledTime < nextTrackedHandAcquireAt",
+            "nextTrackedHandAcquireAt = Time.unscaledTime + TrackedHandAcquireIntervalSeconds",
             "TryConnectTrackedHandRuntime();"
         )) {
             if (-not $maintainHandsBlock.Contains($snippet)) {
@@ -1104,8 +1227,8 @@ if (-not (Test-Path -LiteralPath $buildPath)) {
     $requiredBuildSnippets = @(
         "FA_RADAR_FREE",
         "FA_RADAR_PRO",
-        "fa_radar.free.0.1.56.dll",
-        "fa_radar.pro.0.1.56.dll",
+        "fa_radar.free.0.1.57.dll",
+        "fa_radar.pro.0.1.57.dll",
         "UnityEngine.PhysicsModule.dll",
         "UnityEngine.JSONSerializeModule.dll",
         "FrameAngelDev.Radar.1.var",
@@ -1197,7 +1320,7 @@ if (-not (Test-Path -LiteralPath $anchorPresetPath -PathType Leaf)) {
     $requiredAnchorPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.56.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.57.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"Anchor Mode" : "Containing Atom"',
         '"Radar Enabled" : "true"',
@@ -1228,7 +1351,7 @@ if (-not (Test-Path -LiteralPath $cuaPresetPath -PathType Leaf)) {
     $requiredCuaPresetSnippets = @(
         '"setUnlistedParamsToDefault" : "true"',
         '"id" : "PluginManager"',
-        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.56.dll"',
+        '"plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.57.dll"',
         '"id" : "plugin#0_FrameAngelRadar"',
         '"pluginLabel" : "Frame Angel Radar CUA"',
         '"CUA Anchor Preset" : "true"',
@@ -1284,11 +1407,11 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     Add-Failure "Missing version config: $versionPath"
 } else {
     $version = Get-Content -Raw -LiteralPath $versionPath | ConvertFrom-Json
-    if ($version.version -ne "0.1.56") {
-        Add-Failure "Version config must declare version 0.1.56."
+    if ($version.version -ne "0.1.57") {
+        Add-Failure "Version config must declare version 0.1.57."
     }
-    if ($version.branch -ne "codex/0.1.56-live-wrist-room") {
-        Add-Failure "Version config branch must match codex/0.1.56-live-wrist-room."
+    if ($version.branch -ne "codex/0.1.57-steady-state-performance") {
+        Add-Failure "Version config branch must match codex/0.1.57-steady-state-performance."
     }
     $editionNames = @($version.editions.PSObject.Properties.Name)
     if ($editionNames -notcontains "free") {
@@ -1297,8 +1420,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($editionNames -notcontains "pro") {
         Add-Failure "Version config missing pro edition."
     }
-    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.56.dll") {
-        Add-Failure "Free edition config must produce fa_radar.free.0.1.56.dll."
+    if ($version.editions.free.pluginFileName -ne "fa_radar.free.0.1.57.dll") {
+        Add-Failure "Free edition config must produce fa_radar.free.0.1.57.dll."
     }
     if ($version.editions.free.packageFileName -ne "FrameAngelDev.Radar.1.var") {
         Add-Failure "Free edition config must package as FrameAngelDev.Radar.1.var."
@@ -1309,8 +1432,8 @@ if (-not (Test-Path -LiteralPath $versionPath)) {
     if ($version.editions.free.packageName -ne "Radar") {
         Add-Failure "Free edition config must use packageName Radar for FrameAngelDev.Radar.1.var."
     }
-    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.56.dll") {
-        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.56.dll."
+    if ($version.editions.pro.pluginFileName -ne "fa_radar.pro.0.1.57.dll") {
+        Add-Failure "Pro edition config must produce fa_radar.pro.0.1.57.dll."
     }
     if ($version.editions.pro.creatorResources.customUnityAssetPreset -ne "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap") {
         Add-Failure "Pro edition config must declare the CustomUnityAsset Radar preset."
@@ -1410,8 +1533,8 @@ if ($ValidateLiveDeploy.IsPresent) {
     $roots = @("F:\sim\vam", "C:\vam\virgin-recordable-02")
     foreach ($root in $roots) {
         $expectedDlls = @(
-            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.56.dll"),
-            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.56.dll")
+            (Join-Path $root "Custom\Plugins\fa_radar.free.0.1.57.dll"),
+            (Join-Path $root "Custom\Plugins\fa_radar.pro.0.1.57.dll")
         )
         $expectedAnchorPreset = Join-Path $root "Custom\Atom\Empty\Preset_FrameAngel_Radar_Empty.vap"
         $expectedCuaPreset = Join-Path $root "Custom\Atom\CustomUnityAsset\Preset_FrameAngel_Radar_CUA.vap"
@@ -1569,11 +1692,11 @@ if (Test-Path -LiteralPath $pluginPath) {
     }
 
     $availableLabelIndex = $plugin.IndexOf("private void UpdateAvailableAtomLabel")
-    $refreshLabelIndex = $plugin.IndexOf("private void RefreshActiveLabelOrientations", [Math]::Max(0, $availableLabelIndex))
-    if ($availableLabelIndex -lt 0 -or $refreshLabelIndex -le $availableLabelIndex) {
+    $ensureAvailableLabelIndex = $plugin.IndexOf("private void EnsureAvailableLabelSlot", [Math]::Max(0, $availableLabelIndex))
+    if ($availableLabelIndex -lt 0 -or $ensureAvailableLabelIndex -le $availableLabelIndex) {
         Add-Failure "Available scene label rendering block must remain inspectable."
     } else {
-        $availableLabelBlock = $plugin.Substring($availableLabelIndex, $refreshLabelIndex - $availableLabelIndex)
+        $availableLabelBlock = $plugin.Substring($availableLabelIndex, $ensureAvailableLabelIndex - $availableLabelIndex)
         if (-not $availableLabelBlock.Contains("UpdateLabelLeaderLine(slot.labelLeaderObject, itemLocal, labelLocal,")) {
             Add-Failure "Available labels must draw pooled leader lines from item to outside-shell callouts."
         }
@@ -1801,20 +1924,22 @@ if (Test-Path -LiteralPath $pluginPath) {
         }
     }
 
-    $pollIndex = $plugin.IndexOf("private void PollAvailableAtomsIfDue(RadarFrame frame)")
-    $filterIndex = $plugin.IndexOf("private bool IsAtomVisibleByFilter(AtomRecord record)", [Math]::Max(0, $pollIndex))
-    if ($pollIndex -lt 0 -or $filterIndex -le $pollIndex) {
-        Add-Failure "Available atom polling must build cached AtomRecord entries before filtering."
+    $reconcileIndex = $plugin.IndexOf("private void AdvanceAvailableCandidateReconciliation(RadarFrame frame)")
+    $commitIndex = $plugin.IndexOf("private void CommitAvailableCandidateRecords()", [Math]::Max(0, $reconcileIndex))
+    if ($reconcileIndex -lt 0 -or $commitIndex -le $reconcileIndex) {
+        Add-Failure "Bounded available-atom reconciliation must remain inspectable."
     } else {
-        $pollBlock = $plugin.Substring($pollIndex, $filterIndex - $pollIndex)
-        if ($pollBlock.Contains("ResolveAtomMarkerWorldPosition(left") -or $pollBlock.Contains("ResolveAtomMarkerWorldPosition(right")) {
-            Add-Failure "Available atom polling sort must use cached distance values, not hierarchy-bound scans in comparer."
+        $reconcileBlock = $plugin.Substring($reconcileIndex, $commitIndex - $reconcileIndex)
+        if (-not $reconcileBlock.Contains("processed < AvailableCandidateReconcileBudgetPerFrame")) {
+            Add-Failure "Available-atom reconciliation must enforce its per-frame work budget."
         }
-        if ($pollBlock.Contains("availableAtomRecords.Sort")) {
-            Add-Failure "Available atom polling must use bounded insertion instead of full-list O(n log n) sort."
+        if ($reconcileBlock.Contains("availableAtomRecords.Sort") -or $reconcileBlock.Contains("candidateAvailableAtomRecords.Sort")) {
+            Add-Failure "Available-atom reconciliation must use bounded insertion instead of a full-list sort."
         }
-        if ($pollBlock.Contains("BuildAtomRecord(atom, frame, availableAtomRecords.Count)") -or $pollBlock.Contains("BuildAtomRecord(atom, frame, availableAtomRecords.Count);")) {
-            Add-Failure "Available atom polling must run cheap filtering before renderer/light metadata hydration."
+        $filterAt = $reconcileBlock.IndexOf("IsAtomVisibleByFilter(record, anchorHost)")
+        $hydrateAt = $reconcileBlock.IndexOf("HydrateAtomRecord(record, frame)")
+        if ($filterAt -lt 0 -or $hydrateAt -le $filterAt) {
+            Add-Failure "Available-atom reconciliation must apply cheap filters before metadata hydration."
         }
     }
 

@@ -428,6 +428,7 @@ public class FrameAngelRadar : MVRScript
     private GameObject[] ringObjects;
     private Quaternion[] ringBaseRotations;
     private MeshFilter gridFilter;
+    private MeshFilter targetBlipFilter;
 
     private Mesh sphereMesh;
     private Mesh flatCircleMesh;
@@ -617,6 +618,7 @@ public class FrameAngelRadar : MVRScript
     private int availableAtomRevision;
     private int lastAvailableMarkerFrameSignature = int.MinValue;
     private int lastRadarFrameSignature = int.MinValue;
+    private int lastSelectedStatusSignature = int.MinValue;
     private int stationaryAtomProbeCursor;
     private int candidateReconcileCursor;
     private int candidateFilteredCount;
@@ -645,6 +647,8 @@ public class FrameAngelRadar : MVRScript
     private Vector3 lastCandidateReferencePosition;
     private string lastHostSurfaceStatus = "";
     private string lastDisplaySurfaceStatus = "";
+    private float selectedTargetRingBaseScale;
+    private bool selectedTargetOutsideViewerFrustum;
 #if FA_RADAR_PRO
     private Camera[] sceneCameraBuffer = new Camera[MaxTrackedSceneCameras];
     private Vector3[] sceneCameraPositions = new Vector3[MaxTrackedSceneCameras];
@@ -654,7 +658,9 @@ public class FrameAngelRadar : MVRScript
     private bool[] sceneCameraSamplesKnown = new bool[MaxTrackedSceneCameras];
     private int sceneCameraCount;
     private int sceneCameraProbeCursor;
+    private int lastObservedAllCameraCount = -1;
     private bool sceneCameraCatalogDirty = true;
+    private Camera cachedDesktopCamera;
 #endif
 
     public override void Init()
@@ -3239,6 +3245,7 @@ public class FrameAngelRadar : MVRScript
         centerMarkerObject = CreateMeshObject(BuildFilmSubjectName("User Center"), radarRoot.transform, centerMarkerMesh, centerMaterial, MarkerRenderQueue, MarkerSortingOrder);
         userHeightStemObject = CreateMeshObject(BuildFilmSubjectName("User Height Stem"), axisRoot.transform, heightStemMesh, userHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 5);
         targetBlipObject = CreateMeshObject(BuildFilmSubjectName("Target Blip"), axisRoot.transform, targetBlipMesh, targetMaterial, MarkerRenderQueue, MarkerSortingOrder);
+        targetBlipFilter = targetBlipObject.GetComponent<MeshFilter>();
         selectedTargetRingObjects = CreateTargetSelectionRingSet(BuildFilmSubjectName("Selected Target Ring"));
         selectedViewCueObject = CreateMeshObject(BuildFilmSubjectName("Selected View Cue"), axisRoot.transform, ringMesh, selectedViewCueMaterial, MarkerRenderQueue + 1, MarkerSortingOrder + 1);
         targetHeightStemObject = CreateMeshObject(BuildFilmSubjectName("Target Height Stem"), axisRoot.transform, heightStemMesh, targetHeightStemMaterial, MarkerRenderQueue, MarkerSortingOrder - 4);
@@ -3388,7 +3395,7 @@ public class FrameAngelRadar : MVRScript
 #endif
         UpdateSessionGrabHandles(viewer);
         bool ringAnimationActive = ringRotationSpeedField != null && ringRotationSpeedField.val > 0.001f;
-        bool updateFullDish = dishVisualDirty || frameChanged || ringAnimationActive;
+        bool updateFullDish = dishVisualDirty || frameChanged;
         if (updateFullDish)
         {
             UpdateRadarDish(viewer);
@@ -3398,7 +3405,7 @@ public class FrameAngelRadar : MVRScript
         {
             ApplyHudAnchor(viewer);
         }
-        if (selectedVisualDirty || frameChanged || ringAnimationActive)
+        if (selectedVisualDirty || frameChanged)
         {
             UpdateUserMarker(viewer);
         }
@@ -3415,7 +3422,7 @@ public class FrameAngelRadar : MVRScript
 #else
         bool selectedLightChanged = false;
 #endif
-        if (selectedVisualDirty || frameChanged || ringAnimationActive || selectedTransformChanged || selectedLightChanged)
+        if (selectedVisualDirty || frameChanged || selectedTransformChanged || selectedLightChanged)
         {
             bool showSelectedGroundDrop = hasSelection && selectedGroundDropEnabledField.val;
             SetActiveIfChanged(targetBlipObject, hasSelection);
@@ -3444,6 +3451,11 @@ public class FrameAngelRadar : MVRScript
             }
 #endif
             selectedVisualDirty = false;
+        }
+
+        if (ringAnimationActive)
+        {
+            UpdateRadarAnimations();
         }
 
         SetActiveIfChanged(lastTargetBlipObject, false);
@@ -3578,6 +3590,8 @@ public class FrameAngelRadar : MVRScript
         selectedAtom = nextAtom;
         selectedUid = nextUid;
         selectedAtomRecord = null;
+        lastSelectedStatusSignature = int.MinValue;
+        nextSelectedStatusTime = 0.0f;
         availableMarkersDirty = true;
         selectedVisualDirty = true;
         markerStatusDirty = true;
@@ -3631,7 +3645,8 @@ public class FrameAngelRadar : MVRScript
             return true;
         }
 
-        return string.Equals(ResolveAnchorMode(), AnchorModeHud, StringComparison.Ordinal);
+        return string.Equals(ResolveAnchorMode(), AnchorModeHud, StringComparison.Ordinal)
+            && (anchorToViewField == null || !anchorToViewField.val);
     }
 
     private void UpdateRadarDish(Transform viewer)
@@ -3640,7 +3655,6 @@ public class FrameAngelRadar : MVRScript
         float surfaceLocalRadius = ResolveRadarSurfaceLocalRadius();
         float scaledMarker = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val);
         bool flatDesktop = IsFlatDesktopCircleActive();
-        float ringTime = Time.time * Mathf.Max(0.0f, ringRotationSpeedField.val);
 
         ApplyHudAnchor(viewer);
 
@@ -3673,10 +3687,8 @@ public class FrameAngelRadar : MVRScript
                 continue;
             }
 
-            float direction = i == 1 ? -1.0f : 1.0f;
-            Quaternion spin = Quaternion.AngleAxis(ringTime * direction * (1.0f + (i * 0.17f)), Vector3.forward);
             ring.transform.localPosition = Vector3.zero;
-            ring.transform.localRotation = ringBaseRotations[i] * spin;
+            ring.transform.localRotation = ResolveRadarRingRotation(i);
             ring.transform.localScale = Vector3.one * (surfaceLocalRadius * 1.015f);
             bool showRing = ringsEnabledField.val;
             SetActiveIfChanged(ring, showRing);
@@ -3803,6 +3815,44 @@ public class FrameAngelRadar : MVRScript
         {
             DisconnectTrackedHandRuntime(false);
         }
+    }
+
+    private void UpdateRadarAnimations()
+    {
+        for (int i = 0; ringObjects != null && i < ringObjects.Length; i++)
+        {
+            GameObject ring = ringObjects[i];
+            if (ring != null && ring.activeSelf)
+            {
+                ring.transform.localRotation = ResolveRadarRingRotation(i);
+            }
+        }
+
+        float speed = Mathf.Max(0.0f, ringRotationSpeedField.val);
+        if (centerMarkerObject != null && centerMarkerObject.activeSelf)
+        {
+            centerMarkerObject.transform.localRotation = Quaternion.AngleAxis(Time.time * speed * 0.5f, Vector3.forward);
+        }
+        if (targetBlipObject != null && targetBlipObject.activeSelf)
+        {
+            targetBlipObject.transform.localRotation = Quaternion.AngleAxis(Time.time * speed * 1.75f, Vector3.forward);
+        }
+        if (targetGridDropObject != null && targetGridDropObject.activeSelf)
+        {
+            targetGridDropObject.transform.localRotation = Quaternion.Euler(90.0f, Time.time * speed * 1.75f, 0.0f);
+        }
+        UpdateTargetSelectionRingAnimation();
+    }
+
+    private Quaternion ResolveRadarRingRotation(int ringIndex)
+    {
+        float direction = ringIndex == 1 ? -1.0f : 1.0f;
+        float angle = Time.time
+            * Mathf.Max(0.0f, ringRotationSpeedField.val)
+            * direction
+            * (1.0f + (ringIndex * 0.17f));
+        return ringBaseRotations[ringIndex]
+            * Quaternion.AngleAxis(angle, Vector3.forward);
     }
 
     private void DisconnectTrackedHandRuntime(bool unregister)
@@ -4673,7 +4723,6 @@ public class FrameAngelRadar : MVRScript
         {
             selectedAtomRecord = BuildAtomRecord(selectedAtom, frame, -1);
         }
-        RefreshAtomRecordTransform(selectedAtomRecord, frame);
 
         float visualRadius = frame.visualRadius;
         Vector3 targetWorldPosition = selectedAtomRecord != null ? selectedAtomRecord.markerWorldPosition : (target != null ? target.position : Vector3.zero);
@@ -4691,7 +4740,13 @@ public class FrameAngelRadar : MVRScript
 #endif
         float spin = Time.time * Mathf.Max(0.0f, ringRotationSpeedField.val * 1.75f);
 
-        ApplyMarkerMeshForAtom(targetBlipObject, selectedAtom);
+        if (targetBlipFilter != null
+            && selectedAtomRecord != null
+            && selectedAtomRecord.markerMesh != null
+            && targetBlipFilter.sharedMesh != selectedAtomRecord.markerMesh)
+        {
+            targetBlipFilter.sharedMesh = selectedAtomRecord.markerMesh;
+        }
         PositionTargetSphere(targetBlipObject, radarLocal, visualRadius, markerScale * 0.34f, spin);
         bool selectedInsideViewerFrustum = IsSelectedTargetInsideViewerFrustum(targetWorldPosition);
         UpdateTargetSelectionRingSet(radarLocal, visualRadius, markerScale, fadeAlpha, !selectedInsideViewerFrustum);
@@ -4714,10 +4769,20 @@ public class FrameAngelRadar : MVRScript
             targetGridDropObject.transform.localScale = Vector3.one * (markerScale * 0.55f);
         }
 
-        if (Time.unscaledTime >= nextSelectedStatusTime)
+        Vector3 meterLocal = ResolveWorldMetersFromReference(frame, targetWorldPosition);
+        int selectedStatusSignature;
+        unchecked
+        {
+            selectedStatusSignature = 17;
+            selectedStatusSignature = (selectedStatusSignature * 31) + Quantize(meterLocal.x, 0.05f);
+            selectedStatusSignature = (selectedStatusSignature * 31) + Quantize(meterLocal.y, 0.05f);
+            selectedStatusSignature = (selectedStatusSignature * 31) + Quantize(meterLocal.z, 0.05f);
+        }
+        if (selectedStatusSignature != lastSelectedStatusSignature
+            && Time.unscaledTime >= nextSelectedStatusTime)
         {
             nextSelectedStatusTime = Time.unscaledTime + AvailableMarkerStatusIntervalSeconds;
-            Vector3 meterLocal = ResolveWorldMetersFromReference(frame, targetWorldPosition);
+            lastSelectedStatusSignature = selectedStatusSignature;
             SetStatus(string.Format(
                 "Selected: {0}  x:{1:0.0}m y:{2:0.0}m z:{3:0.0}m",
                 selectedUid,
@@ -4823,13 +4888,8 @@ public class FrameAngelRadar : MVRScript
         Vector3 localPosition = radarLocal * visualRadius;
         float pulse = outsideViewerFrustum ? (1.0f + Mathf.Sin(Time.time * 5.5f) * 0.08f) : 1.0f;
         float ringScale = Mathf.Max(markerScale * 1.85f, visualRadius * 0.018f) * pulse;
-        Quaternion spin = Quaternion.AngleAxis(Time.time * Mathf.Max(8.0f, ringRotationSpeedField.val), Vector3.forward);
-        Quaternion[] rotations = new Quaternion[]
-        {
-            spin,
-            Quaternion.Euler(90.0f, 0.0f, 0.0f) * spin,
-            Quaternion.Euler(0.0f, 90.0f, 0.0f) * spin
-        };
+        selectedTargetRingBaseScale = Mathf.Max(markerScale * 1.85f, visualRadius * 0.018f);
+        selectedTargetOutsideViewerFrustum = outsideViewerFrustum;
 
         for (int i = 0; i < selectedTargetRingObjects.Length; i++)
         {
@@ -4840,10 +4900,49 @@ public class FrameAngelRadar : MVRScript
             }
 
             ring.transform.localPosition = localPosition;
-            ring.transform.localRotation = rotations[i];
+            ring.transform.localRotation = ResolveTargetSelectionRingRotation(i);
             ring.transform.localScale = Vector3.one * ringScale;
             SetActiveIfChanged(ring, true);
         }
+    }
+
+    private void UpdateTargetSelectionRingAnimation()
+    {
+        if (selectedTargetRingObjects == null || selectedTargetRingBaseScale <= 0.0f)
+        {
+            return;
+        }
+
+        float pulse = selectedTargetOutsideViewerFrustum
+            ? (1.0f + Mathf.Sin(Time.time * 5.5f) * 0.08f)
+            : 1.0f;
+        for (int i = 0; i < selectedTargetRingObjects.Length; i++)
+        {
+            GameObject ring = selectedTargetRingObjects[i];
+            if (ring == null || !ring.activeSelf)
+            {
+                continue;
+            }
+
+            ring.transform.localRotation = ResolveTargetSelectionRingRotation(i);
+            ring.transform.localScale = Vector3.one * (selectedTargetRingBaseScale * pulse);
+        }
+    }
+
+    private Quaternion ResolveTargetSelectionRingRotation(int ringIndex)
+    {
+        Quaternion spin = Quaternion.AngleAxis(
+            Time.time * Mathf.Max(8.0f, ringRotationSpeedField.val),
+            Vector3.forward);
+        if (ringIndex == 1)
+        {
+            return Quaternion.Euler(90.0f, 0.0f, 0.0f) * spin;
+        }
+        if (ringIndex == 2)
+        {
+            return Quaternion.Euler(0.0f, 90.0f, 0.0f) * spin;
+        }
+        return spin;
     }
 
     private void UpdateSelectedViewCue(Vector3 radarLocal, float visualRadius, float markerScale, float fadeAlpha, bool visible)
@@ -6167,8 +6266,12 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateAvailableAtomMarkers(RadarFrame frame)
     {
-        RefreshAvailableAtomMotion(frame);
-        int trackedCount = availableAtomMarkersEnabledField.val && availableAtomRecords != null ? availableAtomRecords.Count : 0;
+        bool markersEnabled = availableAtomMarkersEnabledField.val;
+        if (markersEnabled)
+        {
+            RefreshAvailableAtomMotion(frame);
+        }
+        int trackedCount = markersEnabled && availableAtomRecords != null ? availableAtomRecords.Count : 0;
         bool updateAll = availableMarkersDirty || frame.signature != lastAvailableMarkerFrameSignature;
         if (!updateAll && dirtyAvailableAtomRecords.Count <= 0)
         {
@@ -7391,7 +7494,9 @@ public class FrameAngelRadar : MVRScript
 
     private void RefreshSceneCameraCatalogIfNeeded()
     {
-        if (!sceneCameraCatalogDirty)
+        if (!sceneCameraCatalogDirty
+            || showSceneCameraFrustumsField == null
+            || !showSceneCameraFrustumsField.val)
         {
             return;
         }
@@ -7400,6 +7505,8 @@ public class FrameAngelRadar : MVRScript
         int cameraCount = Mathf.Max(0, Camera.allCamerasCount);
         EnsureSceneCameraSampleCapacity(Mathf.Max(MaxTrackedSceneCameras, cameraCount));
         sceneCameraCount = cameraCount > 0 ? Camera.GetAllCameras(sceneCameraBuffer) : 0;
+        lastObservedAllCameraCount = cameraCount;
+        cachedDesktopCamera = Camera.main;
         sceneCameraProbeCursor = 0;
         for (int i = 0; i < sceneCameraSamplesKnown.Length; i++)
         {
@@ -7426,7 +7533,18 @@ public class FrameAngelRadar : MVRScript
 
     private void ProbeSceneCameraChanges()
     {
-        if (showSceneCameraFrustumsField == null || !showSceneCameraFrustumsField.val || sceneCameraCount <= 0)
+        if (showSceneCameraFrustumsField == null || !showSceneCameraFrustumsField.val)
+        {
+            return;
+        }
+
+        int currentCameraCount = Mathf.Max(0, Camera.allCamerasCount);
+        if (currentCameraCount != lastObservedAllCameraCount)
+        {
+            sceneCameraCatalogDirty = true;
+            return;
+        }
+        if (sceneCameraCount <= 0)
         {
             return;
         }
@@ -7487,7 +7605,7 @@ public class FrameAngelRadar : MVRScript
             showUserPovFrustumField != null && showUserPovFrustumField.val,
             true);
 
-        Camera desktopCamera = Camera.main;
+        Camera desktopCamera = ResolveDesktopCameraCached();
         UpdateCameraFrustumObject(
             desktopPovFrustumObject,
             desktopPovFrustumMaterial,
@@ -7499,6 +7617,15 @@ public class FrameAngelRadar : MVRScript
             false);
 
         UpdateSceneCameraFrustums(viewer, viewerCamera, desktopCamera);
+    }
+
+    private Camera ResolveDesktopCameraCached()
+    {
+        if (cachedDesktopCamera == null)
+        {
+            cachedDesktopCamera = Camera.main;
+        }
+        return cachedDesktopCamera;
     }
 
     private void UpdateSceneCameraFrustums(Transform viewer, Camera viewerCamera, Camera desktopCamera)
@@ -7703,6 +7830,7 @@ public class FrameAngelRadar : MVRScript
 #if FA_RADAR_PRO
         sceneCameraCatalogDirty = true;
         cameraFrustumsDirty = true;
+        cachedDesktopCamera = null;
 #endif
     }
 
@@ -7746,6 +7874,7 @@ public class FrameAngelRadar : MVRScript
             cachedLightByAtomId.Remove(atom.GetInstanceID());
         }
         sceneCameraCatalogDirty = true;
+        cachedDesktopCamera = null;
 #endif
     }
 
@@ -7814,6 +7943,7 @@ public class FrameAngelRadar : MVRScript
 #if FA_RADAR_PRO
         sceneCameraCatalogDirty = true;
         cameraFrustumsDirty = true;
+        cachedDesktopCamera = null;
 #endif
     }
 
@@ -7826,6 +7956,7 @@ public class FrameAngelRadar : MVRScript
 #if FA_RADAR_PRO
         sceneCameraCatalogDirty = true;
         cameraFrustumsDirty = true;
+        cachedDesktopCamera = null;
 #endif
     }
 
@@ -11054,6 +11185,7 @@ public class FrameAngelRadar : MVRScript
         ringObjects = null;
         ringBaseRotations = null;
         gridFilter = null;
+        targetBlipFilter = null;
         currentHudAnchor = null;
         lastGoodViewerTransform = null;
 #if FA_RADAR_PRO
