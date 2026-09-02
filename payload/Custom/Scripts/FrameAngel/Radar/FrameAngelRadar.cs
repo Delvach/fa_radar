@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 public class FrameAngelRadar : MVRScript
 {
-    private const string Version = "0.1.56";
+    private const string Version = "0.1.57";
 #if FA_RADAR_PRO && FA_RADAR_FREE
 #error Define only one FA Radar edition symbol.
 #endif
@@ -40,7 +40,6 @@ public class FrameAngelRadar : MVRScript
     private const string FrameAngelRadarCuaCommonPreferencesSchemaVersion = "frameangel_radar_cua_common_preferences_v1";
     private const string FrameAngelRadarCuaProPreferencesSchemaVersion = "frameangel_radar_cua_pro_preferences_v1";
     private const string FilmSubjectIdentifier = "favr.hud.radar";
-    private const string FrameAngelRecorderStatePath = "Custom\\PluginData\\FrameAngelMediaCore\\recorder_v2_state.json";
     private const string AnchorModeHud = "HUD / View";
     private const string AnchorModeWorldStatic = "World Static";
     private const string AnchorModeContainingAtom = "Containing Atom";
@@ -74,8 +73,6 @@ public class FrameAngelRadar : MVRScript
     private const string GrabHandlePrimarySuffix = "primary";
     private const string GrabHandleResizeSuffix = "resize";
     private const float GlobalPreferencesFlushDelaySeconds = 0.75f;
-    private const float GlobalPreferencesSharedStatePollIntervalSeconds = 1.0f;
-    private const float RecorderVisibilityPollIntervalSeconds = 0.25f;
     private const float TrackedHandAcquireIntervalSeconds = 0.50f;
     private const float RadarVisibilityFadeSeconds = 0.18f;
     private const float WristRevealGraceSeconds = 0.55f;
@@ -139,6 +136,11 @@ public class FrameAngelRadar : MVRScript
     private const float AvailableMarkerFrameRotateThresholdDegrees = 0.25f;
     private const float AvailableMarkerTransformMoveThresholdMeters = 0.0025f;
     private const float AvailableMarkerStatusIntervalSeconds = 0.25f;
+    private const float AvailableCandidateReferenceMoveThresholdMeters = 0.25f;
+    private const int AvailableCandidateReconcileBudgetPerFrame = 12;
+    private const int StationaryAtomProbeBudgetPerFrame = 4;
+    private const int MovingAtomStationaryFrameLimit = 12;
+    private const int MaxTrackedSceneCameras = 16;
     private const int AtomCategoryLight = 1 << 0;
     private const int AtomCategoryCua = 1 << 1;
     private const int AtomCategoryPerson = 1 << 2;
@@ -160,16 +162,16 @@ public class FrameAngelRadar : MVRScript
     private static readonly Color FreeAtomMarkerColor = new Color(1.0f, 0.78f, 0.18f, 1.0f);
     private static bool sharedRadarCommonPreferencesCacheKnown;
     private static string sharedRadarCommonPreferencesJson = "";
-    private static float sharedRadarCommonPreferencesNextReadAt;
+    private static int sharedRadarCommonPreferencesRevision;
     private static bool sharedRadarProPreferencesCacheKnown;
     private static string sharedRadarProPreferencesJson = "";
-    private static float sharedRadarProPreferencesNextReadAt;
+    private static int sharedRadarProPreferencesRevision;
     private static bool sharedRadarCuaCommonPreferencesCacheKnown;
     private static string sharedRadarCuaCommonPreferencesJson = "";
-    private static float sharedRadarCuaCommonPreferencesNextReadAt;
+    private static int sharedRadarCuaCommonPreferencesRevision;
     private static bool sharedRadarCuaProPreferencesCacheKnown;
     private static string sharedRadarCuaProPreferencesJson = "";
-    private static float sharedRadarCuaProPreferencesNextReadAt;
+    private static int sharedRadarCuaProPreferencesRevision;
 
     private struct RadarFrame
     {
@@ -200,11 +202,26 @@ public class FrameAngelRadar : MVRScript
         public float distanceSq;
         public int categoryFlags;
         public Mesh markerMesh;
+        public bool metadataHydrated;
+        public bool visualDirty;
+        public bool visualDirtyQueued;
+        public bool moving;
+        public int stationaryFrames;
+        public bool lastOn;
+        public bool lastHidden;
 #if FA_RADAR_PRO
         public string labelText;
         public Light light;
         public bool hasLight;
         public bool lightResolved;
+        public bool hasLightSample;
+        public bool lastLightEnabled;
+        public LightType lastLightType;
+        public float lastLightRange;
+        public float lastLightSpotAngle;
+        public Color lastLightColor;
+        public Vector3 lastLightPosition;
+        public Quaternion lastLightRotation;
 #endif
     }
 
@@ -473,18 +490,22 @@ public class FrameAngelRadar : MVRScript
     private Atom resizeGrabHandleAtom;
     private Atom selectedAtom;
     private Atom lastSelectedAtom;
+    private SuperController lifecycleController;
+    private readonly Dictionary<Atom, AtomRecord> atomRecordByAtom = new Dictionary<Atom, AtomRecord>();
+    private readonly List<AtomRecord> atomCatalogRecords = new List<AtomRecord>();
     private List<Atom> trackedAvailableAtoms = new List<Atom>();
     private List<AtomRecord> availableAtomRecords = new List<AtomRecord>();
+    private List<AtomRecord> candidateAvailableAtomRecords = new List<AtomRecord>();
+    private readonly List<AtomRecord> dirtyAvailableAtomRecords = new List<AtomRecord>();
+    private readonly List<AtomRecord> movingAvailableAtomRecords = new List<AtomRecord>();
 #if FA_RADAR_PRO
     private readonly Dictionary<int, Light> cachedLightByAtomId =
         new Dictionary<int, Light>();
-    private readonly HashSet<int> liveAtomIdsForLightCache =
-        new HashSet<int>();
-    private readonly List<int> staleLightCacheAtomIds =
-        new List<int>();
 #endif
     private MarkerSlot[] availableMarkerSlots;
     private Dictionary<Material, CachedMaterialState> materialStateByMaterial = new Dictionary<Material, CachedMaterialState>();
+    private readonly List<Vector3> resizeGuideVertices = new List<Vector3>();
+    private readonly List<int> resizeGuideTriangles = new List<int>();
     private AtomRecord selectedAtomRecord;
     private Atom cachedAnchorAtom;
     private int lastAvailableAtomSceneCount;
@@ -499,8 +520,6 @@ public class FrameAngelRadar : MVRScript
 #if FA_RADAR_PRO
     private string targetLabelText = "";
 #endif
-    private float nextSelectionPollTime;
-    private float nextAtomPollTime;
     private float nextAvailableMarkerStatusTime;
     private float lastSelectedAtTime = -1000.0f;
     private float nextSelectedStatusTime;
@@ -517,8 +536,6 @@ public class FrameAngelRadar : MVRScript
     private bool globalPreferencesWriteAfterApply;
     private bool materialsDirty = true;
     private bool availableMarkersDirty = true;
-    private bool recorderRadarVisible = true;
-    private bool lastAppliedRecorderRadarVisible = true;
     private bool cuaAnchorPresetApplied;
     private bool wristCompassRevealed;
     private bool radarVisibilityAlphaInitialized;
@@ -554,8 +571,6 @@ public class FrameAngelRadar : MVRScript
     private Vector3 resizeStartPrimaryPosition;
     private Vector3 resizeStartHandlePosition;
     private float nextGlobalPreferencesFlushTime;
-    private float nextGlobalPreferencesPollTime;
-    private float nextRecorderVisibilityPollTime;
     private float nextTrackedHandAcquireAt;
     private float radarVisibilityAlpha = 1.0f;
     private float radarVisibilityTargetAlpha = 1.0f;
@@ -601,6 +616,46 @@ public class FrameAngelRadar : MVRScript
     private Transform lastGoodViewerTransform;
     private int availableAtomRevision;
     private int lastAvailableMarkerFrameSignature = int.MinValue;
+    private int lastRadarFrameSignature = int.MinValue;
+    private int stationaryAtomProbeCursor;
+    private int candidateReconcileCursor;
+    private int candidateFilteredCount;
+    private int observedCommonPreferencesRevision = -1;
+#if FA_RADAR_PRO
+    private int observedProPreferencesRevision = -1;
+#endif
+    private bool lifecycleEventsRegistered;
+    private bool atomCatalogRebuildPending = true;
+    private bool candidateReconcilePending = true;
+    private bool candidateReconcileInProgress;
+    private bool candidateReferenceKnown;
+    private bool markerStatusDirty = true;
+    private bool selectedVisualDirty = true;
+    private bool dishVisualDirty = true;
+#if FA_RADAR_PRO
+    private bool cameraFrustumsDirty = true;
+#endif
+    private bool surfaceStatusDirty = true;
+    private bool lastRuntimeVisible;
+    private bool lastVrDisplayActive;
+    private bool lastVrDisplayActiveKnown;
+    private bool cuaPreferenceProfileKnown;
+    private bool cuaPreferenceProfileActive;
+    private Vector3 candidateReferencePosition;
+    private Vector3 lastCandidateReferencePosition;
+    private string lastHostSurfaceStatus = "";
+    private string lastDisplaySurfaceStatus = "";
+#if FA_RADAR_PRO
+    private Camera[] sceneCameraBuffer = new Camera[MaxTrackedSceneCameras];
+    private Vector3[] sceneCameraPositions = new Vector3[MaxTrackedSceneCameras];
+    private Quaternion[] sceneCameraRotations = new Quaternion[MaxTrackedSceneCameras];
+    private float[] sceneCameraFovs = new float[MaxTrackedSceneCameras];
+    private float[] sceneCameraAspects = new float[MaxTrackedSceneCameras];
+    private bool[] sceneCameraSamplesKnown = new bool[MaxTrackedSceneCameras];
+    private int sceneCameraCount;
+    private int sceneCameraProbeCursor;
+    private bool sceneCameraCatalogDirty = true;
+#endif
 
     public override void Init()
     {
@@ -608,8 +663,10 @@ public class FrameAngelRadar : MVRScript
         LoadGlobalPreferences();
         BuildUi();
         EnsureRuntimeVisuals();
+        EnsureHostLifecycleEvents();
         nextTrackedHandAcquireAt = 0.0f;
         MaintainTrackedHandConnection();
+        CaptureObservedSharedPreferenceRevisions();
         SetStatus("Frame Angel Radar " + Version + " " + EditionName + " ready.");
     }
 
@@ -620,15 +677,27 @@ public class FrameAngelRadar : MVRScript
             EnsureRuntimeVisuals();
         }
 
-        PollSharedGlobalPreferences();
-        FlushGlobalPreferencesIfDue(false);
-        TickGrabHandleHapticStops(Time.unscaledTime);
-        MaintainTrackedHandConnection();
+        EnsureHostLifecycleEvents();
+        ApplySharedGlobalPreferencesIfChanged();
+        if (globalPreferencesDirty)
+        {
+            FlushGlobalPreferencesIfDue(false);
+        }
+        if (ovrLeftGrabHapticActive || ovrRightGrabHapticActive)
+        {
+            TickGrabHandleHapticStops(Time.unscaledTime);
+        }
+        if ((trackedHandReceiverRegistered || ShouldMaintainTrackedHandConnection())
+            && Time.unscaledTime >= nextTrackedHandAcquireAt)
+        {
+            MaintainTrackedHandConnection();
+        }
         TickRadar();
     }
 
     private void OnDestroy()
     {
+        DeregisterHostLifecycleEvents();
         DisconnectTrackedHandRuntime(true);
         FlushGlobalPreferencesIfDue(true);
         DestroySessionGrabHandles();
@@ -1203,9 +1272,7 @@ public class FrameAngelRadar : MVRScript
             roomCompassField.setCallbackFunction = delegate(bool value)
             {
                 MarkGlobalPreferencesDirty();
-                availableMarkersDirty = true;
-                haveSmoothedHudPosition = false;
-                InvalidateGridMesh();
+                MarkRadarConfigurationDirty();
             };
         }
         ConfigureGlobalPreferenceCallback(ignoreContainingAtomField);
@@ -1237,9 +1304,8 @@ public class FrameAngelRadar : MVRScript
                 }
 
                 MarkGlobalPreferencesDirty();
-                availableMarkersDirty = true;
-                haveSmoothedHudPosition = false;
-                InvalidateGridMesh();
+                MarkRadarConfigurationDirty();
+                nextTrackedHandAcquireAt = 0.0f;
             };
         }
         ConfigureGlobalPreferenceCallback(desktopPlacementField);
@@ -1349,6 +1415,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(bool value)
         {
             MarkGlobalPreferencesDirty();
+            MarkRadarConfigurationDirty();
             HideAvailableProOverlaysOutsideBudget();
         };
     }
@@ -1364,6 +1431,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(float value)
         {
             MarkGlobalPreferencesDirty();
+            MarkRadarConfigurationDirty();
             HideAvailableProOverlaysOutsideBudget();
         };
     }
@@ -1391,6 +1459,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(bool value)
         {
             MarkGlobalPreferencesDirty();
+            MarkRadarConfigurationDirty();
         };
     }
 
@@ -1405,6 +1474,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(float value)
         {
             MarkGlobalPreferencesDirty();
+            MarkRadarConfigurationDirty();
         };
     }
 
@@ -1419,7 +1489,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(float value)
         {
             MarkGlobalPreferencesDirty();
-            FlushGlobalPreferencesIfDue(true);
+            MarkRadarConfigurationDirty();
         };
     }
 
@@ -1434,6 +1504,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(string value)
         {
             MarkGlobalPreferencesDirty();
+            MarkRadarConfigurationDirty();
         };
     }
 
@@ -1448,6 +1519,7 @@ public class FrameAngelRadar : MVRScript
         field.setCallbackFunction = delegate(string value)
         {
             MarkGlobalPreferencesDirty();
+            MarkRadarConfigurationDirty();
         };
     }
 
@@ -1458,6 +1530,7 @@ public class FrameAngelRadar : MVRScript
 
     private void LoadGlobalPreferencesAction()
     {
+        InvalidateSharedGlobalPreferencesCacheForActiveProfile();
         LoadGlobalPreferences();
     }
 
@@ -1489,9 +1562,23 @@ public class FrameAngelRadar : MVRScript
 
         SetBoolNoCallback(globalPrefsAutoSaveField, true);
         globalPreferencesDirty = true;
+        nextGlobalPreferencesFlushTime = Time.unscaledTime + GlobalPreferencesFlushDelaySeconds;
+    }
+
+    private void MarkRadarConfigurationDirty()
+    {
         materialsDirty = true;
         availableMarkersDirty = true;
-        nextGlobalPreferencesFlushTime = Time.unscaledTime + GlobalPreferencesFlushDelaySeconds;
+        selectedVisualDirty = true;
+        dishVisualDirty = true;
+#if FA_RADAR_PRO
+        cameraFrustumsDirty = true;
+#endif
+        surfaceStatusDirty = true;
+        haveSmoothedHudPosition = false;
+        markerStatusDirty = true;
+        RequestAvailableCandidateReconciliation();
+        InvalidateGridMesh();
     }
 
     private void FlushGlobalPreferencesIfDue(bool force)
@@ -1530,6 +1617,7 @@ public class FrameAngelRadar : MVRScript
         bool writeAfterApply = globalPreferencesWriteAfterApply;
         globalPreferencesWriteAfterApply = false;
         globalPreferencesDirty = false;
+        CaptureObservedSharedPreferenceRevisions();
         if (writeAfterApply)
         {
             WriteGlobalPreferences();
@@ -1546,28 +1634,36 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
-    private void PollSharedGlobalPreferences()
+    private void ApplySharedGlobalPreferencesIfChanged()
     {
-        if (globalPreferencesDirty || Time.unscaledTime < nextGlobalPreferencesPollTime)
+        if (globalPreferencesDirty)
         {
             return;
         }
 
-        nextGlobalPreferencesPollTime = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
-
         bool applied = false;
         string preferencesJson;
-        if (TryReadSharedGlobalPreferencesCache(false, out preferencesJson)
-            && !string.Equals(preferencesJson ?? "", lastAppliedCommonPreferencesJson ?? "", StringComparison.Ordinal))
+        int commonRevision = ResolveSharedGlobalPreferencesRevision(false);
+        if (commonRevision != observedCommonPreferencesRevision)
         {
-            applied = ApplyCommonGlobalPreferences(preferencesJson) || applied;
+            observedCommonPreferencesRevision = commonRevision;
+            if (TryGetSharedGlobalPreferencesCache(false, out preferencesJson)
+                && !string.Equals(preferencesJson ?? "", lastAppliedCommonPreferencesJson ?? "", StringComparison.Ordinal))
+            {
+                applied = ApplyCommonGlobalPreferences(preferencesJson) || applied;
+            }
         }
 
 #if FA_RADAR_PRO
-        if (TryReadSharedGlobalPreferencesCache(true, out preferencesJson)
-            && !string.Equals(preferencesJson ?? "", lastAppliedProPreferencesJson ?? "", StringComparison.Ordinal))
+        int proRevision = ResolveSharedGlobalPreferencesRevision(true);
+        if (proRevision != observedProPreferencesRevision)
         {
-            applied = ApplyProGlobalPreferences(preferencesJson) || applied;
+            observedProPreferencesRevision = proRevision;
+            if (TryGetSharedGlobalPreferencesCache(true, out preferencesJson)
+                && !string.Equals(preferencesJson ?? "", lastAppliedProPreferencesJson ?? "", StringComparison.Ordinal))
+            {
+                applied = ApplyProGlobalPreferences(preferencesJson) || applied;
+            }
         }
 #endif
 
@@ -1617,6 +1713,7 @@ public class FrameAngelRadar : MVRScript
 #endif
 
         globalPreferencesDirty = false;
+        CaptureObservedSharedPreferenceRevisions();
         SetStatus("Global prefs saved.");
     }
 
@@ -1675,69 +1772,46 @@ public class FrameAngelRadar : MVRScript
 
     private bool TryReadSharedGlobalPreferencesCache(bool proPreferences, out string preferencesJson)
     {
+        if (TryGetSharedGlobalPreferencesCache(proPreferences, out preferencesJson))
+        {
+            return true;
+        }
+
+        if (!TryReadGlobalPreferencesFromDisk(
+            proPreferences ? ResolveProPreferencesPath() : ResolveCommonPreferencesPath(),
+            proPreferences ? ResolveProPreferencesSchemaVersion() : ResolveCommonPreferencesSchemaVersion(),
+            out preferencesJson))
+        {
+            return false;
+        }
+
+        UpdateSharedGlobalPreferencesCache(proPreferences, preferencesJson);
+        return true;
+    }
+
+    private bool TryGetSharedGlobalPreferencesCache(bool proPreferences, out string preferencesJson)
+    {
         preferencesJson = "";
         if (proPreferences)
         {
             if (IsCuaPreferenceProfileActive())
             {
                 preferencesJson = sharedRadarCuaProPreferencesJson ?? "";
-                if (sharedRadarCuaProPreferencesCacheKnown && Time.unscaledTime < sharedRadarCuaProPreferencesNextReadAt)
-                {
-                    return true;
-                }
-            }
-            else
-            {
-                preferencesJson = sharedRadarProPreferencesJson ?? "";
-                if (sharedRadarProPreferencesCacheKnown && Time.unscaledTime < sharedRadarProPreferencesNextReadAt)
-                {
-                    return true;
-                }
+                return sharedRadarCuaProPreferencesCacheKnown;
             }
 
-            if (!TryReadGlobalPreferencesFromDisk(
-                ResolveProPreferencesPath(),
-                ResolveProPreferencesSchemaVersion(),
-                out preferencesJson))
-            {
-                return IsCuaPreferenceProfileActive()
-                    ? sharedRadarCuaProPreferencesCacheKnown
-                    : sharedRadarProPreferencesCacheKnown;
-            }
-
-            UpdateSharedGlobalPreferencesCache(true, preferencesJson);
-            return true;
+            preferencesJson = sharedRadarProPreferencesJson ?? "";
+            return sharedRadarProPreferencesCacheKnown;
         }
 
         if (IsCuaPreferenceProfileActive())
         {
             preferencesJson = sharedRadarCuaCommonPreferencesJson ?? "";
-            if (sharedRadarCuaCommonPreferencesCacheKnown && Time.unscaledTime < sharedRadarCuaCommonPreferencesNextReadAt)
-            {
-                return true;
-            }
-        }
-        else
-        {
-            preferencesJson = sharedRadarCommonPreferencesJson ?? "";
-            if (sharedRadarCommonPreferencesCacheKnown && Time.unscaledTime < sharedRadarCommonPreferencesNextReadAt)
-            {
-                return true;
-            }
+            return sharedRadarCuaCommonPreferencesCacheKnown;
         }
 
-        if (!TryReadGlobalPreferencesFromDisk(
-            ResolveCommonPreferencesPath(),
-            ResolveCommonPreferencesSchemaVersion(),
-            out preferencesJson))
-        {
-            return IsCuaPreferenceProfileActive()
-                ? sharedRadarCuaCommonPreferencesCacheKnown
-                : sharedRadarCommonPreferencesCacheKnown;
-        }
-
-        UpdateSharedGlobalPreferencesCache(false, preferencesJson);
-        return true;
+        preferencesJson = sharedRadarCommonPreferencesJson ?? "";
+        return sharedRadarCommonPreferencesCacheKnown;
     }
 
     private void UpdateSharedGlobalPreferencesCache(bool proPreferences, string preferencesJson)
@@ -1748,13 +1822,13 @@ public class FrameAngelRadar : MVRScript
             {
                 sharedRadarCuaProPreferencesJson = preferencesJson ?? "";
                 sharedRadarCuaProPreferencesCacheKnown = true;
-                sharedRadarCuaProPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+                sharedRadarCuaProPreferencesRevision++;
                 return;
             }
 
             sharedRadarProPreferencesJson = preferencesJson ?? "";
             sharedRadarProPreferencesCacheKnown = true;
-            sharedRadarProPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+            sharedRadarProPreferencesRevision++;
             return;
         }
 
@@ -1762,19 +1836,59 @@ public class FrameAngelRadar : MVRScript
         {
             sharedRadarCuaCommonPreferencesJson = preferencesJson ?? "";
             sharedRadarCuaCommonPreferencesCacheKnown = true;
-            sharedRadarCuaCommonPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+            sharedRadarCuaCommonPreferencesRevision++;
             return;
         }
 
         sharedRadarCommonPreferencesJson = preferencesJson ?? "";
         sharedRadarCommonPreferencesCacheKnown = true;
-        sharedRadarCommonPreferencesNextReadAt = Time.unscaledTime + GlobalPreferencesSharedStatePollIntervalSeconds;
+        sharedRadarCommonPreferencesRevision++;
+    }
+
+    private int ResolveSharedGlobalPreferencesRevision(bool proPreferences)
+    {
+        if (proPreferences)
+        {
+            return IsCuaPreferenceProfileActive()
+                ? sharedRadarCuaProPreferencesRevision
+                : sharedRadarProPreferencesRevision;
+        }
+
+        return IsCuaPreferenceProfileActive()
+            ? sharedRadarCuaCommonPreferencesRevision
+            : sharedRadarCommonPreferencesRevision;
+    }
+
+    private void CaptureObservedSharedPreferenceRevisions()
+    {
+        observedCommonPreferencesRevision = ResolveSharedGlobalPreferencesRevision(false);
+#if FA_RADAR_PRO
+        observedProPreferencesRevision = ResolveSharedGlobalPreferencesRevision(true);
+#endif
+    }
+
+    private void InvalidateSharedGlobalPreferencesCacheForActiveProfile()
+    {
+        if (IsCuaPreferenceProfileActive())
+        {
+            sharedRadarCuaCommonPreferencesCacheKnown = false;
+            sharedRadarCuaProPreferencesCacheKnown = false;
+            return;
+        }
+
+        sharedRadarCommonPreferencesCacheKnown = false;
+        sharedRadarProPreferencesCacheKnown = false;
     }
 
     private bool IsCuaPreferenceProfileActive()
     {
         // Legacy name: this profile now covers creator anchor hosts, including Empty atoms.
-        return IsEmptyAnchorHostActive();
+        if (!cuaPreferenceProfileKnown)
+        {
+            cuaPreferenceProfileActive = IsEmptyAnchorHostActive();
+            cuaPreferenceProfileKnown = true;
+        }
+        return cuaPreferenceProfileActive;
     }
 
     private bool IsEmptyAnchorHostActive()
@@ -1855,8 +1969,30 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdatePluginSurfaceStatus()
     {
-        SetStringNoCallback(hostSurfaceField, ResolvePluginHostSurfaceName());
-        SetStringNoCallback(displaySurfaceField, ResolveDisplaySurfaceName());
+        bool vrDisplayActive = IsVrDisplayActive();
+        if (!surfaceStatusDirty
+            && lastVrDisplayActiveKnown
+            && vrDisplayActive == lastVrDisplayActive)
+        {
+            return;
+        }
+
+        string hostSurface = ResolvePluginHostSurfaceName();
+        string displaySurface = ResolveDisplaySurfaceName();
+        if (!string.Equals(hostSurface, lastHostSurfaceStatus, StringComparison.Ordinal))
+        {
+            SetStringNoCallback(hostSurfaceField, hostSurface);
+            lastHostSurfaceStatus = hostSurface;
+        }
+        if (!string.Equals(displaySurface, lastDisplaySurfaceStatus, StringComparison.Ordinal))
+        {
+            SetStringNoCallback(displaySurfaceField, displaySurface);
+            lastDisplaySurfaceStatus = displaySurface;
+        }
+
+        lastVrDisplayActive = vrDisplayActive;
+        lastVrDisplayActiveKnown = true;
+        surfaceStatusDirty = false;
     }
 
     private string ResolvePluginHostSurfaceName()
@@ -2042,10 +2178,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         lastAppliedCommonPreferencesJson = preferencesJson;
-        haveSmoothedHudPosition = false;
-        materialsDirty = true;
-        availableMarkersDirty = true;
-        InvalidateGridMesh();
+        MarkRadarConfigurationDirty();
         return true;
     }
 
@@ -2132,7 +2265,7 @@ public class FrameAngelRadar : MVRScript
 
         lastAppliedProPreferencesJson = preferencesJson;
         trackedAvailableAtoms.Clear();
-        nextAtomPollTime = 0.0f;
+        MarkRadarConfigurationDirty();
         return true;
     }
 
@@ -2627,7 +2760,7 @@ public class FrameAngelRadar : MVRScript
 
     private static void SetBoolNoCallback(JSONStorableBool field, bool value)
     {
-        if (field != null)
+        if (field != null && field.val != value)
         {
             field.valNoCallback = value;
         }
@@ -2635,7 +2768,7 @@ public class FrameAngelRadar : MVRScript
 
     private static void SetFloatNoCallback(JSONStorableFloat field, float value)
     {
-        if (field != null)
+        if (field != null && Mathf.Abs(field.val - value) > 0.000001f)
         {
             field.valNoCallback = value;
         }
@@ -2643,17 +2776,19 @@ public class FrameAngelRadar : MVRScript
 
     private static void SetStringNoCallback(JSONStorableString field, string value)
     {
-        if (field != null)
+        string normalized = value ?? "";
+        if (field != null && !string.Equals(field.val ?? "", normalized, StringComparison.Ordinal))
         {
-            field.valNoCallback = value ?? "";
+            field.valNoCallback = normalized;
         }
     }
 
     private static void SetStringNoCallback(JSONStorableStringChooser field, string value)
     {
-        if (field != null)
+        string normalized = NormalizeAnchorMode(value);
+        if (field != null && !string.Equals(field.val ?? "", normalized, StringComparison.Ordinal))
         {
-            field.valNoCallback = NormalizeAnchorMode(value);
+            field.valNoCallback = normalized;
         }
     }
 
@@ -3178,22 +3313,14 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        PollRecorderRadarVisibility();
         ApplyCuaAnchorPresetMode();
-        if (!recorderRadarVisible)
-        {
-            ApplyRecorderRadarVisibility(false);
-            DestroySessionGrabHandles();
-            SetStatus("Hidden by FAAR radarHudVisible=false.");
-            return;
-        }
-        ApplyRecorderRadarVisibility(true);
 
         Transform viewer = ResolveViewerTransform();
         if (!radarEnabledField.val || viewer == null)
         {
             SetActiveIfChanged(hudRoot, false);
             DestroySessionGrabHandles();
+            lastRuntimeVisible = false;
             if (viewer == null)
             {
                 SetStatus("Waiting for VaM look camera.");
@@ -3202,59 +3329,142 @@ public class FrameAngelRadar : MVRScript
         }
 
         UpdateWristCompassReveal(viewer);
-        SetRadarVisualsVisible(ResolveRadarRuntimeVisible(viewer));
-        PollSelectionIfDue();
+        bool runtimeVisible = ResolveRadarRuntimeVisible(viewer);
+        SetRadarVisualsVisible(runtimeVisible);
+        if (!hudRoot.activeInHierarchy || radarVisibilityAlpha <= 0.001f)
+        {
+            DestroySessionGrabHandles();
+            lastRuntimeVisible = false;
+            return;
+        }
+
+        if (!lastRuntimeVisible)
+        {
+            availableMarkersDirty = true;
+            selectedVisualDirty = true;
+            dishVisualDirty = true;
+#if FA_RADAR_PRO
+            cameraFrustumsDirty = true;
+#endif
+        }
+        lastRuntimeVisible = true;
+
+        RefreshSelectedAtomFromHost();
         RadarFrame frame = BuildRadarFrame(viewer);
-        PollAvailableAtomsIfDue(frame);
+        bool frameChanged = frame.signature != lastRadarFrameSignature;
+        if (!candidateReconcilePending
+            && !candidateReconcileInProgress
+            && (!candidateReferenceKnown
+                || (frame.referencePosition - lastCandidateReferencePosition).sqrMagnitude
+                    > (AvailableCandidateReferenceMoveThresholdMeters * AvailableCandidateReferenceMoveThresholdMeters)))
+        {
+            RequestAvailableCandidateReconciliation();
+        }
+
+        RebuildAtomCatalogIfNeeded(frame);
+        AdvanceAvailableCandidateReconciliation(frame);
         frame.signature = BuildRadarFrameSignature(frame);
+        frameChanged = frame.signature != lastRadarFrameSignature;
+        if (frameChanged)
+        {
+            dishVisualDirty = true;
+            selectedVisualDirty = true;
+#if FA_RADAR_PRO
+            cameraFrustumsDirty = true;
+#endif
+        }
+
         TrackAttachedAtomPlacement(viewer);
-        RefreshGridMeshIfNeeded(frame);
+        if (frameChanged || dishVisualDirty)
+        {
+            RefreshGridMeshIfNeeded(frame);
+        }
         UpdateMaterialsIfNeeded();
 #if FA_RADAR_PRO
-        UpdateGrabThrowPin(viewer);
+        if (grabThrowActive)
+        {
+            UpdateGrabThrowPin(viewer);
+        }
 #endif
         UpdateSessionGrabHandles(viewer);
-        UpdateRadarDish(viewer);
-        UpdateUserMarker(viewer);
+        bool ringAnimationActive = ringRotationSpeedField != null && ringRotationSpeedField.val > 0.001f;
+        bool updateFullDish = dishVisualDirty || frameChanged || ringAnimationActive;
+        if (updateFullDish)
+        {
+            UpdateRadarDish(viewer);
+            dishVisualDirty = false;
+        }
+        else if (ShouldUpdateRadarDishContinuously())
+        {
+            ApplyHudAnchor(viewer);
+        }
+        if (selectedVisualDirty || frameChanged || ringAnimationActive)
+        {
+            UpdateUserMarker(viewer);
+        }
 
         Transform target = ResolveAtomRootTransform(selectedAtom);
         bool hasSelection = target != null;
-        bool showSelectedGroundDrop = hasSelection && selectedGroundDropEnabledField.val;
-        SetActiveIfChanged(targetBlipObject, hasSelection);
-        SetActiveIfChanged(targetHeightStemObject, hasSelection && heightStemsEnabledField.val);
-        SetActiveIfChanged(targetGridDropObject, showSelectedGroundDrop);
-
-        if (hasSelection)
-        {
-            UpdateTargetBlip(frame, target, showSelectedGroundDrop);
-        }
+        bool selectedTransformChanged = hasSelection
+            && selectedAtomRecord != null
+            && RefreshAtomRecordTransform(selectedAtomRecord, frame);
 #if FA_RADAR_PRO
-        else
-        {
-            SetTargetSelectionRingSetVisible(false);
-            SetActiveIfChanged(selectedViewCueObject, false);
-            SetRotationAxisSetVisible(targetRotationAxisObjects, false);
-            SetSelectedLabelVisible(false);
-            SetActiveIfChanged(targetLightRangeObject, false);
-            SetActiveIfChanged(targetSpotlightConeObject, false);
-        }
+        bool selectedLightChanged = hasSelection
+            && selectedAtomRecord != null
+            && RefreshAtomLightVisualState(selectedAtomRecord);
 #else
-        if (!hasSelection)
-        {
-            SetTargetSelectionRingSetVisible(false);
-            SetActiveIfChanged(selectedViewCueObject, false);
-        }
+        bool selectedLightChanged = false;
 #endif
+        if (selectedVisualDirty || frameChanged || ringAnimationActive || selectedTransformChanged || selectedLightChanged)
+        {
+            bool showSelectedGroundDrop = hasSelection && selectedGroundDropEnabledField.val;
+            SetActiveIfChanged(targetBlipObject, hasSelection);
+            SetActiveIfChanged(targetHeightStemObject, hasSelection && heightStemsEnabledField.val);
+            SetActiveIfChanged(targetGridDropObject, showSelectedGroundDrop);
+
+            if (hasSelection)
+            {
+                UpdateTargetBlip(frame, target, showSelectedGroundDrop);
+            }
+#if FA_RADAR_PRO
+            else
+            {
+                SetTargetSelectionRingSetVisible(false);
+                SetActiveIfChanged(selectedViewCueObject, false);
+                SetRotationAxisSetVisible(targetRotationAxisObjects, false);
+                SetSelectedLabelVisible(false);
+                SetActiveIfChanged(targetLightRangeObject, false);
+                SetActiveIfChanged(targetSpotlightConeObject, false);
+            }
+#else
+            if (!hasSelection)
+            {
+                SetTargetSelectionRingSetVisible(false);
+                SetActiveIfChanged(selectedViewCueObject, false);
+            }
+#endif
+            selectedVisualDirty = false;
+        }
 
         SetActiveIfChanged(lastTargetBlipObject, false);
         SetActiveIfChanged(lastTargetGridDropObject, false);
         UpdateAvailableAtomMarkers(frame);
-        UpdateAvailableAtomMarkerStatus();
+        if (markerStatusDirty)
+        {
+            UpdateAvailableAtomMarkerStatus();
+        }
 #if FA_RADAR_PRO
-        UpdateProCameraFrustums(viewer);
+        RefreshSceneCameraCatalogIfNeeded();
+        ProbeSceneCameraChanges();
+        if (cameraFrustumsDirty || frameChanged)
+        {
+            UpdateProCameraFrustums(viewer);
+            cameraFrustumsDirty = false;
+        }
 #endif
         HandleDesktopRadarRangeScroll(viewer);
         HandleRadarMarkerClick();
+        lastRadarFrameSignature = frame.signature;
     }
 
     private void ApplyCuaAnchorPresetMode()
@@ -3281,62 +3491,6 @@ public class FrameAngelRadar : MVRScript
         SetStatus("Creator anchor preset active.");
     }
 
-    private void PollRecorderRadarVisibility()
-    {
-        if (Time.unscaledTime < nextRecorderVisibilityPollTime)
-        {
-            return;
-        }
-
-        nextRecorderVisibilityPollTime = Time.unscaledTime + RecorderVisibilityPollIntervalSeconds;
-        bool visible;
-        recorderRadarVisible = !ReadRecorderRadarVisible(out visible) || visible;
-    }
-
-    private bool ReadRecorderRadarVisible(out bool visible)
-    {
-        visible = true;
-        if (!FileManagerSecure.FileExists(FrameAngelRecorderStatePath, false))
-        {
-            return false;
-        }
-
-        string stateJson;
-        try
-        {
-            stateJson = FileManagerSecure.ReadAllText(FrameAngelRecorderStatePath);
-        }
-        catch
-        {
-            return false;
-        }
-
-        string radarHudFilmSubjectIdentifier;
-        if (ExtractJsonString(stateJson, "radarHudFilmSubjectIdentifier", out radarHudFilmSubjectIdentifier)
-            && !string.IsNullOrEmpty(radarHudFilmSubjectIdentifier)
-            && !string.Equals(radarHudFilmSubjectIdentifier, FilmSubjectIdentifier, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return ExtractJsonBool(stateJson, "radarHudVisible", out visible);
-    }
-
-    private void ApplyRecorderRadarVisibility(bool visible)
-    {
-        if (visible == lastAppliedRecorderRadarVisible)
-        {
-            return;
-        }
-
-        lastAppliedRecorderRadarVisible = visible;
-        SetMaterialAlphaMultiplier(visible ? 1.0f : 0.0f);
-        if (!visible)
-        {
-            SetRadarVisualsVisible(false);
-        }
-    }
-
     private void SetRadarVisualsVisible(bool visible)
     {
         if (hudRoot == null)
@@ -3359,6 +3513,16 @@ public class FrameAngelRadar : MVRScript
             SetActiveIfChanged(hudRoot, true);
         }
 
+        if (Mathf.Abs(radarVisibilityAlpha - radarVisibilityTargetAlpha) <= 0.001f)
+        {
+            radarVisibilityAlpha = radarVisibilityTargetAlpha;
+            if (!visible)
+            {
+                SetActiveIfChanged(hudRoot, false);
+            }
+            return;
+        }
+
         float step = RadarVisibilityFadeSeconds > 0.0f
             ? Mathf.Max(Time.unscaledDeltaTime, 0.001f) / RadarVisibilityFadeSeconds
             : 1.0f;
@@ -3371,16 +3535,11 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
-    private void PollSelectionIfDue()
+    private void RefreshSelectedAtomFromHost()
     {
-        if (Time.time < nextSelectionPollTime)
-        {
-            return;
-        }
-
-        float interval = Mathf.Max(0.03f, pollIntervalField.val);
-        nextSelectionPollTime = Time.time + interval;
-
+        // This VaM build exposes atom/scene lifecycle delegates but no general
+        // selected-atom-changed delegate. GetSelectedAtom returns the retained
+        // selection, so this reference comparison is allocation-free.
         Atom nextAtom = null;
         if (SuperController.singleton != null)
         {
@@ -3398,11 +3557,15 @@ public class FrameAngelRadar : MVRScript
             nextAtom = null;
         }
 
-        string nextUid = nextAtom != null ? nextAtom.uid : "";
-        if (nextUid == selectedUid)
+        ApplySelectedAtomChange(nextAtom, false);
+    }
+
+    private bool ApplySelectedAtomChange(Atom nextAtom, bool selectedFromRadar)
+    {
+        string nextUid = nextAtom != null ? (nextAtom.uid ?? "") : "";
+        if (nextAtom == selectedAtom && string.Equals(nextUid, selectedUid, StringComparison.Ordinal))
         {
-            selectedAtom = nextAtom;
-            return;
+            return false;
         }
 
         if (selectedAtom != null && !string.IsNullOrEmpty(selectedUid))
@@ -3416,16 +3579,20 @@ public class FrameAngelRadar : MVRScript
         selectedUid = nextUid;
         selectedAtomRecord = null;
         availableMarkersDirty = true;
+        selectedVisualDirty = true;
+        markerStatusDirty = true;
         availableAtomRevision++;
+        RequestAvailableCandidateReconciliation();
 
         if (selectedAtom != null)
         {
-            SetStatus("Selected: " + selectedUid);
+            SetStatus((selectedFromRadar ? "Radar selected: " : "Selected: ") + selectedUid);
         }
         else
         {
             SetStatus("No selected atom.");
         }
+        return true;
     }
 
     private void TrackAttachedAtomPlacement(Transform viewer)
@@ -3441,7 +3608,30 @@ public class FrameAngelRadar : MVRScript
         Vector3 localOffset = anchor != null
             ? anchor.InverseTransformPoint(worldPosition)
             : viewer.InverseTransformPoint(worldPosition);
-        SetHudOffset(localOffset);
+        if ((localOffset - GetHudOffset()).sqrMagnitude > 0.00000025f)
+        {
+            SetHudOffset(localOffset);
+        }
+    }
+
+    private bool ShouldUpdateRadarDishContinuously()
+    {
+        if (moveGrabActive || resizeGrabActive || accordionResizeActive || placementModeField.val)
+        {
+            return true;
+        }
+#if FA_RADAR_PRO
+        if (grabThrowActive)
+        {
+            return true;
+        }
+#endif
+        if (IsWristCompassModeActive())
+        {
+            return true;
+        }
+
+        return string.Equals(ResolveAnchorMode(), AnchorModeHud, StringComparison.Ordinal);
     }
 
     private void UpdateRadarDish(Transform viewer)
@@ -3550,8 +3740,25 @@ public class FrameAngelRadar : MVRScript
         return -Mathf.Atan2(localWorldRight.z, localWorldRight.x) * Mathf.Rad2Deg;
     }
 
+    private bool ShouldMaintainTrackedHandConnection()
+    {
+        return radarEnabledField != null
+            && radarEnabledField.val
+            && (ReadBool(grabHandlesEnabledField, true) || IsWristCompassModeActive());
+    }
+
     private void MaintainTrackedHandConnection()
     {
+        nextTrackedHandAcquireAt = Time.unscaledTime + TrackedHandAcquireIntervalSeconds;
+        if (!ShouldMaintainTrackedHandConnection())
+        {
+            if (trackedHandReceiverRegistered)
+            {
+                DisconnectTrackedHandRuntime(true);
+            }
+            return;
+        }
+
         if (trackedHandReceiverRegistered)
         {
             if (trackedHandRuntimeRoot != null
@@ -3562,14 +3769,7 @@ public class FrameAngelRadar : MVRScript
             }
 
             DisconnectTrackedHandRuntime(true);
-            nextTrackedHandAcquireAt = 0.0f;
         }
-
-        if (Time.unscaledTime < nextTrackedHandAcquireAt)
-        {
-            return;
-        }
-        nextTrackedHandAcquireAt = Time.unscaledTime + TrackedHandAcquireIntervalSeconds;
         TryConnectTrackedHandRuntime();
     }
 
@@ -3921,7 +4121,7 @@ public class FrameAngelRadar : MVRScript
 
     private bool ResolveRadarRuntimeVisible(Transform viewer)
     {
-        if (!recorderRadarVisible || radarEnabledField == null || !radarEnabledField.val)
+        if (radarEnabledField == null || !radarEnabledField.val)
         {
             return false;
         }
@@ -5107,70 +5307,190 @@ public class FrameAngelRadar : MVRScript
         stemObject.transform.localScale = new Vector3(visualRadius, visualRadius * length, visualRadius);
     }
 
-    private void PollAvailableAtomsIfDue(RadarFrame frame)
+    private void RebuildAtomCatalogIfNeeded(RadarFrame frame)
     {
-        if (Time.time < nextAtomPollTime && !availableMarkersDirty)
+        if (!atomCatalogRebuildPending)
         {
             return;
         }
 
-        float interval = Mathf.Max(0.15f, atomPollSecondsField.val);
-        nextAtomPollTime = Time.time + interval;
-        trackedAvailableAtoms.Clear();
-        availableAtomRecords.Clear();
-        lastAvailableAtomSceneCount = 0;
-        lastAvailableAtomTrackedCount = 0;
-        lastAvailableAtomVisibleCount = 0;
-        lastAvailableAtomRangeHiddenCount = 0;
-        lastAvailableAtomMissingTargetCount = 0;
-        lastAvailableAtomBudgetHiddenCount = 0;
-
-        if (!availableAtomMarkersEnabledField.val || SuperController.singleton == null)
-        {
+        atomCatalogRebuildPending = false;
+        atomRecordByAtom.Clear();
+        atomCatalogRecords.Clear();
+        movingAvailableAtomRecords.Clear();
+        dirtyAvailableAtomRecords.Clear();
+        stationaryAtomProbeCursor = 0;
 #if FA_RADAR_PRO
-            cachedLightByAtomId.Clear();
-            liveAtomIdsForLightCache.Clear();
-            staleLightCacheAtomIds.Clear();
+        cachedLightByAtomId.Clear();
 #endif
-            return;
+
+        SuperController controller = SuperController.singleton;
+        List<Atom> atoms = controller != null ? controller.GetAtoms() : null;
+        if (atoms != null)
+        {
+            for (int i = 0; i < atoms.Count; i++)
+            {
+                AddAtomCatalogRecord(atoms[i]);
+            }
         }
 
-        List<Atom> atoms = SuperController.singleton.GetAtoms();
-        if (atoms == null)
+        lastAvailableAtomSceneCount = atomCatalogRecords.Count;
+        candidateReconcileInProgress = false;
+        RequestAvailableCandidateReconciliation();
+    }
+
+    private void AddAtomCatalogRecord(Atom atom)
+    {
+        if (atom == null || atomRecordByAtom.ContainsKey(atom))
         {
             return;
         }
-        lastAvailableAtomSceneCount = atoms.Count;
+
+        AtomRecord record = new AtomRecord();
+        record.recordId = -1;
+        record.atom = atom;
+        record.uid = atom.uid ?? "";
+        record.root = ResolveAtomRootTransform(atom);
+        record.categoryFlags = ResolveAtomCategoryFlags(atom);
+        record.markerMesh = ResolveMarkerMeshForRecord(record);
+        record.lastOn = atom.on;
+        record.lastHidden = atom.hidden;
+        record.visualDirty = true;
 #if FA_RADAR_PRO
-        liveAtomIdsForLightCache.Clear();
+        record.labelText = SanitizeRadarLabelText(record.uid);
 #endif
+        atomRecordByAtom.Add(atom, record);
+        atomCatalogRecords.Add(record);
+        lastAvailableAtomSceneCount = atomCatalogRecords.Count;
+    }
+
+    private void RemoveAtomCatalogRecord(Atom atom)
+    {
+        AtomRecord record;
+        if (atom == null || !atomRecordByAtom.TryGetValue(atom, out record))
+        {
+            return;
+        }
+
+        atomRecordByAtom.Remove(atom);
+        atomCatalogRecords.Remove(record);
+        candidateAvailableAtomRecords.Remove(record);
+        movingAvailableAtomRecords.Remove(record);
+        dirtyAvailableAtomRecords.Remove(record);
+        if (availableAtomRecords.Remove(record))
+        {
+            ReindexAvailableAtomRecords();
+            availableMarkersDirty = true;
+        }
+        record.recordId = -1;
+        record.moving = false;
+        record.visualDirtyQueued = false;
+        lastAvailableAtomSceneCount = atomCatalogRecords.Count;
+    }
+
+    private void RequestAvailableCandidateReconciliation()
+    {
+        candidateReconcilePending = true;
+        markerStatusDirty = true;
+    }
+
+    private void AdvanceAvailableCandidateReconciliation(RadarFrame frame)
+    {
+        if (!availableAtomMarkersEnabledField.val)
+        {
+            if (availableAtomRecords.Count > 0)
+            {
+                for (int i = 0; i < availableAtomRecords.Count; i++)
+                {
+                    availableAtomRecords[i].recordId = -1;
+                }
+                availableAtomRecords.Clear();
+                trackedAvailableAtoms.Clear();
+                availableMarkersDirty = true;
+            }
+            candidateReconcileInProgress = false;
+            candidateReconcilePending = false;
+            return;
+        }
+
+        if (!candidateReconcileInProgress)
+        {
+            if (!candidateReconcilePending)
+            {
+                return;
+            }
+
+            candidateReconcilePending = false;
+            candidateReconcileInProgress = true;
+            candidateReconcileCursor = 0;
+            candidateFilteredCount = 0;
+            candidateAvailableAtomRecords.Clear();
+            candidateReferencePosition = frame.referencePosition;
+        }
 
         Atom anchorHost = ResolveAttachedAtomAnchorHost();
         int maxVisibleMarkers = ResolveMaxVisibleMarkerCount();
-        int filteredCandidateCount = 0;
-        for (int i = 0; i < atoms.Count; i++)
+        int processed = 0;
+        while (candidateReconcileCursor < atomCatalogRecords.Count
+            && processed < AvailableCandidateReconcileBudgetPerFrame)
         {
-            Atom atom = atoms[i];
-#if FA_RADAR_PRO
-            if (atom != null)
+            AtomRecord record = atomCatalogRecords[candidateReconcileCursor++];
+            processed++;
+            if (record == null || record.atom == null)
             {
-                liveAtomIdsForLightCache.Add(atom.GetInstanceID());
+                continue;
             }
-#endif
-            AtomRecord record = BuildAtomRecord(atom, frame, availableAtomRecords.Count, false);
+
+            RefreshAtomRecordTransform(record, frame);
             if (!IsAtomVisibleByFilter(record, anchorHost))
             {
                 continue;
             }
 
-            filteredCandidateCount++;
+            candidateFilteredCount++;
             HydrateAtomRecord(record, frame);
-            InsertAvailableAtomRecordByDistance(record, maxVisibleMarkers);
+            record.distanceSq = (record.markerWorldPosition - candidateReferencePosition).sqrMagnitude;
+            InsertAtomRecordByDistance(candidateAvailableAtomRecords, record, maxVisibleMarkers);
         }
-#if FA_RADAR_PRO
-        PruneCachedLightAtoms();
-#endif
 
+        if (candidateReconcileCursor < atomCatalogRecords.Count)
+        {
+            return;
+        }
+
+        candidateReconcileInProgress = false;
+        CommitAvailableCandidateRecords();
+        lastCandidateReferencePosition = candidateReferencePosition;
+        candidateReferenceKnown = true;
+        if ((frame.referencePosition - candidateReferencePosition).sqrMagnitude
+            > (AvailableCandidateReferenceMoveThresholdMeters * AvailableCandidateReferenceMoveThresholdMeters))
+        {
+            candidateReconcilePending = true;
+        }
+    }
+
+    private void CommitAvailableCandidateRecords()
+    {
+        for (int i = 0; i < availableAtomRecords.Count; i++)
+        {
+            availableAtomRecords[i].recordId = -1;
+        }
+
+        List<AtomRecord> previous = availableAtomRecords;
+        availableAtomRecords = candidateAvailableAtomRecords;
+        candidateAvailableAtomRecords = previous;
+        candidateAvailableAtomRecords.Clear();
+        ReindexAvailableAtomRecords();
+        lastAvailableAtomTrackedCount = availableAtomRecords.Count;
+        lastAvailableAtomBudgetHiddenCount = Mathf.Max(0, candidateFilteredCount - availableAtomRecords.Count);
+        EnsureAvailableMarkerCapacity(availableAtomRecords.Count);
+        availableAtomRevision++;
+        availableMarkersDirty = true;
+        markerStatusDirty = true;
+    }
+
+    private void ReindexAvailableAtomRecords()
+    {
         trackedAvailableAtoms.Clear();
         for (int i = 0; i < availableAtomRecords.Count; i++)
         {
@@ -5181,14 +5501,12 @@ public class FrameAngelRadar : MVRScript
             }
 
             record.recordId = i;
+            record.visualDirty = true;
+            record.visualDirtyQueued = false;
             trackedAvailableAtoms.Add(record.atom);
         }
-
-        lastAvailableAtomTrackedCount = availableAtomRecords.Count;
-        lastAvailableAtomBudgetHiddenCount = Mathf.Max(0, filteredCandidateCount - availableAtomRecords.Count);
-        EnsureAvailableMarkerCapacity(availableAtomRecords.Count);
-        availableAtomRevision++;
-        availableMarkersDirty = true;
+        dirtyAvailableAtomRecords.Clear();
+        stationaryAtomProbeCursor = 0;
     }
 
     private AtomRecord BuildAtomRecord(Atom atom, RadarFrame frame, int recordId)
@@ -5208,6 +5526,8 @@ public class FrameAngelRadar : MVRScript
         record.root = ResolveAtomRootTransform(atom);
         record.categoryFlags = ResolveAtomCategoryFlags(atom);
         record.markerMesh = ResolveMarkerMeshForRecord(record);
+        record.lastOn = atom != null && atom.on;
+        record.lastHidden = atom != null && atom.hidden;
         if (hydrateMetadata)
         {
             HydrateAtomRecord(record, frame);
@@ -5226,8 +5546,13 @@ public class FrameAngelRadar : MVRScript
 
     private void HydrateAtomRecord(AtomRecord record, RadarFrame frame)
     {
-        if (record == null)
+        if (record == null || record.metadataHydrated)
         {
+            if (record != null)
+            {
+                RefreshAtomRecordTransform(record, frame);
+                record.distanceSq = (record.markerWorldPosition - frame.referencePosition).sqrMagnitude;
+            }
             return;
         }
 
@@ -5245,19 +5570,20 @@ public class FrameAngelRadar : MVRScript
         }
 #endif
         record.distanceSq = (record.markerWorldPosition - frame.referencePosition).sqrMagnitude;
+        record.metadataHydrated = true;
     }
 
-    private void InsertAvailableAtomRecordByDistance(AtomRecord record, int maxCount)
+    private void InsertAtomRecordByDistance(List<AtomRecord> records, AtomRecord record, int maxCount)
     {
-        if (record == null || maxCount <= 0)
+        if (records == null || record == null || maxCount <= 0)
         {
             return;
         }
 
-        int insertAt = availableAtomRecords.Count;
+        int insertAt = records.Count;
         while (insertAt > 0)
         {
-            AtomRecord previous = availableAtomRecords[insertAt - 1];
+            AtomRecord previous = records[insertAt - 1];
             float previousDistance = previous != null ? previous.distanceSq : float.MaxValue;
             if (record.distanceSq >= previousDistance)
             {
@@ -5267,15 +5593,15 @@ public class FrameAngelRadar : MVRScript
             insertAt--;
         }
 
-        if (availableAtomRecords.Count >= maxCount && insertAt >= availableAtomRecords.Count)
+        if (records.Count >= maxCount && insertAt >= records.Count)
         {
             return;
         }
 
-        availableAtomRecords.Insert(insertAt, record);
-        if (availableAtomRecords.Count > maxCount)
+        records.Insert(insertAt, record);
+        if (records.Count > maxCount)
         {
-            availableAtomRecords.RemoveAt(availableAtomRecords.Count - 1);
+            records.RemoveAt(records.Count - 1);
         }
     }
 
@@ -5841,108 +6167,325 @@ public class FrameAngelRadar : MVRScript
 
     private void UpdateAvailableAtomMarkers(RadarFrame frame)
     {
+        RefreshAvailableAtomMotion(frame);
         int trackedCount = availableAtomMarkersEnabledField.val && availableAtomRecords != null ? availableAtomRecords.Count : 0;
-        bool atomTransformChanged = false;
-        for (int i = 0; i < trackedCount; i++)
+        bool updateAll = availableMarkersDirty || frame.signature != lastAvailableMarkerFrameSignature;
+        if (!updateAll && dirtyAvailableAtomRecords.Count <= 0)
         {
-            AtomRecord record = availableAtomRecords[i];
-            if (RefreshAtomRecordTransform(record, frame))
-            {
-                atomTransformChanged = true;
-            }
-        }
-
-        if (atomTransformChanged)
-        {
-            availableAtomRevision++;
-            frame.signature = BuildRadarFrameSignature(frame);
-        }
-
-        if (!availableMarkersDirty && frame.signature == lastAvailableMarkerFrameSignature)
-        {
-#if FA_RADAR_PRO
-            RefreshActiveLabelOrientations(frame);
-#endif
             return;
         }
 
         int visibleMarkerCount = 0;
         int rangeHiddenCount = 0;
         int missingTargetCount = 0;
-        float visualRadius = frame.visualRadius;
-        for (int i = 0; availableMarkerSlots != null && i < availableMarkerSlots.Length; i++)
+        if (updateAll)
         {
-            MarkerSlot slot = availableMarkerSlots[i];
-            bool show = i < trackedCount;
-            if (slot == null || !show)
+            for (int i = 0; availableMarkerSlots != null && i < availableMarkerSlots.Length; i++)
             {
-                if (slot != null)
+                UpdateAvailableAtomMarkerSlot(
+                    i,
+                    trackedCount,
+                    frame,
+                    ref visibleMarkerCount,
+                    ref rangeHiddenCount,
+                    ref missingTargetCount);
+            }
+
+            lastAvailableAtomTrackedCount = trackedCount;
+            lastAvailableAtomVisibleCount = visibleMarkerCount;
+            lastAvailableAtomRangeHiddenCount = rangeHiddenCount;
+            lastAvailableAtomMissingTargetCount = missingTargetCount;
+            lastAvailableMarkerFrameSignature = frame.signature;
+            availableMarkersDirty = false;
+            for (int i = 0; i < dirtyAvailableAtomRecords.Count; i++)
+            {
+                AtomRecord dirtyRecord = dirtyAvailableAtomRecords[i];
+                if (dirtyRecord != null)
                 {
-                    SetActiveIfChanged(slot.markerObject, false);
-                    SetActiveIfChanged(slot.stemObject, false);
-                    slot.recordId = -1;
+                    dirtyRecord.visualDirty = false;
+                    dirtyRecord.visualDirtyQueued = false;
                 }
-#if FA_RADAR_PRO
-                SetProAvailableAtomVisualsVisible(i, false);
-                SetAvailableLabelVisible(slot, false);
-#endif
+            }
+            dirtyAvailableAtomRecords.Clear();
+            markerStatusDirty = true;
+            return;
+        }
+
+        for (int i = 0; i < dirtyAvailableAtomRecords.Count; i++)
+        {
+            AtomRecord record = dirtyAvailableAtomRecords[i];
+            if (record == null)
+            {
                 continue;
             }
 
-            AtomRecord record = availableAtomRecords[i];
-            Transform target = record != null ? record.root : null;
-            if (record == null || record.atom == null || target == null || !record.atom.on || record.atom.hidden)
+            int slotIndex = record.recordId;
+            if (slotIndex >= 0
+                && slotIndex < trackedCount
+                && slotIndex < availableAtomRecords.Count
+                && availableAtomRecords[slotIndex] == record)
             {
-                missingTargetCount++;
+                UpdateAvailableAtomMarkerSlot(
+                    slotIndex,
+                    trackedCount,
+                    frame,
+                    ref visibleMarkerCount,
+                    ref rangeHiddenCount,
+                    ref missingTargetCount);
+            }
+            record.visualDirty = false;
+            record.visualDirtyQueued = false;
+        }
+        dirtyAvailableAtomRecords.Clear();
+    }
+
+    private void UpdateAvailableAtomMarkerSlot(
+        int index,
+        int trackedCount,
+        RadarFrame frame,
+        ref int visibleMarkerCount,
+        ref int rangeHiddenCount,
+        ref int missingTargetCount)
+    {
+        MarkerSlot slot = availableMarkerSlots != null && index >= 0 && index < availableMarkerSlots.Length
+            ? availableMarkerSlots[index]
+            : null;
+        bool show = index < trackedCount;
+        if (slot == null || !show)
+        {
+            if (slot != null)
+            {
                 SetActiveIfChanged(slot.markerObject, false);
                 SetActiveIfChanged(slot.stemObject, false);
                 slot.recordId = -1;
+            }
 #if FA_RADAR_PRO
-                SetProAvailableAtomVisualsVisible(i, false);
-                SetAvailableLabelVisible(slot, false);
+            SetProAvailableAtomVisualsVisible(index, false);
+            SetAvailableLabelVisible(slot, false);
+#endif
+            return;
+        }
+
+        AtomRecord record = availableAtomRecords[index];
+        Transform target = record != null ? record.root : null;
+        if (record == null || record.atom == null || target == null || !record.atom.on || record.atom.hidden)
+        {
+            missingTargetCount++;
+            SetActiveIfChanged(slot.markerObject, false);
+            SetActiveIfChanged(slot.stemObject, false);
+            slot.recordId = -1;
+#if FA_RADAR_PRO
+            SetProAvailableAtomVisualsVisible(index, false);
+            SetAvailableLabelVisible(slot, false);
+#endif
+            RequestAvailableCandidateReconciliation();
+            return;
+        }
+
+        float visualRadius = frame.visualRadius;
+        Vector3 targetWorldPosition = record.markerWorldPosition;
+        Vector3 radarLocal = ResolveWorldPositionRadarLocal(frame, targetWorldPosition);
+        Vector3 groundLocal = ResolveTargetGroundRadarLocal(frame, targetWorldPosition);
+        float distanceMeters = ResolveWorldDistanceMeters(frame, targetWorldPosition);
+        float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
+        float depthScale = ResolveDepthScale(distanceMeters);
+        float depthAlpha = ResolveDepthVisibilityAlpha(distanceMeters);
+        float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * 0.58f * depthScale;
+#if FA_RADAR_PRO
+        if (HasCategory(record, AtomCategoryLight))
+        {
+            markerScale *= Mathf.Clamp(ReadFloat(lightMarkerScaleField, 0.28f), 0.12f, 1.0f);
+        }
+#endif
+        Color color = ResolveAvailableAtomColor(record, Mathf.Clamp01(availableAtomAlphaField.val) * fadeAlpha * depthAlpha);
+        ApplyMaterialColorIfChanged(slot.markerMaterial, color, Mathf.Max(0.0f, emissionStrengthField.val) * 0.85f);
+        if (slot.markerFilter != null && record.markerMesh != null && slot.markerMesh != record.markerMesh)
+        {
+            slot.markerFilter.sharedMesh = record.markerMesh;
+            slot.markerMesh = record.markerMesh;
+        }
+        slot.recordId = record.recordId;
+        SetActiveIfChanged(slot.markerObject, true);
+        visibleMarkerCount++;
+        PositionTargetSphere(slot.markerObject, radarLocal, visualRadius, markerScale, 0.0f);
+        UpdateHeightStem(slot.stemObject, radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && (fadeAlpha * depthAlpha) > 0.08f);
+#if FA_RADAR_PRO
+        UpdateProAvailableAtomVisuals(index, record, radarLocal, ResolveDirectorOverlayScale(markerScale, depthAlpha), ResolveDirectorOverlayAlpha(fadeAlpha, depthAlpha));
+        UpdateAvailableAtomLabel(index, slot, record, frame, radarLocal, markerScale, fadeAlpha * depthAlpha);
+#endif
+    }
+
+    private void RefreshAvailableAtomMotion(RadarFrame frame)
+    {
+        for (int i = movingAvailableAtomRecords.Count - 1; i >= 0; i--)
+        {
+            AtomRecord record = movingAvailableAtomRecords[i];
+            if (record == null || record.atom == null)
+            {
+                movingAvailableAtomRecords.RemoveAt(i);
+                continue;
+            }
+
+            bool visibilityChanged = RefreshAtomVisibilityState(record);
+            bool changed = RefreshAtomRecordTransform(record, frame);
+#if FA_RADAR_PRO
+            changed = RefreshAtomLightVisualState(record) || changed;
+#endif
+            if (changed || visibilityChanged)
+            {
+                record.stationaryFrames = 0;
+                MarkAvailableAtomRecordDirty(record);
+                RequestAvailableCandidateReconciliation();
+#if FA_RADAR_PRO
+                if (HasCategory(record, AtomCategoryCamera))
+                {
+                    cameraFrustumsDirty = true;
+                }
 #endif
                 continue;
             }
 
-            Vector3 targetWorldPosition = record.markerWorldPosition;
-            Vector3 radarLocal = ResolveWorldPositionRadarLocal(frame, targetWorldPosition);
-            Vector3 groundLocal = ResolveTargetGroundRadarLocal(frame, targetWorldPosition);
-            float distanceMeters = ResolveWorldDistanceMeters(frame, targetWorldPosition);
-            float fadeAlpha = ResolveRangeFadeAlpha(distanceMeters);
-
-            float depthScale = ResolveDepthScale(distanceMeters);
-            float depthAlpha = ResolveDepthVisibilityAlpha(distanceMeters);
-            float markerScale = visualRadius * Mathf.Max(0.01f, targetMarkerScaleField.val) * 0.58f * depthScale;
-#if FA_RADAR_PRO
-            if (HasCategory(record, AtomCategoryLight))
+            record.stationaryFrames++;
+            if (record.stationaryFrames >= MovingAtomStationaryFrameLimit)
             {
-                markerScale *= Mathf.Clamp(ReadFloat(lightMarkerScaleField, 0.28f), 0.12f, 1.0f);
+                record.moving = false;
+                record.stationaryFrames = 0;
+                movingAvailableAtomRecords.RemoveAt(i);
             }
-#endif
-            Color color = ResolveAvailableAtomColor(record, Mathf.Clamp01(availableAtomAlphaField.val) * fadeAlpha * depthAlpha);
-            ApplyMaterialColorIfChanged(slot.markerMaterial, color, Mathf.Max(0.0f, emissionStrengthField.val) * 0.85f);
-            if (slot.markerFilter != null && record.markerMesh != null && slot.markerMesh != record.markerMesh)
-            {
-                slot.markerFilter.sharedMesh = record.markerMesh;
-                slot.markerMesh = record.markerMesh;
-            }
-            slot.recordId = record.recordId;
-            SetActiveIfChanged(slot.markerObject, true);
-            visibleMarkerCount++;
-            PositionTargetSphere(slot.markerObject, radarLocal, visualRadius, markerScale, 0.0f);
-            UpdateHeightStem(slot.stemObject, radarLocal.x, groundLocal.y, radarLocal.y, radarLocal.z, visualRadius, heightStemsEnabledField.val && (fadeAlpha * depthAlpha) > 0.08f);
-#if FA_RADAR_PRO
-            UpdateProAvailableAtomVisuals(i, record, radarLocal, ResolveDirectorOverlayScale(markerScale, depthAlpha), ResolveDirectorOverlayAlpha(fadeAlpha, depthAlpha));
-            UpdateAvailableAtomLabel(i, slot, record, frame, radarLocal, markerScale, fadeAlpha * depthAlpha);
-#endif
         }
 
-        lastAvailableAtomTrackedCount = trackedCount;
-        lastAvailableAtomVisibleCount = visibleMarkerCount;
-        lastAvailableAtomRangeHiddenCount = rangeHiddenCount;
-        lastAvailableAtomMissingTargetCount = missingTargetCount;
-        lastAvailableMarkerFrameSignature = frame.signature;
-        availableMarkersDirty = false;
+        int catalogCount = atomCatalogRecords.Count;
+        int probed = 0;
+        while (catalogCount > 0 && probed < StationaryAtomProbeBudgetPerFrame)
+        {
+            if (stationaryAtomProbeCursor >= catalogCount)
+            {
+                stationaryAtomProbeCursor = 0;
+            }
+
+            AtomRecord record = atomCatalogRecords[stationaryAtomProbeCursor++];
+            probed++;
+            if (record == null || record.atom == null || record.moving)
+            {
+                continue;
+            }
+
+            bool visibilityChanged = RefreshAtomVisibilityState(record);
+            bool changed = RefreshAtomRecordTransform(record, frame);
+#if FA_RADAR_PRO
+            changed = RefreshAtomLightVisualState(record) || changed;
+#endif
+            if (!changed && !visibilityChanged)
+            {
+                continue;
+            }
+
+            if (changed)
+            {
+                record.moving = true;
+                record.stationaryFrames = 0;
+                movingAvailableAtomRecords.Add(record);
+            }
+            MarkAvailableAtomRecordDirty(record);
+            RequestAvailableCandidateReconciliation();
+#if FA_RADAR_PRO
+            if (HasCategory(record, AtomCategoryCamera))
+            {
+                cameraFrustumsDirty = true;
+            }
+#endif
+        }
+    }
+
+    private bool RefreshAtomVisibilityState(AtomRecord record)
+    {
+        if (record == null || record.atom == null)
+        {
+            return false;
+        }
+
+        bool atomOn = record.atom.on;
+        bool atomHidden = record.atom.hidden;
+        if (atomOn == record.lastOn && atomHidden == record.lastHidden)
+        {
+            return false;
+        }
+
+        record.lastOn = atomOn;
+        record.lastHidden = atomHidden;
+        return true;
+    }
+
+#if FA_RADAR_PRO
+    private bool RefreshAtomLightVisualState(AtomRecord record)
+    {
+        if (record == null || !record.metadataHydrated || !HasCategory(record, AtomCategoryLight))
+        {
+            return false;
+        }
+
+        Light light;
+        if (!TryResolveUnityLight(record, out light) || light == null)
+        {
+            bool changed = record.hasLightSample;
+            record.hasLightSample = false;
+            return changed;
+        }
+
+        Transform lightTransform = light.transform;
+        Vector3 position = lightTransform != null ? lightTransform.position : Vector3.zero;
+        Quaternion rotation = lightTransform != null ? lightTransform.rotation : Quaternion.identity;
+        Color color = light.color;
+        bool stateChanged = !record.hasLightSample
+            || record.lastLightEnabled != light.enabled
+            || record.lastLightType != light.type
+            || Mathf.Abs(record.lastLightRange - light.range) > 0.001f
+            || Mathf.Abs(record.lastLightSpotAngle - light.spotAngle) > 0.05f
+            || ColorDifferenceSquared(record.lastLightColor, color) > 0.000001f
+            || (record.lastLightPosition - position).sqrMagnitude
+                > (AvailableMarkerTransformMoveThresholdMeters * AvailableMarkerTransformMoveThresholdMeters)
+            || Quaternion.Angle(record.lastLightRotation, rotation) > AvailableMarkerFrameRotateThresholdDegrees;
+        if (!stateChanged)
+        {
+            return false;
+        }
+
+        record.hasLightSample = true;
+        record.lastLightEnabled = light.enabled;
+        record.lastLightType = light.type;
+        record.lastLightRange = light.range;
+        record.lastLightSpotAngle = light.spotAngle;
+        record.lastLightColor = color;
+        record.lastLightPosition = position;
+        record.lastLightRotation = rotation;
+        return true;
+    }
+
+    private static float ColorDifferenceSquared(Color left, Color right)
+    {
+        float red = left.r - right.r;
+        float green = left.g - right.g;
+        float blue = left.b - right.b;
+        float alpha = left.a - right.a;
+        return (red * red) + (green * green) + (blue * blue) + (alpha * alpha);
+    }
+#endif
+
+    private void MarkAvailableAtomRecordDirty(AtomRecord record)
+    {
+        if (record == null)
+        {
+            return;
+        }
+
+        record.visualDirty = true;
+        if (record.recordId < 0 || record.visualDirtyQueued)
+        {
+            return;
+        }
+
+        record.visualDirtyQueued = true;
+        dirtyAvailableAtomRecords.Add(record);
     }
 
     private void UpdateAvailableAtomMarkerStatus()
@@ -5953,6 +6496,7 @@ public class FrameAngelRadar : MVRScript
         }
 
         nextAvailableMarkerStatusTime = Time.unscaledTime + AvailableMarkerStatusIntervalSeconds;
+        markerStatusDirty = false;
         if (selectedAtom != null || !availableAtomMarkersEnabledField.val)
         {
             return;
@@ -6333,33 +6877,6 @@ public class FrameAngelRadar : MVRScript
         PositionLabelObject(slot.labelObject, frame, record.root, radarLocal, false, markerIndex, out itemLocal, out labelLocal);
         UpdateLabelLeaderLine(slot.labelLeaderObject, itemLocal, labelLocal, alpha);
         SetAvailableLabelVisible(slot, true);
-    }
-
-    private void RefreshActiveLabelOrientations(RadarFrame frame)
-    {
-        if (!string.Equals(ResolveLabelOrientationMode(), LabelOrientationFaceViewer, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        Transform selectedTarget = selectedAtomRecord != null ? selectedAtomRecord.root : null;
-        if (targetLabelObject != null && targetLabelObject.activeSelf && selectedTarget != null)
-        {
-            targetLabelObject.transform.localRotation = ResolveLabelRadarRotation(frame, selectedTarget, targetLabelObject.transform.localPosition);
-        }
-
-        int limit = ResolveLabelLimit();
-        for (int i = 0; availableMarkerSlots != null && i < availableMarkerSlots.Length && i < limit; i++)
-        {
-            MarkerSlot slot = availableMarkerSlots[i];
-            AtomRecord record = availableAtomRecords != null && i < availableAtomRecords.Count ? availableAtomRecords[i] : null;
-            if (slot == null || slot.labelObject == null || !slot.labelObject.activeSelf || record == null || record.root == null)
-            {
-                continue;
-            }
-
-            slot.labelObject.transform.localRotation = ResolveLabelRadarRotation(frame, record.root, slot.labelObject.transform.localPosition);
-        }
     }
 
     private void EnsureAvailableLabelSlot(MarkerSlot slot, int markerIndex)
@@ -6872,6 +7389,91 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
+    private void RefreshSceneCameraCatalogIfNeeded()
+    {
+        if (!sceneCameraCatalogDirty)
+        {
+            return;
+        }
+
+        sceneCameraCatalogDirty = false;
+        int cameraCount = Mathf.Max(0, Camera.allCamerasCount);
+        EnsureSceneCameraSampleCapacity(Mathf.Max(MaxTrackedSceneCameras, cameraCount));
+        sceneCameraCount = cameraCount > 0 ? Camera.GetAllCameras(sceneCameraBuffer) : 0;
+        sceneCameraProbeCursor = 0;
+        for (int i = 0; i < sceneCameraSamplesKnown.Length; i++)
+        {
+            sceneCameraSamplesKnown[i] = false;
+        }
+        cameraFrustumsDirty = true;
+    }
+
+    private void EnsureSceneCameraSampleCapacity(int requiredCount)
+    {
+        if (sceneCameraBuffer != null && sceneCameraBuffer.Length >= requiredCount)
+        {
+            return;
+        }
+
+        int capacity = Mathf.Max(MaxTrackedSceneCameras, requiredCount);
+        sceneCameraBuffer = new Camera[capacity];
+        sceneCameraPositions = new Vector3[capacity];
+        sceneCameraRotations = new Quaternion[capacity];
+        sceneCameraFovs = new float[capacity];
+        sceneCameraAspects = new float[capacity];
+        sceneCameraSamplesKnown = new bool[capacity];
+    }
+
+    private void ProbeSceneCameraChanges()
+    {
+        if (showSceneCameraFrustumsField == null || !showSceneCameraFrustumsField.val || sceneCameraCount <= 0)
+        {
+            return;
+        }
+
+        int probed = 0;
+        while (probed < StationaryAtomProbeBudgetPerFrame && sceneCameraCount > 0)
+        {
+            if (sceneCameraProbeCursor >= sceneCameraCount)
+            {
+                sceneCameraProbeCursor = 0;
+            }
+
+            int index = sceneCameraProbeCursor++;
+            probed++;
+            Camera camera = sceneCameraBuffer[index];
+            if (camera == null)
+            {
+                sceneCameraCatalogDirty = true;
+                cameraFrustumsDirty = true;
+                continue;
+            }
+
+            Transform cameraTransform = camera.transform;
+            Vector3 position = cameraTransform.position;
+            Quaternion rotation = cameraTransform.rotation;
+            float fov = camera.fieldOfView;
+            float aspect = camera.aspect;
+            bool changed = !sceneCameraSamplesKnown[index]
+                || (position - sceneCameraPositions[index]).sqrMagnitude
+                    > (AvailableMarkerTransformMoveThresholdMeters * AvailableMarkerTransformMoveThresholdMeters)
+                || Quaternion.Angle(rotation, sceneCameraRotations[index]) > AvailableMarkerFrameRotateThresholdDegrees
+                || Mathf.Abs(fov - sceneCameraFovs[index]) > 0.05f
+                || Mathf.Abs(aspect - sceneCameraAspects[index]) > 0.001f;
+            if (!changed)
+            {
+                continue;
+            }
+
+            sceneCameraSamplesKnown[index] = true;
+            sceneCameraPositions[index] = position;
+            sceneCameraRotations[index] = rotation;
+            sceneCameraFovs[index] = fov;
+            sceneCameraAspects[index] = aspect;
+            cameraFrustumsDirty = true;
+        }
+    }
+
     private void UpdateProCameraFrustums(Transform viewer)
     {
         Camera viewerCamera = ResolveViewerCamera();
@@ -6902,20 +7504,15 @@ public class FrameAngelRadar : MVRScript
     private void UpdateSceneCameraFrustums(Transform viewer, Camera viewerCamera, Camera desktopCamera)
     {
         bool showSceneCameras = showSceneCameraFrustumsField != null && showSceneCameraFrustumsField.val;
-        Camera[] cameras = showSceneCameras ? Camera.allCameras : null;
-        int requiredCount = 0;
-        if (cameras != null)
-        {
-            requiredCount = Mathf.Min(cameras.Length, 16);
-        }
+        int requiredCount = showSceneCameras ? Mathf.Min(sceneCameraCount, MaxTrackedSceneCameras) : 0;
 
         EnsureSceneCameraFrustumCapacity(requiredCount);
         int used = 0;
-        if (showSceneCameras && cameras != null)
+        if (showSceneCameras && sceneCameraBuffer != null)
         {
-            for (int i = 0; i < cameras.Length && used < requiredCount; i++)
+            for (int i = 0; i < sceneCameraCount && used < requiredCount; i++)
             {
-                Camera camera = cameras[i];
+                Camera camera = sceneCameraBuffer[i];
                 if (camera == null || camera == viewerCamera || camera == desktopCamera)
                 {
                     continue;
@@ -7077,25 +7674,160 @@ public class FrameAngelRadar : MVRScript
         }
     }
 
-#if FA_RADAR_PRO
-    private void PruneCachedLightAtoms()
+    private void EnsureHostLifecycleEvents()
     {
-        staleLightCacheAtomIds.Clear();
-        foreach (KeyValuePair<int, Light> entry in cachedLightByAtomId)
+        SuperController current = SuperController.singleton;
+        if (lifecycleEventsRegistered && lifecycleController == current)
         {
-            if (!liveAtomIdsForLightCache.Contains(entry.Key) || entry.Value == null)
-            {
-                staleLightCacheAtomIds.Add(entry.Key);
-            }
+            return;
         }
 
-        for (int i = 0; i < staleLightCacheAtomIds.Count; i++)
+        DeregisterHostLifecycleEvents();
+        if (current == null)
         {
-            cachedLightByAtomId.Remove(staleLightCacheAtomIds[i]);
+            return;
         }
-        staleLightCacheAtomIds.Clear();
-    }
+
+        current.onAtomAddedHandlers += HandleHostAtomAdded;
+        current.onAtomRemovedHandlers += HandleHostAtomRemoved;
+        current.onAtomUIDRenameHandlers += HandleHostAtomUidRenamed;
+        current.onAtomParentChangedHandlers += HandleHostAtomParentChanged;
+        current.onAtomSubSceneChangedHandlers += HandleHostAtomSubSceneChanged;
+        current.onSceneLoadedHandlers += HandleHostSceneLoaded;
+        current.onSubSceneLoadedHandlers += HandleHostSubSceneLoaded;
+        lifecycleController = current;
+        lifecycleEventsRegistered = true;
+        atomCatalogRebuildPending = true;
+        RequestAvailableCandidateReconciliation();
+        surfaceStatusDirty = true;
+#if FA_RADAR_PRO
+        sceneCameraCatalogDirty = true;
+        cameraFrustumsDirty = true;
 #endif
+    }
+
+    private void DeregisterHostLifecycleEvents()
+    {
+        SuperController previous = lifecycleController;
+        lifecycleController = null;
+        if (!lifecycleEventsRegistered || previous == null)
+        {
+            lifecycleEventsRegistered = false;
+            return;
+        }
+
+        previous.onAtomAddedHandlers -= HandleHostAtomAdded;
+        previous.onAtomRemovedHandlers -= HandleHostAtomRemoved;
+        previous.onAtomUIDRenameHandlers -= HandleHostAtomUidRenamed;
+        previous.onAtomParentChangedHandlers -= HandleHostAtomParentChanged;
+        previous.onAtomSubSceneChangedHandlers -= HandleHostAtomSubSceneChanged;
+        previous.onSceneLoadedHandlers -= HandleHostSceneLoaded;
+        previous.onSubSceneLoadedHandlers -= HandleHostSubSceneLoaded;
+        lifecycleEventsRegistered = false;
+    }
+
+    private void HandleHostAtomAdded(Atom atom)
+    {
+        AddAtomCatalogRecord(atom);
+        RequestAvailableCandidateReconciliation();
+#if FA_RADAR_PRO
+        sceneCameraCatalogDirty = true;
+#endif
+    }
+
+    private void HandleHostAtomRemoved(Atom atom)
+    {
+        RemoveAtomCatalogRecord(atom);
+        RequestAvailableCandidateReconciliation();
+        selectedVisualDirty = true;
+#if FA_RADAR_PRO
+        if (atom != null)
+        {
+            cachedLightByAtomId.Remove(atom.GetInstanceID());
+        }
+        sceneCameraCatalogDirty = true;
+#endif
+    }
+
+    private void HandleHostAtomUidRenamed(string oldName, string newName)
+    {
+        if (lifecycleController == null || string.IsNullOrEmpty(newName))
+        {
+            return;
+        }
+
+        Atom atom = lifecycleController.GetAtomByUid(newName);
+        AtomRecord record;
+        if (atom == null || !atomRecordByAtom.TryGetValue(atom, out record) || record == null)
+        {
+            return;
+        }
+
+        record.uid = atom.uid ?? "";
+        record.categoryFlags = ResolveAtomCategoryFlags(atom);
+        record.markerMesh = ResolveMarkerMeshForRecord(record);
+#if FA_RADAR_PRO
+        record.labelText = SanitizeRadarLabelText(record.uid);
+#endif
+        MarkAvailableAtomRecordDirty(record);
+        RequestAvailableCandidateReconciliation();
+    }
+
+    private void HandleHostAtomParentChanged(Atom atom, Atom newParent)
+    {
+        RefreshLifecycleAtomRecord(atom);
+    }
+
+    private void HandleHostAtomSubSceneChanged(Atom atom, SubScene newSubScene)
+    {
+        RefreshLifecycleAtomRecord(atom);
+    }
+
+    private void RefreshLifecycleAtomRecord(Atom atom)
+    {
+        cuaPreferenceProfileKnown = false;
+        surfaceStatusDirty = true;
+        AtomRecord record;
+        if (atom == null || !atomRecordByAtom.TryGetValue(atom, out record) || record == null)
+        {
+            return;
+        }
+
+        record.root = ResolveAtomRootTransform(atom);
+        record.markerLocalOffsetKnown = false;
+        record.metadataHydrated = false;
+        record.hasTransformSample = false;
+        MarkAvailableAtomRecordDirty(record);
+        RequestAvailableCandidateReconciliation();
+    }
+
+    private void HandleHostSceneLoaded()
+    {
+        cuaPreferenceProfileKnown = false;
+        atomCatalogRebuildPending = true;
+        candidateReconcileInProgress = false;
+        candidateReconcilePending = true;
+        selectedVisualDirty = true;
+        dishVisualDirty = true;
+        surfaceStatusDirty = true;
+        nextTrackedHandAcquireAt = 0.0f;
+#if FA_RADAR_PRO
+        sceneCameraCatalogDirty = true;
+        cameraFrustumsDirty = true;
+#endif
+    }
+
+    private void HandleHostSubSceneLoaded(SubScene subScene)
+    {
+        cuaPreferenceProfileKnown = false;
+        atomCatalogRebuildPending = true;
+        candidateReconcileInProgress = false;
+        candidateReconcilePending = true;
+#if FA_RADAR_PRO
+        sceneCameraCatalogDirty = true;
+        cameraFrustumsDirty = true;
+#endif
+    }
 
     private bool IsMouseOverRadarVisual(Camera camera)
     {
@@ -7350,7 +8082,7 @@ public class FrameAngelRadar : MVRScript
             return false;
         }
 
-        return recorderRadarVisible && radarEnabledField != null && radarEnabledField.val;
+        return radarEnabledField != null && radarEnabledField.val;
     }
 
     private void EnsurePrimaryGrabHandleAtom(Vector3 worldPosition)
@@ -8524,17 +9256,17 @@ public class FrameAngelRadar : MVRScript
         float width = grabbed ? 0.006f : 0.004f;
         float dashLength = Mathf.Clamp(distance * 0.075f, 0.025f, 0.09f);
         float gapLength = dashLength * 0.85f;
-        List<Vector3> vertices = new List<Vector3>();
-        List<int> triangles = new List<int>();
+        resizeGuideVertices.Clear();
+        resizeGuideTriangles.Clear();
         for (float cursor = 0.0f; cursor < distance; cursor += dashLength + gapLength)
         {
             float segmentEnd = Mathf.Min(distance, cursor + dashLength);
-            AddWorldLineSegment(vertices, triangles, start + (direction * cursor), start + (direction * segmentEnd), side * width);
+            AddWorldLineSegment(resizeGuideVertices, resizeGuideTriangles, start + (direction * cursor), start + (direction * segmentEnd), side * width);
         }
 
         resizeGuideLineMesh.Clear();
-        resizeGuideLineMesh.SetVertices(vertices);
-        resizeGuideLineMesh.SetTriangles(triangles, 0);
+        resizeGuideLineMesh.SetVertices(resizeGuideVertices);
+        resizeGuideLineMesh.SetTriangles(resizeGuideTriangles, 0);
         resizeGuideLineMesh.RecalculateBounds();
         ApplyMaterialColor(grabGuideMaterial, new Color(0.72f, 1.0f, 1.0f, grabbed ? 0.74f : 0.36f), Mathf.Max(0.0f, emissionStrengthField.val));
         SetResizeGuideLineVisible(true);
@@ -8790,22 +9522,8 @@ public class FrameAngelRadar : MVRScript
             return;
         }
 
-        if (selectedAtom != null && selectedAtom != atom && !string.IsNullOrEmpty(selectedUid))
-        {
-            lastSelectedAtom = selectedAtom;
-            lastSelectedUid = selectedUid;
-            lastSelectedAtTime = Time.time;
-        }
-
         SuperController.singleton.SelectController(atom.mainController, false, false, false, true);
-        selectedAtom = atom;
-        selectedUid = atom.uid;
-        selectedAtomRecord = null;
-        nextSelectionPollTime = 0.0f;
-        nextAtomPollTime = 0.0f;
-        availableMarkersDirty = true;
-        availableAtomRevision++;
-        SetStatus("Radar selected: " + selectedUid);
+        ApplySelectedAtomChange(atom, true);
     }
 
     private Color ResolveAvailableAtomColor(AtomRecord record, float alpha)
@@ -10014,9 +10732,21 @@ public class FrameAngelRadar : MVRScript
 
     private void SetHudOffset(Vector3 offset)
     {
-        hudOffsetXField.SetVal(offset.x);
-        hudOffsetYField.SetVal(offset.y);
-        hudOffsetZField.SetVal(offset.z);
+        float x = ClampStorableFloat(hudOffsetXField, offset.x, -1.0f, 1.0f);
+        float y = ClampStorableFloat(hudOffsetYField, offset.y, -1.0f, 1.0f);
+        float z = ClampStorableFloat(hudOffsetZField, offset.z, 0.15f, 1.5f);
+        if (Mathf.Abs(hudOffsetXField.val - x) > 0.00001f)
+        {
+            hudOffsetXField.SetVal(x);
+        }
+        if (Mathf.Abs(hudOffsetYField.val - y) > 0.00001f)
+        {
+            hudOffsetYField.SetVal(y);
+        }
+        if (Mathf.Abs(hudOffsetZField.val - z) > 0.00001f)
+        {
+            hudOffsetZField.SetVal(z);
+        }
     }
 
     private void SetHudOffsetNoCallback(Vector3 offset)
@@ -10329,8 +11059,6 @@ public class FrameAngelRadar : MVRScript
 #if FA_RADAR_PRO
         targetLabelText = "";
         cachedLightByAtomId.Clear();
-        liveAtomIdsForLightCache.Clear();
-        staleLightCacheAtomIds.Clear();
 #endif
 
         DestroyOwnedObject(shellMaterial);

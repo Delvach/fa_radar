@@ -4,7 +4,7 @@
       {
          "id" : "PluginManager",
          "plugins" : {
-            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.56.dll"
+            "plugin#0" : "Custom/Plugins/fa_radar.pro.0.1.57.dll"
          }
       },
       {
